@@ -9,6 +9,7 @@ import 'package:bowling_diary/features/auth/presentation/providers/auth_provider
 import 'package:bowling_diary/features/home/presentation/pages/home_page.dart';
 import 'package:bowling_diary/features/record/presentation/pages/record_page.dart';
 import 'package:bowling_diary/features/stats/presentation/pages/stats_page.dart';
+import 'package:bowling_diary/features/balls/presentation/pages/ball_form_page.dart';
 import 'package:bowling_diary/features/balls/presentation/pages/balls_page.dart';
 import 'package:bowling_diary/features/settings/presentation/pages/settings_page.dart';
 
@@ -60,6 +61,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile-setup',
         builder: (context, state) => const ProfileSetupPage(),
+      ),
+      GoRoute(
+        path: '/ball/add',
+        builder: (context, state) => const BallFormPage(),
+      ),
+      GoRoute(
+        path: '/ball/edit/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return BallFormPage(ballId: id);
+        },
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
