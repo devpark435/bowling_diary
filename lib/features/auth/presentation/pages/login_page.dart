@@ -123,16 +123,6 @@ class LoginPage extends ConsumerWidget {
           isLoading: isLoading,
           onTap: () => ref.read(authNotifierProvider.notifier).signInWithGoogle(),
         ),
-        const SizedBox(height: 12),
-        _SocialLoginButton(
-          icon: Icons.chat_bubble,
-          label: '카카오로 계속하기',
-          backgroundColor: const Color(0xFFFEE500),
-          textColor: const Color(0xFF191919),
-          iconColor: const Color(0xFF191919),
-          isLoading: isLoading,
-          onTap: () => ref.read(authNotifierProvider.notifier).signInWithKakao(),
-        ),
         if (authState is AuthStateError) ...[
           const SizedBox(height: 16),
           Container(

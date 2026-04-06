@@ -1,8 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bowling_diary/features/auth/domain/entities/user_entity.dart';
+
 import 'package:bowling_diary/features/auth/data/models/user_model.dart';
+import 'package:bowling_diary/features/auth/domain/entities/user_entity.dart';
 
 sealed class AuthState {}
 
@@ -27,7 +34,8 @@ class AuthStateError extends AuthState {
   AuthStateError(this.message);
 }
 
-final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+final authNotifierProvider =
+    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final notifier = AuthNotifier();
   ref.onDispose(() => notifier.dispose());
   return notifier;
@@ -42,12 +50,9 @@ final currentUserProvider = Provider<UserEntity?>((ref) {
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier() : super(AuthStateInitial()) {
     _init();
-    _authSubscription = _supabase.auth.onAuthStateChange.listen(
-      (data) {
-        final d = data as dynamic;
-        handleAuthStateChange(d.event as AuthChangeEvent, d.session as Session?);
-      },
-    );
+    _authSubscription = _supabase.auth.onAuthStateChange.listen((data) {
+      _handleAuthStateChange(data.event, data.session);
+    });
   }
 
   final _supabase = Supabase.instance.client;
@@ -92,30 +97,94 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  // --- Google 네이티브 로그인 ---
   Future<void> signInWithGoogle() async {
     state = AuthStateLoading();
     try {
-      await _supabase.auth.signInWithOAuth(OAuthProvider.google);
-    } catch (e) {
+      // TODO: Google Cloud Console에서 발급받은 Client ID로 교체 필요
+      const webClientId = String.fromEnvironment(
+        'GOOGLE_WEB_CLIENT_ID',
+        defaultValue: '',
+      );
+      const iosClientId = String.fromEnvironment(
+        'GOOGLE_IOS_CLIENT_ID',
+        defaultValue: '',
+      );
+
+      final googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize(
+        clientId: iosClientId.isNotEmpty ? iosClientId : null,
+        serverClientId: webClientId.isNotEmpty ? webClientId : null,
+      );
+
+      final googleUser = await googleSignIn.authenticate();
+
+      final idToken = googleUser.authentication.idToken;
+
+      if (idToken == null) {
+        state = AuthStateError('Google 인증 토큰을 가져올 수 없습니다');
+        return;
+      }
+
+      final response = await _supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+      );
+
+      if (response.session == null) {
+        state = AuthStateError('Google 로그인에 실패했습니다');
+      }
+    } on GoogleSignInException catch (e) {
+      debugPrint('Google 로그인 에러: $e');
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        state = AuthStateUnauthenticated();
+        return;
+      }
       state = AuthStateError('Google 로그인에 실패했습니다');
+    } catch (e) {
+      debugPrint('Google 로그인 에러: $e');
+      state = AuthStateError('Google 로그인에 실패했습니다: ${e.toString()}');
     }
   }
 
+  // --- Apple 네이티브 로그인 ---
   Future<void> signInWithApple() async {
     state = AuthStateLoading();
     try {
-      await _supabase.auth.signInWithOAuth(OAuthProvider.apple);
-    } catch (e) {
-      state = AuthStateError('Apple 로그인에 실패했습니다');
-    }
-  }
+      final rawNonce = _supabase.auth.generateRawNonce();
+      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
-  Future<void> signInWithKakao() async {
-    state = AuthStateLoading();
-    try {
-      await _supabase.auth.signInWithOAuth(OAuthProvider.kakao);
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final idToken = credential.identityToken;
+      if (idToken == null) {
+        state = AuthStateError('Apple 인증 토큰을 가져올 수 없습니다');
+        return;
+      }
+
+      final response = await _supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.apple,
+        idToken: idToken,
+        nonce: rawNonce,
+      );
+
+      if (response.session == null) {
+        state = AuthStateError('Apple 로그인에 실패했습니다');
+      }
     } catch (e) {
-      state = AuthStateError('카카오 로그인에 실패했습니다');
+      debugPrint('Apple 로그인 에러: $e');
+      if (e is SignInWithAppleAuthorizationException &&
+          e.code == AuthorizationErrorCode.canceled) {
+        state = AuthStateUnauthenticated();
+        return;
+      }
+      state = AuthStateError('Apple 로그인에 실패했습니다: ${e.toString()}');
     }
   }
 
@@ -149,11 +218,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthStateUnauthenticated();
   }
 
-  void handleAuthStateChange(AuthChangeEvent event, Session? session) {
+  void _handleAuthStateChange(AuthChangeEvent event, Session? session) {
     if (event == AuthChangeEvent.signedIn && session != null) {
       _loadUserProfile(session.user.id);
     } else if (event == AuthChangeEvent.signedOut) {
       state = AuthStateUnauthenticated();
     }
   }
+
 }

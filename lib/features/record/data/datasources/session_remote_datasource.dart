@@ -1,0 +1,49 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bowling_diary/features/record/data/models/session_model.dart';
+import 'package:bowling_diary/features/record/data/models/game_model.dart';
+
+class SessionRemoteDataSource {
+  final _supabase = Supabase.instance.client;
+
+  Future<List<SessionModel>> getRecentSessions(String userId, {int limit = 10}) async {
+    final res = await _supabase
+        .from('sessions')
+        .select()
+        .eq('user_id', userId)
+        .order('date', ascending: false)
+        .limit(limit);
+    return (res as List).map((e) => SessionModel.fromJson(Map<String, dynamic>.from(e))).toList();
+  }
+
+  Future<List<GameModel>> getGamesBySessionId(String sessionId) async {
+    final res = await _supabase
+        .from('games')
+        .select()
+        .eq('session_id', sessionId)
+        .order('game_number');
+    return (res as List).map((e) => GameModel.fromJson(Map<String, dynamic>.from(e))).toList();
+  }
+
+  Future<Map<String, dynamic>> getMonthlySummary(String userId, int year, int month) async {
+    final start = DateTime(year, month, 1);
+    final end = DateTime(year, month + 1, 0, 23, 59, 59);
+    final sessionsRes = await _supabase
+        .from('sessions')
+        .select('id')
+        .eq('user_id', userId)
+        .gte('date', start.toIso8601String().split('T').first)
+        .lte('date', end.toIso8601String().split('T').first);
+    final sessionIds = (sessionsRes as List).map((e) => (e as Map)['id'] as String).toList();
+    if (sessionIds.isEmpty) {
+      return {'gameCount': 0, 'totalScore': 0, 'highScore': 0};
+    }
+    final gamesRes = await _supabase
+        .from('games')
+        .select('total_score')
+        .inFilter('session_id', sessionIds);
+    final scores = (gamesRes as List).map((e) => (e as Map)['total_score'] as int).toList();
+    final total = scores.fold<int>(0, (a, b) => a + b);
+    final high = scores.isEmpty ? 0 : scores.reduce((a, b) => a > b ? a : b);
+    return {'gameCount': scores.length, 'totalScore': total, 'highScore': high};
+  }
+}

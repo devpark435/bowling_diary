@@ -136,11 +136,14 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
           appBar: AppBar(title: const Text('볼 수정')),
           body: const Center(child: CircularProgressIndicator(color: AppColors.neonOrange)),
         ),
-        error: (e, _) => Scaffold(
-          backgroundColor: AppColors.darkBg,
-          appBar: AppBar(title: const Text('볼 수정')),
-          body: Center(child: Text('오류: $e')),
-        ),
+        error: (e, st) {
+          debugPrint('볼 상세 로드 에러: $e\n$st');
+          return Scaffold(
+            backgroundColor: AppColors.darkBg,
+            appBar: AppBar(title: const Text('볼 수정')),
+            body: const Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary))),
+          );
+        },
       );
     }
     return _buildForm(widget.ball);

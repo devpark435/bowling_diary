@@ -43,7 +43,10 @@ class BallsPage extends ConsumerWidget {
           );
         },
         loading: () => const LoadingWidget(),
-        error: (e, _) => Center(child: Text('오류: $e', style: const TextStyle(color: AppColors.error))),
+        error: (e, st) {
+          debugPrint('볼 목록 로드 에러: $e\n$st');
+          return const SizedBox.shrink();
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/ball/add'),
