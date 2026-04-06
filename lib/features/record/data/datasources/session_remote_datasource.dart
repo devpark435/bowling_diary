@@ -62,6 +62,32 @@ class SessionRemoteDataSource {
     });
   }
 
+  Future<void> updateSession({
+    required String id,
+    required DateTime date,
+    String? alleyName,
+    int? laneNumber,
+    String? oilPattern,
+    String? memo,
+  }) async {
+    await _supabase.from('sessions').update({
+      'date': date.toIso8601String().split('T').first,
+      'alley_name': alleyName,
+      'lane_number': laneNumber,
+      'oil_pattern': oilPattern,
+      'memo': memo,
+    }).eq('id', id);
+  }
+
+  Future<void> deleteGamesBySessionId(String sessionId) async {
+    await _supabase.from('games').delete().eq('session_id', sessionId);
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    await deleteGamesBySessionId(sessionId);
+    await _supabase.from('sessions').delete().eq('id', sessionId);
+  }
+
   /// 기간별 게임 데이터 조회 (통계용)
   /// [since] 가 null이면 전체 기간
   Future<List<Map<String, dynamic>>> getGamesWithDate(String userId, {DateTime? since}) async {

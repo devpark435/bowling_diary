@@ -13,10 +13,39 @@ import 'package:bowling_diary/features/balls/presentation/providers/ball_provide
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
 
 class RecordPage extends ConsumerStatefulWidget {
-  const RecordPage({super.key});
+  const RecordPage({super.key, this.editSession});
+
+  final EditSessionData? editSession;
 
   @override
   ConsumerState<RecordPage> createState() => _RecordPageState();
+}
+
+class EditSessionData {
+  final String sessionId;
+  final DateTime date;
+  final String? alleyName;
+  final int? laneNumber;
+  final String? oilPattern;
+  final String? memo;
+  final List<EditGameData> games;
+
+  const EditSessionData({
+    required this.sessionId,
+    required this.date,
+    this.alleyName,
+    this.laneNumber,
+    this.oilPattern,
+    this.memo,
+    required this.games,
+  });
+}
+
+class EditGameData {
+  final int totalScore;
+  final String? ballId;
+
+  const EditGameData({required this.totalScore, this.ballId});
 }
 
 class _GameEntry {
@@ -46,16 +75,34 @@ class _RecordPageState extends ConsumerState<RecordPage> {
 
   DateTime _selectedDate = DateTime.now();
   late final List<_GameEntry> _games;
+  bool get _isEditMode => widget.editSession != null;
 
   @override
   void initState() {
     super.initState();
-    final initial = _GameEntry()..attachListener(_onScoreChanged);
-    _games = [initial];
+    final edit = widget.editSession;
+    if (edit != null) {
+      _selectedDate = edit.date;
+      _alleyNameController.text = edit.alleyName ?? '';
+      _laneNumberController.text = edit.laneNumber?.toString() ?? '';
+      _oilPatternController.text = edit.oilPattern ?? '';
+      _memoController.text = edit.memo ?? '';
+      _games = edit.games.map((g) {
+        final entry = _GameEntry()..attachListener(_onScoreChanged);
+        entry.scoreController.text = g.totalScore.toString();
+        return entry;
+      }).toList();
+      if (_games.isEmpty) {
+        _games.add(_GameEntry()..attachListener(_onScoreChanged));
+      }
+    } else {
+      _games = [_GameEntry()..attachListener(_onScoreChanged)];
+    }
   }
 
   void _onScoreChanged() => setState(() {});
   bool _isLoading = false;
+  bool _didRestoreBalls = false;
 
   @override
   void dispose() {
@@ -187,38 +234,64 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     setState(() => _isLoading = true);
     try {
       final dataSource = ref.read(sessionRemoteDataSourceProvider);
-      final sessionId = const Uuid().v4();
 
-      await dataSource.createSession(
-        id: sessionId,
-        userId: user.id,
-        date: _selectedDate,
-        alleyName: _alleyNameController.text.trim().isEmpty ? null : _alleyNameController.text.trim(),
-        laneNumber: int.tryParse(_laneNumberController.text.trim()),
-        oilPattern: _oilPatternController.text.trim().isEmpty ? null : _oilPatternController.text.trim(),
-        memo: _memoController.text.trim().isEmpty ? null : _memoController.text.trim(),
-      );
-
-      for (int i = 0; i < _games.length; i++) {
-        final entry = _games[i];
-        final score = int.tryParse(entry.scoreController.text.trim()) ?? 0;
-        await dataSource.createGame(
-          id: const Uuid().v4(),
-          sessionId: sessionId,
-          gameNumber: i + 1,
-          ballId: entry.selectedBall?.id,
-          totalScore: score,
+      if (_isEditMode) {
+        final sessionId = widget.editSession!.sessionId;
+        await dataSource.updateSession(
+          id: sessionId,
+          date: _selectedDate,
+          alleyName: _alleyNameController.text.trim().isEmpty ? null : _alleyNameController.text.trim(),
+          laneNumber: int.tryParse(_laneNumberController.text.trim()),
+          oilPattern: _oilPatternController.text.trim().isEmpty ? null : _oilPatternController.text.trim(),
+          memo: _memoController.text.trim().isEmpty ? null : _memoController.text.trim(),
         );
+
+        await dataSource.deleteGamesBySessionId(sessionId);
+        for (int i = 0; i < _games.length; i++) {
+          final entry = _games[i];
+          final score = int.tryParse(entry.scoreController.text.trim()) ?? 0;
+          await dataSource.createGame(
+            id: const Uuid().v4(),
+            sessionId: sessionId,
+            gameNumber: i + 1,
+            ballId: entry.selectedBall?.id,
+            totalScore: score,
+          );
+        }
+      } else {
+        final sessionId = const Uuid().v4();
+        await dataSource.createSession(
+          id: sessionId,
+          userId: user.id,
+          date: _selectedDate,
+          alleyName: _alleyNameController.text.trim().isEmpty ? null : _alleyNameController.text.trim(),
+          laneNumber: int.tryParse(_laneNumberController.text.trim()),
+          oilPattern: _oilPatternController.text.trim().isEmpty ? null : _oilPatternController.text.trim(),
+          memo: _memoController.text.trim().isEmpty ? null : _memoController.text.trim(),
+        );
+
+        for (int i = 0; i < _games.length; i++) {
+          final entry = _games[i];
+          final score = int.tryParse(entry.scoreController.text.trim()) ?? 0;
+          await dataSource.createGame(
+            id: const Uuid().v4(),
+            sessionId: sessionId,
+            gameNumber: i + 1,
+            ballId: entry.selectedBall?.id,
+            totalScore: score,
+          );
+        }
       }
 
       ref.invalidate(recentGamesProvider);
       ref.invalidate(monthlySummaryProvider);
 
       if (mounted) {
-        _resetForm();
+        final msg = _isEditMode ? '기록이 수정되었습니다!' : '${_games.length}게임이 기록되었습니다!';
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_games.length}게임이 기록되었습니다!'),
+            content: Text(msg),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
           ),
@@ -240,26 +313,28 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     }
   }
 
-  void _resetForm() {
-    _alleyNameController.clear();
-    _laneNumberController.clear();
-    _oilPatternController.clear();
-    _memoController.clear();
-    for (final g in _games) {
-      g.dispose();
-    }
-    setState(() {
-      _selectedDate = DateTime.now();
-      _games.clear();
-      _games.add(_GameEntry()..attachListener(_onScoreChanged));
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (_isEditMode && !_didRestoreBalls) {
+      final ballsAsync = ref.watch(ballsListProvider);
+      ballsAsync.whenData((balls) {
+        final edit = widget.editSession!;
+        for (int i = 0; i < _games.length && i < edit.games.length; i++) {
+          final ballId = edit.games[i].ballId;
+          if (ballId != null) {
+            final match = balls.where((b) => b.id == ballId);
+            if (match.isNotEmpty) {
+              _games[i].selectedBall = match.first;
+            }
+          }
+        }
+        _didRestoreBalls = true;
+      });
+    }
+
     return Scaffold(
       backgroundColor: AppColors.darkBg,
-      appBar: AppBar(title: const Text('게임 기록')),
+      appBar: AppBar(title: Text(_isEditMode ? '기록 수정' : '게임 기록')),
       body: LoadingOverlay(
         isLoading: _isLoading,
         child: SingleChildScrollView(
@@ -433,7 +508,10 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             controller: game.scoreController,
             style: AppTextStyles.scoreDisplay.copyWith(fontSize: 28),
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              _MaxScoreFormatter(300),
+            ],
             textAlign: TextAlign.center,
             decoration: InputDecoration(
               hintText: '0',
@@ -565,10 +643,26 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           height: 52,
           child: ElevatedButton(
             onPressed: _isLoading ? null : _submit,
-            child: const Text('기록 저장하기'),
+            child: Text(_isEditMode ? '수정 저장하기' : '기록 저장하기'),
           ),
         ),
       ],
     );
+  }
+}
+
+class _MaxScoreFormatter extends TextInputFormatter {
+  final int max;
+  _MaxScoreFormatter(this.max);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    final value = int.tryParse(newValue.text);
+    if (value == null || value > max) return oldValue;
+    return newValue;
   }
 }

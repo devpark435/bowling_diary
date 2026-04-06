@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
+import 'package:bowling_diary/features/record/presentation/pages/record_page.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
 
 class HomePage extends ConsumerWidget {
@@ -70,7 +72,15 @@ class HomePage extends ConsumerWidget {
                   const SizedBox(height: 24),
                   Text('최근 게임', style: AppTextStyles.headingSmall),
                   const SizedBox(height: 12),
-                  ...items.map((e) => _RecentGameCard(summary: e)),
+                  SlidableAutoCloseBehavior(
+                    child: Column(
+                      children: items.map((e) => _RecentGameCard(
+                        summary: e,
+                        onEdit: () => _navigateToEdit(context, ref, e),
+                        onDelete: () => _confirmDelete(context, ref, e),
+                      )).toList(),
+                    ),
+                  ),
                 ],
               ),
             );
@@ -88,6 +98,63 @@ class HomePage extends ConsumerWidget {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  void _navigateToEdit(BuildContext context, WidgetRef ref, RecentGameSummary summary) {
+    final s = summary.session;
+    final editData = EditSessionData(
+      sessionId: s.id,
+      date: s.date,
+      alleyName: s.alleyName,
+      laneNumber: s.laneNumber,
+      oilPattern: s.oilPattern,
+      memo: s.memo,
+      games: summary.games
+          .map((g) => EditGameData(totalScore: g.totalScore, ballId: g.ballId))
+          .toList(),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RecordPage(editSession: editData)),
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, RecentGameSummary summary) async {
+    final dateStr = DateFormat('M/d', 'ko').format(summary.session.date);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('기록 삭제'),
+        content: Text('$dateStr 기록을 삭제할까요?\n삭제된 기록은 복구할 수 없습니다.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('삭제', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    try {
+      final ds = ref.read(sessionRemoteDataSourceProvider);
+      await ds.deleteSession(summary.session.id);
+      ref.invalidate(recentGamesProvider);
+      ref.invalidate(monthlySummaryProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('기록이 삭제되었습니다'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
+        );
+      }
+    } catch (e) {
+      debugPrint('기록 삭제 에러: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('삭제에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
   }
 }
 
@@ -156,107 +223,155 @@ class _SummaryItem extends StatelessWidget {
 
 class _RecentGameCard extends StatelessWidget {
   final RecentGameSummary summary;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _RecentGameCard({required this.summary});
+  const _RecentGameCard({
+    required this.summary,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
     final s = summary.session;
     final dateStr = DateFormat('M/d (E)', 'ko').format(s.date);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 상단: 날짜 + 총점/게임수
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Slidable(
+        key: ValueKey(s.id),
+        endActionPane: ActionPane(
+          motion: const BehindMotion(),
+          extentRatio: 0.4,
+          children: [
+            CustomSlidableAction(
+              onPressed: (_) => onEdit(),
+              backgroundColor: AppColors.mint,
+              foregroundColor: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.edit, size: 22),
+                  SizedBox(height: 4),
+                  Text('수정', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            CustomSlidableAction(
+              onPressed: (_) => onDelete(),
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.delete_outline, size: 22),
+                  SizedBox(height: 4),
+                  Text('삭제', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: InkWell(
+            onTap: () {},
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(dateStr, style: AppTextStyles.labelLarge),
-                      if (summary.ballName != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.neonOrange.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(summary.ballName!,
-                              style: const TextStyle(color: AppColors.neonOrange, fontSize: 10, fontWeight: FontWeight.w600)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (summary.games.isNotEmpty)
-                    Text(
-                      '${summary.totalScore}점 · ${summary.games.length}게임',
-                      style: AppTextStyles.labelSmall,
-                    ),
-                ],
-              ),
-              // 볼링장 이름
-              if (s.alleyName != null && s.alleyName!.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, color: AppColors.mint, size: 14),
-                    const SizedBox(width: 4),
-                    Text(s.alleyName!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.mint)),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 12),
-              // 점수 칩셋
-              Row(
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: summary.games.map((g) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _scoreColor(g.totalScore).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: _scoreColor(g.totalScore).withValues(alpha: 0.3)),
-                          ),
-                          child: Text(
-                            '${g.totalScore}',
-                            style: TextStyle(
-                              color: _scoreColor(g.totalScore),
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
+                      Row(
+                        children: [
+                          Text(dateStr, style: AppTextStyles.labelLarge),
+                          if (summary.ballName != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.neonOrange.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(summary.ballName!,
+                                  style: const TextStyle(color: AppColors.neonOrange, fontSize: 10, fontWeight: FontWeight.w600)),
                             ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // 평균 점수 크게
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        summary.average.toStringAsFixed(1),
-                        style: AppTextStyles.scoreDisplay.copyWith(fontSize: 26, color: AppColors.neonOrange),
+                          ],
+                        ],
                       ),
-                      Text('평균', style: AppTextStyles.labelSmall),
+                      if (summary.games.isNotEmpty)
+                        Text(
+                          '${summary.totalScore}점 · ${summary.games.length}게임',
+                          style: AppTextStyles.labelSmall,
+                        ),
+                    ],
+                  ),
+                  if (s.alleyName != null && s.alleyName!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, color: AppColors.mint, size: 14),
+                        const SizedBox(width: 4),
+                        Text(s.alleyName!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.mint)),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: summary.games.map((g) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _scoreColor(g.totalScore).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: _scoreColor(g.totalScore).withValues(alpha: 0.3)),
+                              ),
+                              child: Text(
+                                '${g.totalScore}',
+                                style: TextStyle(
+                                  color: _scoreColor(g.totalScore),
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            summary.average.toStringAsFixed(1),
+                            style: AppTextStyles.scoreDisplay.copyWith(fontSize: 26, color: AppColors.neonOrange),
+                          ),
+                          Text('평균', style: AppTextStyles.labelSmall),
+                        ],
+                      ),
                     ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
