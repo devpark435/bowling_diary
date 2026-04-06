@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 enum AppColorTheme {
   dark,
-  light,
+  cream,
   lavender,
   tossBlue,
 }
@@ -63,21 +63,21 @@ class ColorThemes {
     success: Color(0xFF2ED573),
   );
 
-  static const light = ColorPalette(
-    primary: Color(0xFFFF6B35),
-    secondary: Color(0xFF00D9A6),
-    primaryGlow: Color(0x33FF6B35),
-    secondaryGlow: Color(0x3300D9A6),
+  static const cream = ColorPalette(
+    primary: Color(0xFFFF8A65),
+    secondary: Color(0xFF9CDDCE),
+    primaryGlow: Color(0x33FF8A65),
+    secondaryGlow: Color(0x339CDDCE),
     brightness: Brightness.light,
-    bg: Color(0xFFF5F5F5),
-    surface: Color(0xFFFFFFFF),
-    card: Color(0xFFFAFAFA),
-    divider: Color(0xFFE0E0E0),
-    textPrimary: Color(0xFF1A1A1A),
-    textSecondary: Color(0xFF666666),
-    textHint: Color(0xFFAAAAAA),
-    error: Color(0xFFFF4757),
-    success: Color(0xFF2ED573),
+    bg: Color(0xFFFFFBF5),
+    surface: Color(0xFFFFFDF9),
+    card: Color(0xFFFFF9F0),
+    divider: Color(0xFFEDE4D8),
+    textPrimary: Color(0xFF3D2817),
+    textSecondary: Color(0xFF8B7355),
+    textHint: Color(0xFFBBA88A),
+    error: Color(0xFFE8534A),
+    success: Color(0xFF5CB88A),
   );
 
   static const lavender = ColorPalette(
@@ -118,8 +118,8 @@ class ColorThemes {
     switch (theme) {
       case AppColorTheme.dark:
         return dark;
-      case AppColorTheme.light:
-        return light;
+      case AppColorTheme.cream:
+        return cream;
       case AppColorTheme.lavender:
         return lavender;
       case AppColorTheme.tossBlue:

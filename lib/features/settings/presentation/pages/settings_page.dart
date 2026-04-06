@@ -265,7 +265,7 @@ class _ColorThemeSelector extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [palette.primary, palette.secondary],
+                        colors: [palette.bg, palette.primary, palette.secondary],
                       ),
                     ),
                     child: isSelected
@@ -294,8 +294,8 @@ class _ColorThemeSelector extends StatelessWidget {
     switch (theme) {
       case AppColorTheme.dark:
         return '다크';
-      case AppColorTheme.light:
-        return '라이트';
+      case AppColorTheme.cream:
+        return '크림';
       case AppColorTheme.lavender:
         return '라벤더';
       case AppColorTheme.tossBlue:

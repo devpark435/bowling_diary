@@ -61,7 +61,7 @@ class LoginPage extends ConsumerWidget {
             colors: [AppColors.neonOrange, AppColors.mint],
           ).createShader(bounds),
           child: const Text(
-            'Bowling Diary',
+            '핀로그',
             style: TextStyle(
               fontSize: 30,
               fontWeight: FontWeight.w800,
@@ -110,7 +110,8 @@ class LoginPage extends ConsumerWidget {
           textColor: Colors.black,
           iconColor: Colors.black,
           isLoading: isLoading,
-          onTap: () => ref.read(authNotifierProvider.notifier).signInWithApple(),
+          onTap: () =>
+              ref.read(authNotifierProvider.notifier).signInWithApple(),
         ),
         const SizedBox(height: 12),
         _SocialLoginButton(
@@ -120,7 +121,8 @@ class LoginPage extends ConsumerWidget {
           textColor: Colors.white,
           iconColor: Colors.white,
           isLoading: isLoading,
-          onTap: () => ref.read(authNotifierProvider.notifier).signInWithGoogle(),
+          onTap: () =>
+              ref.read(authNotifierProvider.notifier).signInWithGoogle(),
         ),
         if (authState is AuthStateError) ...[
           const SizedBox(height: 16),

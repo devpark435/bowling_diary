@@ -22,7 +22,7 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bowling Diary'),
+        title: const Text('핀로그'),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -37,15 +37,18 @@ class HomePage extends ConsumerWidget {
                 builder: (context, constraints) => SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.sports_baseball, size: 72, color: AppColors.textHint),
+                          Icon(Icons.sports_baseball,
+                              size: 72, color: AppColors.textHint),
                           const SizedBox(height: 20),
                           Text('아직 기록된 게임이 없어요',
-                              style: AppTextStyles.headingSmall.copyWith(color: AppColors.textSecondary)),
+                              style: AppTextStyles.headingSmall
+                                  .copyWith(color: AppColors.textSecondary)),
                           const SizedBox(height: 8),
                           Text('+ 버튼을 눌러 기록을 추가해보세요',
                               style: AppTextStyles.bodySmall),
@@ -68,20 +71,24 @@ class HomePage extends ConsumerWidget {
                       totalScore: data['totalScore'] as int,
                       highScore: data['highScore'] as int,
                     ),
-                    loading: () => _MonthlySummaryCard(gameCount: 0, totalScore: 0, highScore: 0),
-                    error: (_, __) => _MonthlySummaryCard(gameCount: 0, totalScore: 0, highScore: 0),
+                    loading: () => _MonthlySummaryCard(
+                        gameCount: 0, totalScore: 0, highScore: 0),
+                    error: (_, __) => _MonthlySummaryCard(
+                        gameCount: 0, totalScore: 0, highScore: 0),
                   ),
                   const SizedBox(height: 24),
                   Text('최근 게임', style: AppTextStyles.headingSmall),
                   const SizedBox(height: 12),
                   SlidableAutoCloseBehavior(
                     child: Column(
-                      children: items.map((e) => _RecentGameCard(
-                        summary: e,
-                        onTap: () => _navigateToDetail(context, e),
-                        onEdit: () => _navigateToEdit(context, ref, e),
-                        onDelete: () => _confirmDelete(context, ref, e),
-                      )).toList(),
+                      children: items
+                          .map((e) => _RecentGameCard(
+                                summary: e,
+                                onTap: () => _navigateToDetail(context, e),
+                                onEdit: () => _navigateToEdit(context, ref, e),
+                                onDelete: () => _confirmDelete(context, ref, e),
+                              ))
+                          .toList(),
                     ),
                   ),
                 ],
@@ -110,7 +117,8 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  void _navigateToEdit(BuildContext context, WidgetRef ref, RecentGameSummary summary) {
+  void _navigateToEdit(
+      BuildContext context, WidgetRef ref, RecentGameSummary summary) {
     final s = summary.session;
     final editData = EditSessionData(
       sessionId: s.id,
@@ -129,7 +137,8 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, RecentGameSummary summary) async {
+  Future<void> _confirmDelete(
+      BuildContext context, WidgetRef ref, RecentGameSummary summary) async {
     final dateStr = DateFormat('M/d', 'ko').format(summary.session.date);
     final ok = await showDialog<bool>(
       context: context,
@@ -137,7 +146,9 @@ class HomePage extends ConsumerWidget {
         title: const Text('기록 삭제'),
         content: Text('$dateStr 기록을 삭제할까요?\n삭제된 기록은 복구할 수 없습니다.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
             child: Text('삭제', style: TextStyle(color: AppColors.error)),
@@ -154,14 +165,20 @@ class HomePage extends ConsumerWidget {
       ref.invalidate(monthlySummaryProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('기록이 삭제되었습니다'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
+          SnackBar(
+              content: Text('기록이 삭제되었습니다'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {
       debugPrint('기록 삭제 에러: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('삭제에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+          SnackBar(
+              content: Text('삭제에 실패했습니다'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -193,16 +210,26 @@ class _MonthlySummaryCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('이번 달', style: AppTextStyles.labelLarge),
-                Text(DateFormat('yyyy년 M월').format(DateTime.now()), style: AppTextStyles.bodySmall),
+                Text(DateFormat('yyyy년 M월').format(DateTime.now()),
+                    style: AppTextStyles.bodySmall),
               ],
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _SummaryItem(label: '게임 수', value: '$gameCount', color: AppColors.neonOrange),
-                _SummaryItem(label: '평균', value: avg.toStringAsFixed(1), color: AppColors.mint),
-                _SummaryItem(label: '하이스코어', value: '$highScore', color: AppColors.textPrimary),
+                _SummaryItem(
+                    label: '게임 수',
+                    value: '$gameCount',
+                    color: AppColors.neonOrange),
+                _SummaryItem(
+                    label: '평균',
+                    value: avg.toStringAsFixed(1),
+                    color: AppColors.mint),
+                _SummaryItem(
+                    label: '하이스코어',
+                    value: '$highScore',
+                    color: AppColors.textPrimary),
               ],
             ),
           ],
@@ -217,13 +244,16 @@ class _SummaryItem extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _SummaryItem({required this.label, required this.value, required this.color});
+  const _SummaryItem(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: AppTextStyles.scoreDisplay.copyWith(fontSize: 24, color: color)),
+        Text(value,
+            style: AppTextStyles.scoreDisplay
+                .copyWith(fontSize: 24, color: color)),
         const SizedBox(height: 4),
         Text(label, style: AppTextStyles.labelSmall),
       ],
@@ -270,7 +300,9 @@ class _RecentGameCard extends StatelessWidget {
                 children: [
                   Icon(Icons.edit, size: 22),
                   SizedBox(height: 4),
-                  Text('수정', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text('수정',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -287,7 +319,9 @@ class _RecentGameCard extends StatelessWidget {
                 children: [
                   Icon(Icons.delete_outline, size: 22),
                   SizedBox(height: 4),
-                  Text('삭제', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text('삭제',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -312,13 +346,18 @@ class _RecentGameCard extends StatelessWidget {
                           if (summary.ballName != null) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.neonOrange.withValues(alpha: 0.12),
+                                color: AppColors.neonOrange
+                                    .withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(summary.ballName!,
-                                  style: TextStyle(color: AppColors.neonOrange, fontSize: 10, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(
+                                      color: AppColors.neonOrange,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600)),
                             ),
                           ],
                         ],
@@ -334,9 +373,12 @@ class _RecentGameCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.location_on, color: AppColors.mint, size: 14),
+                        Icon(Icons.location_on,
+                            color: AppColors.mint, size: 14),
                         const SizedBox(width: 4),
-                        Text(s.alleyName!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.mint)),
+                        Text(s.alleyName!,
+                            style: AppTextStyles.bodySmall
+                                .copyWith(color: AppColors.mint)),
                       ],
                     ),
                   ],
@@ -349,11 +391,15 @@ class _RecentGameCard extends StatelessWidget {
                           runSpacing: 6,
                           children: summary.games.map((g) {
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: _scoreColor(g.totalScore).withValues(alpha: 0.12),
+                                color: _scoreColor(g.totalScore)
+                                    .withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _scoreColor(g.totalScore).withValues(alpha: 0.3)),
+                                border: Border.all(
+                                    color: _scoreColor(g.totalScore)
+                                        .withValues(alpha: 0.3)),
                               ),
                               child: Text(
                                 '${g.totalScore}',
@@ -374,7 +420,8 @@ class _RecentGameCard extends StatelessWidget {
                         children: [
                           Text(
                             summary.average.toStringAsFixed(1),
-                            style: AppTextStyles.scoreDisplay.copyWith(fontSize: 26, color: AppColors.neonOrange),
+                            style: AppTextStyles.scoreDisplay.copyWith(
+                                fontSize: 26, color: AppColors.neonOrange),
                           ),
                           Text('평균', style: AppTextStyles.labelSmall),
                         ],

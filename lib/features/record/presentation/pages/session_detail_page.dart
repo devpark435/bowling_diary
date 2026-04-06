@@ -7,6 +7,7 @@ import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/balls/presentation/providers/ball_provider.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
 import 'package:bowling_diary/features/record/data/models/game_model.dart';
+import 'package:bowling_diary/features/record/domain/entities/game_entity.dart';
 import 'package:bowling_diary/features/record/data/models/session_model.dart';
 import 'package:bowling_diary/features/record/presentation/pages/record_page.dart';
 import 'package:bowling_diary/shared/providers/theme_provider.dart';
@@ -272,7 +273,11 @@ class SessionDetailPage extends ConsumerWidget {
       oilPattern: s.oilPattern,
       memo: s.memo,
       games: games
-          .map((g) => EditGameData(totalScore: g.totalScore, ballId: g.ballId))
+          .map((g) => EditGameData(
+                totalScore: g.totalScore,
+                ballId: g.ballId,
+                frames: g.frames,
+              ))
           .toList(),
     );
     Navigator.push(
@@ -360,6 +365,7 @@ class _GameDetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ballName = _getBallName();
+    final hasFrames = game.frames != null && game.frames!.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -369,53 +375,61 @@ class _GameDetailCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.darkDivider),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: _scoreColor(game.totalScore).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Center(
-              child: Text(
-                '${index + 1}',
-                style: TextStyle(
-                  color: _scoreColor(game.totalScore),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _scoreColor(game.totalScore).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('게임 ${index + 1}', style: AppTextStyles.labelLarge),
-                if (ballName != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Row(
-                      children: [
-                        Icon(Icons.sports_baseball, color: AppColors.textHint, size: 12),
-                        const SizedBox(width: 4),
-                        Text(ballName, style: AppTextStyles.bodySmall),
-                      ],
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      color: _scoreColor(game.totalScore),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
                     ),
                   ),
-              ],
-            ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('게임 ${index + 1}', style: AppTextStyles.labelLarge),
+                    if (ballName != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            Icon(Icons.sports_baseball, color: AppColors.textHint, size: 12),
+                            const SizedBox(width: 4),
+                            Text(ballName, style: AppTextStyles.bodySmall),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Text(
+                '${game.totalScore}',
+                style: AppTextStyles.scoreDisplay.copyWith(
+                  fontSize: 28,
+                  color: _scoreColor(game.totalScore),
+                ),
+              ),
+            ],
           ),
-          Text(
-            '${game.totalScore}',
-            style: AppTextStyles.scoreDisplay.copyWith(
-              fontSize: 28,
-              color: _scoreColor(game.totalScore),
-            ),
-          ),
+          if (hasFrames) ...[
+            const SizedBox(height: 12),
+            _FrameScoreBoard(frames: game.frames!),
+          ],
         ],
       ),
     );
@@ -436,5 +450,195 @@ class _GameDetailCard extends StatelessWidget {
     if (score >= 200) return AppColors.mint;
     if (score >= 150) return AppColors.neonOrange;
     return AppColors.textSecondary;
+  }
+}
+
+class _FrameScoreBoard extends StatelessWidget {
+  final List<FrameData> frames;
+
+  const _FrameScoreBoard({required this.frames});
+
+  @override
+  Widget build(BuildContext context) {
+    final frameMap = {for (final f in frames) f.frameNumber: f};
+    final cumulativeScores = _calculateCumulativeScores(frameMap);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(10, (i) {
+          final frame = frameMap[i + 1];
+          final isTenth = i == 9;
+          return _buildFrameCell(i, frame, isTenth, cumulativeScores[i]);
+        }),
+      ),
+    );
+  }
+
+  Widget _buildFrameCell(int idx, FrameData? frame, bool isTenth, int? cumScore) {
+    return Container(
+      width: isTenth ? 90 : 58,
+      margin: const EdgeInsets.only(right: 3),
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.darkDivider, width: 0.5),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.neonOrange.withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+            ),
+            child: Center(
+              child: Text(
+                '${idx + 1}',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textHint,
+                ),
+              ),
+            ),
+          ),
+          Container(height: 0.5, color: AppColors.darkDivider),
+          SizedBox(
+            height: 22,
+            child: Row(
+              children: _buildThrowCells(frame, isTenth),
+            ),
+          ),
+          Container(height: 0.5, color: AppColors.darkDivider),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Center(
+              child: Text(
+                cumScore != null ? '$cumScore' : '',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildThrowCells(FrameData? frame, bool isTenth) {
+    if (frame == null) {
+      return isTenth
+          ? [_throwCell(''), _throwCell(''), _throwCell('')]
+          : [_throwCell(''), _throwCell('')];
+    }
+
+    if (isTenth) {
+      final t1 = frame.firstThrow == 10 ? 'X' : '${frame.firstThrow}';
+      String t2 = '';
+      if (frame.secondThrow != null) {
+        if (frame.secondThrow == 10) {
+          t2 = 'X';
+        } else if (frame.firstThrow == 10) {
+          t2 = '${frame.secondThrow}';
+        } else if (frame.firstThrow + frame.secondThrow! == 10) {
+          t2 = '/';
+        } else {
+          t2 = '${frame.secondThrow}';
+        }
+      }
+      String t3 = '';
+      if (frame.thirdThrow != null) {
+        t3 = frame.thirdThrow == 10 ? 'X' : '${frame.thirdThrow}';
+      }
+      return [_throwCell(t1), _throwCell(t2), _throwCell(t3)];
+    }
+
+    if (frame.isStrike) {
+      return [_throwCell(''), _throwCell('X', isStrike: true)];
+    }
+
+    final t1 = frame.firstThrow == 0 ? '-' : '${frame.firstThrow}';
+    String t2 = '';
+    if (frame.secondThrow != null) {
+      t2 = frame.isSpare ? '/' : (frame.secondThrow == 0 ? '-' : '${frame.secondThrow}');
+    }
+    return [_throwCell(t1), _throwCell(t2, isSpare: frame.isSpare)];
+  }
+
+  Widget _throwCell(String text, {bool isStrike = false, bool isSpare = false}) {
+    Color textColor = AppColors.textSecondary;
+    if (isStrike) textColor = AppColors.neonOrange;
+    if (isSpare) textColor = AppColors.mint;
+    if (text == 'X') textColor = AppColors.neonOrange;
+    if (text == '/') textColor = AppColors.mint;
+
+    return Expanded(
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(left: BorderSide(color: AppColors.darkDivider, width: 0.5)),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<int?> _calculateCumulativeScores(Map<int, FrameData> frameMap) {
+    final scores = List<int?>.filled(10, null);
+    int cumulative = 0;
+
+    for (int i = 0; i < 10; i++) {
+      final frame = frameMap[i + 1];
+      if (frame == null) break;
+
+      if (i < 9) {
+        if (frame.isStrike) {
+          final bonus = _nextTwoBalls(i, frameMap);
+          if (bonus == null) break;
+          cumulative += 10 + bonus;
+        } else if (frame.isSpare) {
+          final bonus = _nextOneBall(i, frameMap);
+          if (bonus == null) break;
+          cumulative += 10 + bonus;
+        } else {
+          cumulative += frame.firstThrow + (frame.secondThrow ?? 0);
+        }
+      } else {
+        cumulative += frame.firstThrow + (frame.secondThrow ?? 0) + (frame.thirdThrow ?? 0);
+      }
+      scores[i] = cumulative;
+    }
+
+    return scores;
+  }
+
+  int? _nextOneBall(int frameIdx, Map<int, FrameData> frameMap) {
+    final next = frameMap[frameIdx + 2];
+    if (next == null) return null;
+    return next.firstThrow;
+  }
+
+  int? _nextTwoBalls(int frameIdx, Map<int, FrameData> frameMap) {
+    final next = frameMap[frameIdx + 2];
+    if (next == null) return null;
+    if (next.isStrike && frameIdx + 2 < 10) {
+      final nextNext = frameMap[frameIdx + 3];
+      if (nextNext == null) return null;
+      return 10 + nextNext.firstThrow;
+    }
+    if (next.secondThrow == null) return null;
+    return next.firstThrow + next.secondThrow!;
   }
 }

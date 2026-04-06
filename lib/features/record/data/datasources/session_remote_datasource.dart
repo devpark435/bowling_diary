@@ -52,6 +52,7 @@ class SessionRemoteDataSource {
     required int gameNumber,
     String? ballId,
     required int totalScore,
+    List<Map<String, dynamic>>? frames,
   }) async {
     await _supabase.from('games').insert({
       'id': id,
@@ -59,6 +60,7 @@ class SessionRemoteDataSource {
       'game_number': gameNumber,
       'ball_id': ballId,
       'total_score': totalScore,
+      if (frames != null) 'frames': frames,
     });
   }
 

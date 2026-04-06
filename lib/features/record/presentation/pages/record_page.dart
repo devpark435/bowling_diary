@@ -11,6 +11,8 @@ import 'package:bowling_diary/features/auth/presentation/providers/auth_provider
 import 'package:bowling_diary/features/balls/domain/entities/ball_entity.dart';
 import 'package:bowling_diary/features/balls/presentation/providers/ball_provider.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
+import 'package:bowling_diary/features/record/domain/entities/game_entity.dart';
+import 'package:bowling_diary/features/record/presentation/widgets/frame_input_widget.dart';
 
 class RecordPage extends ConsumerStatefulWidget {
   const RecordPage({super.key, this.editSession});
@@ -44,14 +46,17 @@ class EditSessionData {
 class EditGameData {
   final int totalScore;
   final String? ballId;
+  final List<FrameData>? frames;
 
-  const EditGameData({required this.totalScore, this.ballId});
+  const EditGameData({required this.totalScore, this.ballId, this.frames});
 }
 
 class _GameEntry {
   final TextEditingController scoreController;
   BallEntity? selectedBall;
   VoidCallback? _listener;
+  bool useFrameInput = false;
+  List<FrameData>? frames;
 
   _GameEntry() : scoreController = TextEditingController();
 
@@ -90,6 +95,10 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       _games = edit.games.map((g) {
         final entry = _GameEntry()..attachListener(_onScoreChanged);
         entry.scoreController.text = g.totalScore.toString();
+        if (g.frames != null && g.frames!.isNotEmpty) {
+          entry.useFrameInput = true;
+          entry.frames = g.frames;
+        }
         return entry;
       }).toList();
       if (_games.isEmpty) {
@@ -256,6 +265,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             gameNumber: i + 1,
             ballId: entry.selectedBall?.id,
             totalScore: score,
+            frames: entry.frames?.map((f) => f.toJson()).toList(),
           );
         }
       } else {
@@ -279,6 +289,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             gameNumber: i + 1,
             ballId: entry.selectedBall?.id,
             totalScore: score,
+            frames: entry.frames?.map((f) => f.toJson()).toList(),
           );
         }
       }
@@ -501,38 +512,66 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 ),
             ],
           ),
-          const SizedBox(height: 14),
-          // 점수 입력
-          TextFormField(
-            controller: game.scoreController,
-            style: AppTextStyles.scoreDisplay.copyWith(fontSize: 28),
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              _MaxScoreFormatter(300),
+          const SizedBox(height: 10),
+          // 입력 모드 전환
+          Row(
+            children: [
+              _InputModeChip(
+                label: '총점 입력',
+                selected: !game.useFrameInput,
+                onTap: () => setState(() => game.useFrameInput = false),
+              ),
+              const SizedBox(width: 8),
+              _InputModeChip(
+                label: '프레임 입력',
+                selected: game.useFrameInput,
+                onTap: () => setState(() => game.useFrameInput = true),
+              ),
             ],
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: '0',
-              hintStyle: AppTextStyles.scoreDisplay.copyWith(
-                fontSize: 28,
-                color: AppColors.textHint,
-              ),
-              filled: true,
-              fillColor: AppColors.darkBg,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return '점수를 입력하세요';
-              final score = int.tryParse(v.trim());
-              if (score == null || score < 0 || score > 300) return '0~300 사이 점수를 입력하세요';
-              return null;
-            },
           ),
+          const SizedBox(height: 14),
+          if (game.useFrameInput)
+            FrameInputWidget(
+              initialFrames: game.frames,
+              onFramesChanged: (frames) {
+                game.frames = frames;
+              },
+              onTotalScoreChanged: (total) {
+                game.scoreController.text = total > 0 ? '$total' : '';
+              },
+            )
+          else
+            TextFormField(
+              controller: game.scoreController,
+              style: AppTextStyles.scoreDisplay.copyWith(fontSize: 28),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                _MaxScoreFormatter(300),
+              ],
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '0',
+                hintStyle: AppTextStyles.scoreDisplay.copyWith(
+                  fontSize: 28,
+                  color: AppColors.textHint,
+                ),
+                filled: true,
+                fillColor: AppColors.darkBg,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              validator: (v) {
+                if (game.useFrameInput) return null;
+                if (v == null || v.trim().isEmpty) return '점수를 입력하세요';
+                final score = int.tryParse(v.trim());
+                if (score == null || score < 0 || score > 300) return '0~300 사이 점수를 입력하세요';
+                return null;
+              },
+            ),
           const SizedBox(height: 12),
           // 볼 선택
           GestureDetector(
@@ -663,5 +702,44 @@ class _MaxScoreFormatter extends TextInputFormatter {
     final value = int.tryParse(newValue.text);
     if (value == null || value > max) return oldValue;
     return newValue;
+  }
+}
+
+class _InputModeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _InputModeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.neonOrange.withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppColors.neonOrange : AppColors.darkDivider,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppColors.neonOrange : AppColors.textHint,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
   }
 }

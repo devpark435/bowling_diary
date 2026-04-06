@@ -19,7 +19,7 @@ class BowlingDiaryApp extends ConsumerWidget {
         : ThemeMode.dark;
 
     return MaterialApp.router(
-      title: 'Bowling Diary',
+      title: '핀로그',
       theme: themeData,
       darkTheme: themeData,
       themeMode: themeMode,
