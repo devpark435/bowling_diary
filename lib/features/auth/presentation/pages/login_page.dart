@@ -12,6 +12,7 @@ class LoginPage extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
 
     return Scaffold(
+      backgroundColor: AppColors.darkBg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -35,39 +36,34 @@ class LoginPage extends ConsumerWidget {
     return Column(
       children: [
         Container(
-          width: 100,
-          height: 100,
+          width: 120,
+          height: 120,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.darkCard,
-            border: Border.all(color: AppColors.neonOrange, width: 2),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: AppColors.neonOrange.withValues(alpha: 0.3),
-                blurRadius: 20,
+                color: AppColors.neonOrange.withValues(alpha: 0.2),
+                blurRadius: 24,
                 spreadRadius: 2,
               ),
             ],
           ),
-          child: Icon(
-            Icons.sports_baseball,
-            size: 52,
-            color: AppColors.neonOrange,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Image.asset(
+              'assets/icon/app_icon.png',
+              fit: BoxFit.cover,
+            ),
           ),
         ),
-        const SizedBox(height: 20),
-        ShaderMask(
-          shaderCallback: (bounds) => LinearGradient(
-            colors: [AppColors.neonOrange, AppColors.mint],
-          ).createShader(bounds),
-          child: const Text(
-            '핀로그',
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.5,
-            ),
+        const SizedBox(height: 24),
+        Text(
+          '핀로그',
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            color: AppColors.neonOrange,
+            letterSpacing: -0.5,
           ),
         ),
       ],
@@ -80,14 +76,16 @@ class LoginPage extends ConsumerWidget {
         Text(
           '나의 볼링 성장 일기장',
           style: AppTextStyles.headingSmall.copyWith(
-            color: AppColors.textSecondary,
+            color: AppColors.textPrimary,
           ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
           '프레임별 기록부터 통계 분석까지\n볼링 실력을 체계적으로 관리하세요',
-          style: AppTextStyles.bodySmall,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textSecondary,
+          ),
           textAlign: TextAlign.center,
         ),
       ],
@@ -106,20 +104,15 @@ class LoginPage extends ConsumerWidget {
         _SocialLoginButton(
           icon: Icons.apple,
           label: 'Apple로 계속하기',
-          backgroundColor: Colors.white,
-          textColor: Colors.black,
-          iconColor: Colors.black,
+          backgroundColor: Colors.black,
+          textColor: Colors.white,
+          iconColor: Colors.white,
           isLoading: isLoading,
           onTap: () =>
               ref.read(authNotifierProvider.notifier).signInWithApple(),
         ),
         const SizedBox(height: 12),
-        _SocialLoginButton(
-          icon: Icons.g_mobiledata,
-          label: 'Google로 계속하기',
-          backgroundColor: const Color(0xFF4285F4),
-          textColor: Colors.white,
-          iconColor: Colors.white,
+        _GoogleSignInButton(
           isLoading: isLoading,
           onTap: () =>
               ref.read(authNotifierProvider.notifier).signInWithGoogle(),
@@ -190,6 +183,59 @@ class _SocialLoginButton extends StatelessWidget {
                 color: textColor,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Google 공식 브랜딩 가이드라인 준수 버튼
+class _GoogleSignInButton extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  const _GoogleSignInButton({
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFF2F2F2),
+          foregroundColor: const Color(0xFF1F1F1F),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.asset(
+                'assets/icon/google_logo.png',
+                width: 20,
+                height: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Google로 계속하기',
+              style: TextStyle(
+                color: Color(0xFF1F1F1F),
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Roboto',
               ),
             ),
           ],

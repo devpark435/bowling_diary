@@ -12,6 +12,7 @@ import 'package:bowling_diary/features/balls/domain/entities/ball_entity.dart';
 import 'package:bowling_diary/features/balls/presentation/providers/ball_provider.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
 import 'package:bowling_diary/features/record/domain/entities/game_entity.dart';
+import 'package:bowling_diary/features/record/presentation/widgets/alley_search_sheet.dart';
 import 'package:bowling_diary/features/record/presentation/widgets/frame_input_widget.dart';
 
 class RecordPage extends ConsumerStatefulWidget {
@@ -402,12 +403,23 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         ),
         const SizedBox(height: 12),
         // 볼링장 이름
-        TextFormField(
-          controller: _alleyNameController,
-          style: TextStyle(color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: '볼링장 이름',
-            prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.textHint, size: 20),
+        GestureDetector(
+          onTap: () async {
+            final selected = await showAlleySearchSheet(context);
+            if (selected != null) {
+              _alleyNameController.text = selected;
+            }
+          },
+          child: AbsorbPointer(
+            child: TextFormField(
+              controller: _alleyNameController,
+              style: TextStyle(color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: '볼링장 검색',
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.textHint, size: 20),
+                suffixIcon: Icon(Icons.search, color: AppColors.textHint, size: 20),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 12),

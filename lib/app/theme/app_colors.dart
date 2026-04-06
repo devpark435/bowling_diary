@@ -4,7 +4,7 @@ import 'color_themes.dart';
 class AppColors {
   AppColors._();
 
-  static ColorPalette _palette = ColorThemes.dark;
+  static ColorPalette _palette = ColorThemes.cream;
 
   static void setPalette(ColorPalette palette) {
     _palette = palette;

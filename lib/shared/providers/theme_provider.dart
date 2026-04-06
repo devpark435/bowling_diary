@@ -15,7 +15,7 @@ final themeProvider = Provider<ThemeMode>((ref) {
 });
 
 class ColorThemeNotifier extends StateNotifier<AppColorTheme> {
-  ColorThemeNotifier() : super(AppColorTheme.dark) {
+  ColorThemeNotifier() : super(AppColorTheme.cream) {
     _load();
   }
 
@@ -23,11 +23,14 @@ class ColorThemeNotifier extends StateNotifier<AppColorTheme> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final idx = prefs.getInt(_key) ?? 0;
-    if (idx >= 0 && idx < AppColorTheme.values.length) {
+    final idx = prefs.getInt(_key);
+    if (idx != null && idx >= 0 && idx < AppColorTheme.values.length) {
       final theme = AppColorTheme.values[idx];
       AppColors.setPalette(ColorThemes.fromTheme(theme));
       state = theme;
+    } else {
+      AppColors.setPalette(ColorThemes.cream);
+      state = AppColorTheme.cream;
     }
   }
 
