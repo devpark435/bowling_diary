@@ -93,23 +93,84 @@ class SettingsPage extends ConsumerWidget {
           ),
           const SizedBox(height: 32),
 
-          // 로그아웃
+          // 계정 섹션
+          Text('계정', style: AppTextStyles.labelSmall),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: OutlinedButton(
               onPressed: () => ref.read(authNotifierProvider.notifier).signOut(),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: const BorderSide(color: AppColors.error),
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.darkDivider),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('로그아웃'),
             ),
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () => _confirmDeleteAccount(context, ref),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('회원 탈퇴'),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+    final firstConfirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('회원 탈퇴'),
+        content: const Text('정말 탈퇴하시겠습니까?\n모든 기록과 데이터가 삭제되며 복구할 수 없습니다.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('탈퇴하기', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (firstConfirm != true || !context.mounted) return;
+
+    final secondConfirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('마지막 확인'),
+        content: const Text('삭제된 데이터는 절대 복구할 수 없습니다.\n정말로 진행하시겠습니까?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('삭제 및 탈퇴', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (secondConfirm != true || !context.mounted) return;
+
+    try {
+      await ref.read(authNotifierProvider.notifier).deleteAccount();
+    } catch (e) {
+      debugPrint('회원 탈퇴 에러: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('탈퇴 처리 중 오류가 발생했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
   }
 }
 

@@ -62,6 +62,39 @@ class SessionRemoteDataSource {
     });
   }
 
+  /// 기간별 게임 데이터 조회 (통계용)
+  /// [since] 가 null이면 전체 기간
+  Future<List<Map<String, dynamic>>> getGamesWithDate(String userId, {DateTime? since}) async {
+    var query = _supabase
+        .from('sessions')
+        .select('id, date');
+
+    query = query.eq('user_id', userId);
+
+    if (since != null) {
+      query = query.gte('date', since.toIso8601String().split('T').first);
+    }
+
+    final sessionsRes = await query.order('date');
+    final sessions = (sessionsRes as List).cast<Map<String, dynamic>>();
+    if (sessions.isEmpty) return [];
+
+    final sessionIds = sessions.map((e) => e['id'] as String).toList();
+    final gamesRes = await _supabase
+        .from('games')
+        .select('session_id, total_score, game_number')
+        .inFilter('session_id', sessionIds)
+        .order('game_number');
+
+    final sessionDateMap = {for (final s in sessions) s['id'] as String: s['date'] as String};
+
+    return (gamesRes as List).map((g) {
+      final game = Map<String, dynamic>.from(g);
+      game['date'] = sessionDateMap[game['session_id']];
+      return game;
+    }).toList();
+  }
+
   Future<Map<String, dynamic>> getMonthlySummary(String userId, int year, int month) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 0, 23, 59, 59);

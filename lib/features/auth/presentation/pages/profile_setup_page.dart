@@ -16,12 +16,24 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
   final _nicknameController = TextEditingController();
   String _selectedStyle = 'conventional';
   bool _isLoading = false;
+  bool _isEditMode = false;
 
   final _styles = [
     ('conventional', '컨벤셔널', '엄지, 중지, 약지 모두 사용'),
     ('thumbless', '썸리스', '엄지를 사용하지 않음'),
     ('two_hand', '투핸드', '두 손으로 투구'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final user = ref.read(currentUserProvider);
+    if (user != null && user.isProfileComplete) {
+      _isEditMode = true;
+      _nicknameController.text = user.nickname ?? '';
+      _selectedStyle = user.bowlingStyle ?? 'conventional';
+    }
+  }
 
   @override
   void dispose() {
@@ -34,8 +46,8 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       appBar: AppBar(
-        title: const Text('프로필 설정'),
-        automaticallyImplyLeading: false,
+        title: Text(_isEditMode ? '프로필 수정' : '프로필 설정'),
+        automaticallyImplyLeading: _isEditMode,
       ),
       body: SafeArea(
         child: Padding(
@@ -44,6 +56,12 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 24),
+              if (!_isEditMode) ...[
+                Text('환영합니다!', style: AppTextStyles.headingLarge),
+                const SizedBox(height: 8),
+                Text('프로필을 설정하고 시작하세요', style: AppTextStyles.bodySmall),
+                const SizedBox(height: 32),
+              ],
               Text('닉네임', style: AppTextStyles.labelLarge),
               const SizedBox(height: 8),
               TextField(
@@ -73,7 +91,7 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('완료'),
+                      : Text(_isEditMode ? '저장' : '완료'),
                 ),
               ),
               const SizedBox(height: 32),
@@ -141,7 +159,13 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
         nickname: nickname,
         bowlingStyle: _selectedStyle,
       );
-      if (mounted) context.go('/');
+      if (mounted) {
+        if (_isEditMode) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

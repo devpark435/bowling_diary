@@ -81,7 +81,7 @@ class HomePage extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'home_fab',
-        onPressed: () => context.go('/record'),
+        onPressed: () => context.push('/record'),
         child: const Icon(Icons.add),
       ),
     );

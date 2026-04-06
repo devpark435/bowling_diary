@@ -40,7 +40,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (authState is AuthStateAuthenticated) {
-        if (isLoginRoute || isProfileSetup) return '/';
+        if (isLoginRoute) return '/';
         return null;
       }
 
@@ -62,6 +62,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile-setup',
         builder: (context, state) => const ProfileSetupPage(),
+      ),
+      GoRoute(
+        path: '/record',
+        builder: (context, state) => const RecordPage(),
       ),
       GoRoute(
         path: '/ball/add',
@@ -88,14 +92,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/',
                 builder: (context, state) => const HomePage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/record',
-                builder: (context, state) => const RecordPage(),
               ),
             ],
           ),
@@ -155,11 +151,6 @@ class ScaffoldWithNavBar extends StatelessWidget {
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: '홈',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline),
-              activeIcon: Icon(Icons.add_circle),
-              label: '기록',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart_outlined),
