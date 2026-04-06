@@ -24,6 +24,44 @@ class SessionRemoteDataSource {
     return (res as List).map((e) => GameModel.fromJson(Map<String, dynamic>.from(e))).toList();
   }
 
+  Future<void> createSession({
+    required String id,
+    required String userId,
+    required DateTime date,
+    String? alleyName,
+    int? laneNumber,
+    String? oilPattern,
+    String? laneConditionMemo,
+    String? memo,
+  }) async {
+    await _supabase.from('sessions').insert({
+      'id': id,
+      'user_id': userId,
+      'date': date.toIso8601String().split('T').first,
+      'alley_name': alleyName,
+      'lane_number': laneNumber,
+      'oil_pattern': oilPattern,
+      'lane_condition_memo': laneConditionMemo,
+      'memo': memo,
+    });
+  }
+
+  Future<void> createGame({
+    required String id,
+    required String sessionId,
+    required int gameNumber,
+    String? ballId,
+    required int totalScore,
+  }) async {
+    await _supabase.from('games').insert({
+      'id': id,
+      'session_id': sessionId,
+      'game_number': gameNumber,
+      'ball_id': ballId,
+      'total_score': totalScore,
+    });
+  }
+
   Future<Map<String, dynamic>> getMonthlySummary(String userId, int year, int month) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 0, 23, 59, 59);
