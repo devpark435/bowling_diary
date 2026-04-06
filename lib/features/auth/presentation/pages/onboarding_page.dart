@@ -14,7 +14,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _pageController = PageController();
   int _currentPage = 0;
 
-  final _pages = const [
+  final _pages = [
     _OnboardingData(
       icon: Icons.sports_baseball,
       iconColor: AppColors.neonOrange,

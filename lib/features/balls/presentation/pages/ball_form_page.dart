@@ -176,14 +176,14 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
         loading: () => Scaffold(
           backgroundColor: AppColors.darkBg,
           appBar: AppBar(title: const Text('볼 수정')),
-          body: const Center(child: CircularProgressIndicator(color: AppColors.neonOrange)),
+          body: Center(child: CircularProgressIndicator(color: AppColors.neonOrange)),
         ),
         error: (e, st) {
           debugPrint('볼 상세 로드 에러: $e\n$st');
           return Scaffold(
             backgroundColor: AppColors.darkBg,
             appBar: AppBar(title: const Text('볼 수정')),
-            body: const Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary))),
+            body: Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary))),
           );
         },
       );
@@ -199,7 +199,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
         actions: [
           if (ball != null)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              icon: Icon(Icons.delete_outline, color: AppColors.error),
               onPressed: () async {
                 final ok = await showDialog<bool>(
                   context: context,
@@ -208,7 +208,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                     content: const Text('이 볼을 삭제할까요?'),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
-                      TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('삭제', style: TextStyle(color: AppColors.error))),
+                      TextButton(onPressed: () => Navigator.pop(c, true), child: Text('삭제', style: TextStyle(color: AppColors.error))),
                     ],
                   ),
                 );
@@ -239,7 +239,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                       label: const Text('카탈로그에서 볼 검색'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.neonOrange,
-                        side: const BorderSide(color: AppColors.neonOrange),
+                        side: BorderSide(color: AppColors.neonOrange),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -299,7 +299,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _nameController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: '예: Phaze V'),
                   validator: (v) => v == null || v.trim().isEmpty ? '이름을 입력하세요' : null,
                 ),
@@ -308,7 +308,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _brandController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: '예: Storm'),
                 ),
                 const SizedBox(height: 16),
@@ -316,7 +316,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _weightController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(hintText: '예: 14'),
                 ),
@@ -325,7 +325,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _coverstockController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: '커버스톡 종류'),
                 ),
                 const SizedBox(height: 16),
@@ -339,7 +339,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _rgController,
-                            style: const TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(color: AppColors.textPrimary),
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(hintText: '예: 2.49'),
                           ),
@@ -355,7 +355,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _differentialController,
-                            style: const TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(color: AppColors.textPrimary),
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(hintText: '예: 0.050'),
                           ),
@@ -369,7 +369,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _layoutController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   maxLines: 2,
                   decoration: const InputDecoration(
                     hintText: '예: 50° x 4½" x 30°',
@@ -459,13 +459,13 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
           child: TextField(
             controller: _searchController,
             autofocus: true,
-            style: const TextStyle(color: AppColors.textPrimary),
+            style: TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: '볼 이름 또는 브랜드 검색',
-              prefixIcon: const Icon(Icons.search, color: AppColors.textHint),
+              prefixIcon: Icon(Icons.search, color: AppColors.textHint),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: AppColors.textHint, size: 20),
+                      icon: Icon(Icons.clear, color: AppColors.textHint, size: 20),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _query = '');
@@ -492,7 +492,7 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
     return asyncBrands.when(
       data: (brands) {
         if (brands.isEmpty) {
-          return const Center(child: Text('카탈로그가 비어있습니다', style: TextStyle(color: AppColors.textSecondary)));
+          return Center(child: Text('카탈로그가 비어있습니다', style: TextStyle(color: AppColors.textSecondary)));
         }
         return ListView.builder(
           controller: widget.scrollController,
@@ -508,10 +508,10 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
                   color: AppColors.neonOrange.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 20),
+                child: Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 20),
               ),
-              title: Text(brand, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-              trailing: const Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
+              title: Text(brand, style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+              trailing: Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
               onTap: () {
                 _searchController.text = brand;
                 setState(() => _query = brand);
@@ -520,10 +520,10 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonOrange)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.neonOrange)),
       error: (e, st) {
         debugPrint('브랜드 로드 에러: $e\n$st');
-        return const Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary)));
+        return Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary)));
       },
     );
   }
@@ -559,10 +559,10 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonOrange)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.neonOrange)),
       error: (e, st) {
         debugPrint('카탈로그 검색 에러: $e\n$st');
-        return const Center(child: Text('검색 중 오류가 발생했습니다', style: TextStyle(color: AppColors.textSecondary)));
+        return Center(child: Text('검색 중 오류가 발생했습니다', style: TextStyle(color: AppColors.textSecondary)));
       },
     );
   }
@@ -603,10 +603,10 @@ class _CatalogBallTile extends StatelessWidget {
                       child: Image.network(
                         ball.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 24),
+                        errorBuilder: (_, __, ___) => Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 24),
                       ),
                     )
-                  : const Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 24),
+                  : Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -614,7 +614,7 @@ class _CatalogBallTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(ball.name,
-                      style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+                      style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
                   const SizedBox(height: 2),
                   Text(ball.brand, style: AppTextStyles.bodySmall),
                   if (ball.coverstock != null) ...[

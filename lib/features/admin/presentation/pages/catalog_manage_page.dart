@@ -44,13 +44,13 @@ class _CatalogManagePageState extends ConsumerState<CatalogManagePage> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: '볼 이름 또는 브랜드 검색',
-                prefixIcon: const Icon(Icons.search, color: AppColors.textHint),
+                prefixIcon: Icon(Icons.search, color: AppColors.textHint),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: AppColors.textHint, size: 20),
+                        icon: Icon(Icons.clear, color: AppColors.textHint, size: 20),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -85,7 +85,7 @@ class _CatalogManagePageState extends ConsumerState<CatalogManagePage> {
               loading: () => const LoadingWidget(),
               error: (e, st) {
                 debugPrint('카탈로그 로드 에러: $e\n$st');
-                return const Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary)));
+                return Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary)));
               },
             ),
           ),
@@ -123,7 +123,7 @@ class _CatalogManagePageState extends ConsumerState<CatalogManagePage> {
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('삭제', style: TextStyle(color: AppColors.error)),
+            child: Text('삭제', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -136,14 +136,14 @@ class _CatalogManagePageState extends ConsumerState<CatalogManagePage> {
       ref.invalidate(catalogBrandsProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('삭제되었습니다'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text('삭제되었습니다'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {
       debugPrint('카탈로그 삭제 에러: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('삭제에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text('삭제에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -181,12 +181,12 @@ class _CatalogAdminTile extends StatelessWidget {
                   child: Image.network(
                     ball.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.sports_baseball, color: AppColors.textHint, size: 22),
+                    errorBuilder: (_, __, ___) => Icon(Icons.sports_baseball, color: AppColors.textHint, size: 22),
                   ),
                 )
-              : const Icon(Icons.sports_baseball, color: AppColors.textHint, size: 22),
+              : Icon(Icons.sports_baseball, color: AppColors.textHint, size: 22),
         ),
-        title: Text(ball.name, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
+        title: Text(ball.name, style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
         subtitle: Text(
           '${ball.brand}${ball.coverstock != null ? " · ${ball.coverstock}" : ""}',
           style: AppTextStyles.labelSmall,
@@ -203,11 +203,11 @@ class _CatalogAdminTile extends StatelessWidget {
                   color: AppColors.error.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text('이미지 없음', style: TextStyle(color: AppColors.error, fontSize: 10)),
+                child: Text('이미지 없음', style: TextStyle(color: AppColors.error, fontSize: 10)),
               ),
             const SizedBox(width: 4),
-            IconButton(icon: const Icon(Icons.edit, color: AppColors.mint, size: 20), onPressed: onEdit),
-            IconButton(icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20), onPressed: onDelete),
+            IconButton(icon: Icon(Icons.edit, color: AppColors.mint, size: 20), onPressed: onEdit),
+            IconButton(icon: Icon(Icons.delete_outline, color: AppColors.error, size: 20), onPressed: onDelete),
           ],
         ),
       ),
@@ -314,7 +314,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
       debugPrint('카탈로그 저장 에러: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('저장에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text('저장에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
         );
       }
     } finally {
@@ -371,7 +371,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _brandController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: '예: Storm'),
                   validator: (v) => v == null || v.trim().isEmpty ? '브랜드를 입력하세요' : null,
                 ),
@@ -381,7 +381,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _nameController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: '예: Phaze V'),
                   validator: (v) => v == null || v.trim().isEmpty ? '이름을 입력하세요' : null,
                 ),
@@ -391,7 +391,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _coverstockController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: '예: R3S Hybrid'),
                 ),
                 const SizedBox(height: 16),
@@ -400,7 +400,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _coreTypeController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: '예: Velocity Core'),
                 ),
                 const SizedBox(height: 16),
@@ -415,7 +415,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _rgController,
-                            style: const TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(color: AppColors.textPrimary),
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(hintText: '2.48'),
                           ),
@@ -431,7 +431,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _differentialController,
-                            style: const TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(color: AppColors.textPrimary),
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(hintText: '0.053'),
                           ),
@@ -448,7 +448,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _yearController,
-                            style: const TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(color: AppColors.textPrimary),
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             decoration: const InputDecoration(hintText: '2024'),

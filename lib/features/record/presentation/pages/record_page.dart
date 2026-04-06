@@ -139,7 +139,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppColors.neonOrange,
               surface: AppColors.darkCard,
             ),
@@ -172,16 +172,16 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                     children: [
                       Text('사용한 볼 선택', style: AppTextStyles.headingSmall),
                       IconButton(
-                        icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                        icon: Icon(Icons.close, color: AppColors.textSecondary),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
                 ),
-                const Divider(color: AppColors.darkDivider, height: 1),
+                Divider(color: AppColors.darkDivider, height: 1),
                 ListTile(
                   leading: Icon(Icons.clear, color: AppColors.textHint),
-                  title: const Text('선택 안 함', style: TextStyle(color: AppColors.textSecondary)),
+                  title: Text('선택 안 함', style: TextStyle(color: AppColors.textSecondary)),
                   onTap: () {
                     setState(() => _games[gameIndex].selectedBall = null);
                     Navigator.pop(context);
@@ -202,15 +202,15 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                         color: AppColors.darkDivider,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 20),
+                      child: Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 20),
                     ),
-                    title: Text(ball.name, style: const TextStyle(color: AppColors.textPrimary)),
+                    title: Text(ball.name, style: TextStyle(color: AppColors.textPrimary)),
                     subtitle: ball.brand != null 
                       ? Text('${ball.brand} ${ball.weight != null ? "/ ${ball.weight}lb" : ""}',
                           style: AppTextStyles.bodySmall)
                       : null,
                     trailing: _games[gameIndex].selectedBall?.id == ball.id
-                      ? const Icon(Icons.check_circle, color: AppColors.neonOrange)
+                      ? Icon(Icons.check_circle, color: AppColors.neonOrange)
                       : null,
                     onTap: () {
                       setState(() => _games[gameIndex].selectedBall = ball);
@@ -301,7 +301,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       debugPrint('기록 저장 에러: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('저장에 실패했습니다. 다시 시도해주세요.'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
@@ -378,14 +378,14 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today, color: AppColors.neonOrange, size: 20),
+                Icon(Icons.calendar_today, color: AppColors.neonOrange, size: 20),
                 const SizedBox(width: 12),
                 Text(
                   DateFormat('yyyy년 M월 d일 (E)', 'ko').format(_selectedDate),
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 15),
                 ),
                 const Spacer(),
-                const Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
+                Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
               ],
             ),
           ),
@@ -394,8 +394,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         // 볼링장 이름
         TextFormField(
           controller: _alleyNameController,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
+          style: TextStyle(color: AppColors.textPrimary),
+          decoration: InputDecoration(
             hintText: '볼링장 이름',
             prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.textHint, size: 20),
           ),
@@ -408,10 +408,10 @@ class _RecordPageState extends ConsumerState<RecordPage> {
               width: 120,
               child: TextFormField(
                 controller: _laneNumberController,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: AppColors.textPrimary),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: '레인 번호',
                   prefixIcon: Icon(Icons.tag, color: AppColors.textHint, size: 18),
                 ),
@@ -421,8 +421,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             Expanded(
               child: TextFormField(
                 controller: _oilPatternController,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
+                style: TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
                   hintText: '오일 패턴 (예: Kegel Middle Road)',
                   prefixIcon: Icon(Icons.water_drop_outlined, color: AppColors.textHint, size: 18),
                 ),
@@ -484,7 +484,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 child: Center(
                   child: Text(
                     '${index + 1}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.neonOrange,
                       fontWeight: FontWeight.w800,
                       fontSize: 15,
@@ -498,7 +498,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
               if (_games.length > 1)
                 GestureDetector(
                   onTap: () => _removeGame(index),
-                  child: const Icon(Icons.remove_circle_outline, color: AppColors.error, size: 22),
+                  child: Icon(Icons.remove_circle_outline, color: AppColors.error, size: 22),
                 ),
             ],
           ),
@@ -560,7 +560,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                     ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.chevron_right, color: AppColors.textHint, size: 18),
+                  Icon(Icons.chevron_right, color: AppColors.textHint, size: 18),
                 ],
               ),
             ),
@@ -578,9 +578,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         const SizedBox(height: 12),
         TextFormField(
           controller: _memoController,
-          style: const TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: AppColors.textPrimary),
           maxLines: 3,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: '오늘의 컨디션, 느낀점 등을 자유롭게 기록하세요',
             prefixIcon: Padding(
               padding: EdgeInsets.only(bottom: 48),

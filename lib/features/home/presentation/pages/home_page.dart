@@ -139,7 +139,7 @@ class HomePage extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('삭제', style: TextStyle(color: AppColors.error)),
+            child: Text('삭제', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -153,14 +153,14 @@ class HomePage extends ConsumerWidget {
       ref.invalidate(monthlySummaryProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('기록이 삭제되었습니다'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text('기록이 삭제되었습니다'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {
       debugPrint('기록 삭제 에러: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('삭제에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text('삭제에 실패했습니다'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -317,7 +317,7 @@ class _RecentGameCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(summary.ballName!,
-                                  style: const TextStyle(color: AppColors.neonOrange, fontSize: 10, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(color: AppColors.neonOrange, fontSize: 10, fontWeight: FontWeight.w600)),
                             ),
                           ],
                         ],
@@ -333,7 +333,7 @@ class _RecentGameCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.location_on, color: AppColors.mint, size: 14),
+                        Icon(Icons.location_on, color: AppColors.mint, size: 14),
                         const SizedBox(width: 4),
                         Text(s.alleyName!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.mint)),
                       ],

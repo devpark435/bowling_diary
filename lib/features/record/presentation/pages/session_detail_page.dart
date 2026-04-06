@@ -32,7 +32,7 @@ class SessionDetailPage extends ConsumerWidget {
             elevation: 8,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.darkDivider, width: 0.5),
+              side: BorderSide(color: AppColors.darkDivider, width: 0.5),
             ),
             surfaceTintColor: Colors.transparent,
             offset: const Offset(0, 48),
@@ -57,10 +57,10 @@ class SessionDetailPage extends ConsumerWidget {
                         color: AppColors.mint.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.edit_outlined, size: 15, color: AppColors.mint),
+                      child: Icon(Icons.edit_outlined, size: 15, color: AppColors.mint),
                     ),
                     const SizedBox(width: 12),
-                    const Text('수정하기', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
+                    Text('수정하기', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -77,10 +77,10 @@ class SessionDetailPage extends ConsumerWidget {
                         color: AppColors.error.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.delete_outline, size: 15, color: AppColors.error),
+                      child: Icon(Icons.delete_outline, size: 15, color: AppColors.error),
                     ),
                     const SizedBox(width: 12),
-                    const Text('삭제하기', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w500)),
+                    Text('삭제하기', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -202,7 +202,7 @@ class SessionDetailPage extends ConsumerWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.edit_note, color: AppColors.textHint, size: 18),
+                Icon(Icons.edit_note, color: AppColors.textHint, size: 18),
                 const SizedBox(width: 8),
                 Text('메모', style: AppTextStyles.headingSmall),
               ],
@@ -226,7 +226,7 @@ class SessionDetailPage extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('삭제', style: TextStyle(color: AppColors.error)),
+            child: Text('삭제', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -241,7 +241,7 @@ class SessionDetailPage extends ConsumerWidget {
       if (context.mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('기록이 삭제되었습니다'),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
@@ -252,7 +252,7 @@ class SessionDetailPage extends ConsumerWidget {
       debugPrint('기록 삭제 에러: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('삭제에 실패했습니다'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
@@ -399,7 +399,7 @@ class _GameDetailCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Row(
                       children: [
-                        const Icon(Icons.sports_baseball, color: AppColors.textHint, size: 12),
+                        Icon(Icons.sports_baseball, color: AppColors.textHint, size: 12),
                         const SizedBox(width: 4),
                         Text(ballName, style: AppTextStyles.bodySmall),
                       ],

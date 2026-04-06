@@ -50,7 +50,7 @@ class LoginPage extends ConsumerWidget {
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             Icons.sports_baseball,
             size: 52,
             color: AppColors.neonOrange,
@@ -58,7 +58,7 @@ class LoginPage extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
         ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
+          shaderCallback: (bounds) => LinearGradient(
             colors: [AppColors.neonOrange, AppColors.mint],
           ).createShader(bounds),
           child: const Text(
@@ -134,7 +134,7 @@ class LoginPage extends ConsumerWidget {
             ),
             child: Text(
               authState.message,
-              style: const TextStyle(color: AppColors.error, fontSize: 13),
+              style: TextStyle(color: AppColors.error, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ),

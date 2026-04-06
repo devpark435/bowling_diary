@@ -83,18 +83,18 @@ class _BallCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         placeholder: (_, __) => Container(
                           color: AppColors.darkDivider,
-                          child: const Icon(Icons.sports_baseball, color: AppColors.textHint),
+                          child: Icon(Icons.sports_baseball, color: AppColors.textHint),
                         ),
                         errorWidget: (_, __, ___) => Container(
                           color: AppColors.darkDivider,
-                          child: const Icon(Icons.broken_image, color: AppColors.textHint),
+                          child: Icon(Icons.broken_image, color: AppColors.textHint),
                         ),
                       )
                     : Container(
                         width: 72,
                         height: 72,
                         color: AppColors.darkDivider,
-                        child: const Icon(Icons.sports_baseball, color: AppColors.textHint, size: 36),
+                        child: Icon(Icons.sports_baseball, color: AppColors.textHint, size: 36),
                       ),
               ),
               const SizedBox(width: 16),
@@ -110,7 +110,7 @@ class _BallCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.textHint),
+              Icon(Icons.chevron_right, color: AppColors.textHint),
             ],
           ),
         ),

@@ -56,7 +56,7 @@ class StatsPage extends ConsumerWidget {
               loading: () => const LoadingWidget(),
               error: (e, st) {
                 debugPrint('통계 로드 에러: $e\n$st');
-                return const Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary)));
+                return Center(child: Text('데이터를 불러올 수 없습니다', style: TextStyle(color: AppColors.textSecondary)));
               },
             ),
           ),
@@ -245,7 +245,7 @@ class _ScoreTrendChart extends StatelessWidget {
                       interval: 30,
                       getTitlesWidget: (value, meta) => Text(
                         value.toInt().toString(),
-                        style: const TextStyle(color: AppColors.textHint, fontSize: 10),
+                        style: TextStyle(color: AppColors.textHint, fontSize: 10),
                       ),
                     ),
                   ),
@@ -259,7 +259,7 @@ class _ScoreTrendChart extends StatelessWidget {
                         if (idx < 0 || idx >= dailyAvg.length) return const SizedBox.shrink();
                         return Text(
                           DateFormat('M/d').format(dailyAvg[idx].date),
-                          style: const TextStyle(color: AppColors.textHint, fontSize: 9),
+                          style: TextStyle(color: AppColors.textHint, fontSize: 9),
                         );
                       },
                     ),
@@ -306,7 +306,7 @@ class _ScoreTrendChart extends StatelessWidget {
                         final date = idx < dailyAvg.length ? DateFormat('M/d').format(dailyAvg[idx].date) : '';
                         return LineTooltipItem(
                           '$date\n${spot.y.toInt()}점',
-                          const TextStyle(color: AppColors.neonOrange, fontWeight: FontWeight.w700, fontSize: 12),
+                          TextStyle(color: AppColors.neonOrange, fontWeight: FontWeight.w700, fontSize: 12),
                         );
                       }).toList();
                     },
@@ -385,7 +385,7 @@ class _ScoreDistributionChart extends StatelessWidget {
                       interval: 1,
                       getTitlesWidget: (value, meta) {
                         if (value == value.roundToDouble() && value >= 0) {
-                          return Text(value.toInt().toString(), style: const TextStyle(color: AppColors.textHint, fontSize: 10));
+                          return Text(value.toInt().toString(), style: TextStyle(color: AppColors.textHint, fontSize: 10));
                         }
                         return const SizedBox.shrink();
                       },
@@ -402,7 +402,7 @@ class _ScoreDistributionChart extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 6),
                           child: Text(
                             labels[idx],
-                            style: const TextStyle(color: AppColors.textHint, fontSize: 8),
+                            style: TextStyle(color: AppColors.textHint, fontSize: 8),
                           ),
                         );
                       },
@@ -428,7 +428,7 @@ class _ScoreDistributionChart extends StatelessWidget {
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
                         '${labels[group.x]}\n${rod.toY.toInt()}게임',
-                        const TextStyle(color: AppColors.neonOrange, fontWeight: FontWeight.w700, fontSize: 12),
+                        TextStyle(color: AppColors.neonOrange, fontWeight: FontWeight.w700, fontSize: 12),
                       );
                     },
                   ),

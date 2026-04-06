@@ -66,7 +66,7 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
               const SizedBox(height: 8),
               TextField(
                 controller: _nicknameController,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: AppColors.textPrimary),
                 decoration: const InputDecoration(
                   hintText: '닉네임을 입력하세요',
                 ),
@@ -138,7 +138,7 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle, color: AppColors.neonOrange, size: 20),
+              Icon(Icons.check_circle, color: AppColors.neonOrange, size: 20),
           ],
         ),
       ),

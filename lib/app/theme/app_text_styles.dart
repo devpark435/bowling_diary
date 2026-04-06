@@ -4,7 +4,7 @@ import 'app_colors.dart';
 class AppTextStyles {
   AppTextStyles._();
 
-  static const TextStyle scoreDisplay = TextStyle(
+  static TextStyle get scoreDisplay => TextStyle(
     fontFamily: 'monospace',
     fontSize: 32,
     fontWeight: FontWeight.w800,
@@ -12,69 +12,69 @@ class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
-  static const TextStyle scoreFrame = TextStyle(
+  static TextStyle get scoreFrame => TextStyle(
     fontFamily: 'monospace',
     fontSize: 18,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
   );
 
-  static const TextStyle scoreSmall = TextStyle(
+  static TextStyle get scoreSmall => TextStyle(
     fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: FontWeight.w600,
     color: AppColors.textSecondary,
   );
 
-  static const TextStyle headingLarge = TextStyle(
+  static TextStyle get headingLarge => TextStyle(
     fontSize: 28,
     fontWeight: FontWeight.w800,
     color: AppColors.textPrimary,
     letterSpacing: -0.5,
   );
 
-  static const TextStyle headingMedium = TextStyle(
+  static TextStyle get headingMedium => TextStyle(
     fontSize: 22,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     letterSpacing: -0.3,
   );
 
-  static const TextStyle headingSmall = TextStyle(
+  static TextStyle get headingSmall => TextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
   );
 
-  static const TextStyle bodyLarge = TextStyle(
+  static TextStyle get bodyLarge => TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
-  static const TextStyle bodyMedium = TextStyle(
+  static TextStyle get bodyMedium => TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
-  static const TextStyle bodySmall = TextStyle(
+  static TextStyle get bodySmall => TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
     height: 1.4,
   );
 
-  static const TextStyle labelLarge = TextStyle(
+  static TextStyle get labelLarge => TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     letterSpacing: 0.5,
   );
 
-  static const TextStyle labelSmall = TextStyle(
+  static TextStyle get labelSmall => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w500,
     color: AppColors.textSecondary,
@@ -87,14 +87,14 @@ class AppTextStyles {
     letterSpacing: 0.5,
   );
 
-  static const TextStyle strikeStyle = TextStyle(
+  static TextStyle get strikeStyle => TextStyle(
     fontFamily: 'monospace',
     fontSize: 16,
     fontWeight: FontWeight.w800,
     color: AppColors.strike,
   );
 
-  static const TextStyle spareStyle = TextStyle(
+  static TextStyle get spareStyle => TextStyle(
     fontFamily: 'monospace',
     fontSize: 16,
     fontWeight: FontWeight.w700,
