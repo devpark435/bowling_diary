@@ -49,6 +49,7 @@ class BallsPage extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'balls_fab',
         onPressed: () => context.push('/ball/add'),
         child: const Icon(Icons.add),
       ),

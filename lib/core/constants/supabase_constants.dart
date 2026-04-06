@@ -12,6 +12,7 @@ class SupabaseConstants {
   );
 
   static const String ballImagesBucket = 'ball-images';
+  static const String ballCatalogBucket = 'ball-catalog';
   static const String sessionPhotosBucket = 'session-photos';
   static const String profileImagesBucket = 'profile-images';
 }

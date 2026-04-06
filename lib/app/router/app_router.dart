@@ -12,6 +12,7 @@ import 'package:bowling_diary/features/stats/presentation/pages/stats_page.dart'
 import 'package:bowling_diary/features/balls/presentation/pages/ball_form_page.dart';
 import 'package:bowling_diary/features/balls/presentation/pages/balls_page.dart';
 import 'package:bowling_diary/features/settings/presentation/pages/settings_page.dart';
+import 'package:bowling_diary/features/admin/presentation/pages/catalog_manage_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -72,6 +73,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           return BallFormPage(ballId: id);
         },
+      ),
+      GoRoute(
+        path: '/admin/catalog',
+        builder: (context, state) => const CatalogManagePage(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
