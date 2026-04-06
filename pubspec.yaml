@@ -36,6 +36,7 @@ dependencies:
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.7
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -46,5 +47,20 @@ dev_dependencies:
   custom_lint: ^0.7.5
   riverpod_lint: ^2.6.3
 
+flutter_native_splash:
+  color: "#0D0D0D"
+  image: assets/splash_logo.png
+  color_dark: "#0D0D0D"
+  image_dark: assets/splash_logo.png
+  android_12:
+    color: "#0D0D0D"
+    image: assets/splash_logo.png
+    color_dark: "#0D0D0D"
+    image_dark: assets/splash_logo.png
+  ios: true
+  android: true
+
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
