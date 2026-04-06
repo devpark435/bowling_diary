@@ -180,7 +180,6 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       body: Center(
         child: CircularProgressIndicator(color: AppColors.neonOrange),
       ),

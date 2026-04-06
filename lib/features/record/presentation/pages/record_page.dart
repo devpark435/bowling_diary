@@ -333,7 +333,6 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(title: Text(_isEditMode ? '기록 수정' : '게임 기록')),
       body: LoadingOverlay(
         isLoading: _isLoading,

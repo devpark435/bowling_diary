@@ -8,6 +8,7 @@ import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
 import 'package:bowling_diary/features/record/presentation/pages/record_page.dart';
 import 'package:bowling_diary/features/record/presentation/pages/session_detail_page.dart';
+import 'package:bowling_diary/shared/providers/theme_provider.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
 
 class HomePage extends ConsumerWidget {
@@ -15,11 +16,11 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(colorThemeProvider);
     final recentGames = ref.watch(recentGamesProvider);
     final monthly = ref.watch(monthlySummaryProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(
         title: const Text('Bowling Diary'),
       ),

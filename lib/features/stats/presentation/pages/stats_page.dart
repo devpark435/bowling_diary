@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/shared/providers/theme_provider.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
 import 'package:bowling_diary/features/stats/presentation/providers/stats_provider.dart';
 
@@ -12,11 +13,11 @@ class StatsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(colorThemeProvider);
     final period = ref.watch(statsPeriodProvider);
     final asyncStats = ref.watch(statsDataProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(title: const Text('통계')),
       body: Column(
         children: [

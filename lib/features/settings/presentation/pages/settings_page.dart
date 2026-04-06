@@ -16,7 +16,6 @@ class SettingsPage extends ConsumerWidget {
     final isAdmin = user?.isAdmin ?? false;
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(title: const Text('설정')),
       body: ListView(
         padding: const EdgeInsets.all(16),

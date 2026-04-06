@@ -9,6 +9,7 @@ import 'package:bowling_diary/features/home/presentation/providers/home_provider
 import 'package:bowling_diary/features/record/data/models/game_model.dart';
 import 'package:bowling_diary/features/record/data/models/session_model.dart';
 import 'package:bowling_diary/features/record/presentation/pages/record_page.dart';
+import 'package:bowling_diary/shared/providers/theme_provider.dart';
 
 class SessionDetailPage extends ConsumerWidget {
   final RecentGameSummary summary;
@@ -17,12 +18,12 @@ class SessionDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(colorThemeProvider);
     final s = summary.session;
     final games = summary.games;
     final dateStr = DateFormat('yyyy년 M월 d일 (E)', 'ko').format(s.date);
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(
         title: const Text('기록 상세'),
         actions: [

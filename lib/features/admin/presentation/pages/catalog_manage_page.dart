@@ -34,7 +34,6 @@ class _CatalogManagePageState extends ConsumerState<CatalogManagePage> {
         : ref.watch(catalogSearchProvider(_searchQuery));
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(
         title: const Text('카탈로그 관리'),
       ),
@@ -325,7 +324,6 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(title: Text(_isEditing ? '카탈로그 볼 수정' : '카탈로그 볼 추가')),
       body: LoadingOverlay(
         isLoading: _isLoading,

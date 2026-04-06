@@ -44,7 +44,6 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
       appBar: AppBar(
         title: Text(_isEditMode ? '프로필 수정' : '프로필 설정'),
         automaticallyImplyLeading: _isEditMode,
