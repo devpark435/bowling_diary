@@ -7,6 +7,7 @@ import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
 import 'package:bowling_diary/features/record/presentation/pages/record_page.dart';
+import 'package:bowling_diary/features/record/presentation/pages/session_detail_page.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
 
 class HomePage extends ConsumerWidget {
@@ -76,6 +77,7 @@ class HomePage extends ConsumerWidget {
                     child: Column(
                       children: items.map((e) => _RecentGameCard(
                         summary: e,
+                        onTap: () => _navigateToDetail(context, e),
                         onEdit: () => _navigateToEdit(context, ref, e),
                         onDelete: () => _confirmDelete(context, ref, e),
                       )).toList(),
@@ -97,6 +99,13 @@ class HomePage extends ConsumerWidget {
         onPressed: () => context.push('/record'),
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  void _navigateToDetail(BuildContext context, RecentGameSummary summary) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SessionDetailPage(summary: summary)),
     );
   }
 
@@ -223,11 +232,13 @@ class _SummaryItem extends StatelessWidget {
 
 class _RecentGameCard extends StatelessWidget {
   final RecentGameSummary summary;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _RecentGameCard({
     required this.summary,
+    required this.onTap,
     required this.onEdit,
     required this.onDelete,
   });
@@ -284,7 +295,7 @@ class _RecentGameCard extends StatelessWidget {
         child: Card(
           margin: EdgeInsets.zero,
           child: InkWell(
-            onTap: () {},
+            onTap: onTap,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.all(16),

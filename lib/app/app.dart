@@ -19,6 +19,12 @@ class BowlingDiaryApp extends ConsumerWidget {
       themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: child,
+        );
+      },
     );
   }
 }
