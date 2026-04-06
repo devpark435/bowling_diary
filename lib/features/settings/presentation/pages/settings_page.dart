@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/app/theme/color_themes.dart';
@@ -130,6 +131,9 @@ class SettingsPage extends ConsumerWidget {
               child: const Text('회원 탈퇴'),
             ),
           ),
+          const SizedBox(height: 32),
+          _AppVersionInfo(),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -301,5 +305,27 @@ class _ColorThemeSelector extends StatelessWidget {
       case AppColorTheme.tossBlue:
         return '블루';
     }
+  }
+}
+
+class _AppVersionInfo extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        final version = snapshot.data?.version ?? '-';
+        final buildNumber = snapshot.data?.buildNumber ?? '-';
+        return Center(
+          child: Text(
+            '핀로그 v$version ($buildNumber)',
+            style: TextStyle(
+              color: AppColors.textHint,
+              fontSize: 12,
+            ),
+          ),
+        );
+      },
+    );
   }
 }

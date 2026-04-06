@@ -10,6 +10,7 @@ import 'package:bowling_diary/features/record/presentation/pages/record_page.dar
 import 'package:bowling_diary/features/record/presentation/pages/session_detail_page.dart';
 import 'package:bowling_diary/shared/providers/theme_provider.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
+import 'package:bowling_diary/core/services/app_update_service.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -19,6 +20,10 @@ class HomePage extends ConsumerWidget {
     ref.watch(colorThemeProvider);
     final recentGames = ref.watch(recentGamesProvider);
     final monthly = ref.watch(monthlySummaryProvider);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppUpdateService.checkForUpdate(context);
+    });
 
     return Scaffold(
       appBar: AppBar(
