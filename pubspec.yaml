@@ -52,12 +52,12 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.3
 
 flutter_native_splash:
-  color: "#0D0D0D"
+  color: "#FFFBF5"
   image: assets/splash/splash_logo.png
   color_dark: "#0D0D0D"
   image_dark: assets/splash/splash_logo.png
   android_12:
-    color: "#0D0D0D"
+    color: "#FFFBF5"
     image: assets/splash/splash_logo.png
     color_dark: "#0D0D0D"
     image_dark: assets/splash/splash_logo.png

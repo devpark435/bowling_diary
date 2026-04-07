@@ -14,14 +14,17 @@ class ProfileSetupPage extends ConsumerStatefulWidget {
 
 class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
   final _nicknameController = TextEditingController();
-  String _selectedStyle = 'conventional';
+  String _selectedStyle = 'classic';
   bool _isLoading = false;
   bool _isEditMode = false;
 
   final _styles = [
-    ('conventional', '컨벤셔널', '엄지, 중지, 약지 모두 사용'),
-    ('thumbless', '썸리스', '엄지를 사용하지 않음'),
+    ('classic', '클래식', '기본 원핸드 투구'),
+    ('classic_wrist', '아대 클래식', '손목 보호대를 착용한 원핸드'),
     ('two_hand', '투핸드', '두 손으로 투구'),
+    ('thumbless', '덤리스', '엄지를 넣지 않는 원핸드'),
+    ('tweener', '트위너', '스트로커와 크랭커의 중간'),
+    ('cranker', '크랭커', '높은 회전과 강한 훅'),
   ];
 
   @override
@@ -31,7 +34,8 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
     if (user != null && user.isProfileComplete) {
       _isEditMode = true;
       _nicknameController.text = user.nickname ?? '';
-      _selectedStyle = user.bowlingStyle ?? 'conventional';
+      final saved = user.bowlingStyle ?? 'classic';
+      _selectedStyle = saved == 'conventional' ? 'classic' : saved;
     }
   }
 
@@ -49,34 +53,43 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
         automaticallyImplyLeading: _isEditMode,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
-              if (!_isEditMode) ...[
-                Text('환영합니다!', style: AppTextStyles.headingLarge),
-                const SizedBox(height: 8),
-                Text('프로필을 설정하고 시작하세요', style: AppTextStyles.bodySmall),
-                const SizedBox(height: 32),
-              ],
-              Text('닉네임', style: AppTextStyles.labelLarge),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _nicknameController,
-                style: TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: '닉네임을 입력하세요',
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    if (!_isEditMode) ...[
+                      Text('환영합니다!', style: AppTextStyles.headingLarge),
+                      const SizedBox(height: 8),
+                      Text('프로필을 설정하고 시작하세요', style: AppTextStyles.bodySmall),
+                      const SizedBox(height: 32),
+                    ],
+                    Text('닉네임', style: AppTextStyles.labelLarge),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _nicknameController,
+                      style: TextStyle(color: AppColors.textPrimary),
+                      decoration: const InputDecoration(
+                        hintText: '닉네임을 입력하세요',
+                      ),
+                      maxLength: 20,
+                    ),
+                    const SizedBox(height: 32),
+                    Text('볼링 스타일', style: AppTextStyles.labelLarge),
+                    const SizedBox(height: 12),
+                    ...(_styles.map((style) => _buildStyleTile(style))),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-                maxLength: 20,
               ),
-              const SizedBox(height: 32),
-              Text('볼링 스타일', style: AppTextStyles.labelLarge),
-              const SizedBox(height: 12),
-              ...(_styles.map((style) => _buildStyleTile(style))),
-              const Spacer(),
-              SizedBox(
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+              child: SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
@@ -93,9 +106,8 @@ class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
                       : Text(_isEditMode ? '저장' : '완료'),
                 ),
               ),
-              const SizedBox(height: 32),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
