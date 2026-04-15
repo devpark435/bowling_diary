@@ -15,4 +15,7 @@ class SupabaseConstants {
   static const String ballCatalogBucket = 'ball-catalog';
   static const String sessionPhotosBucket = 'session-photos';
   static const String profileImagesBucket = 'profile-images';
+
+  /// 회원탈퇴 시 Auth 사용자 삭제용 Edge Function 이름 (supabase/README.md 배포 가이드)
+  static const String deleteAccountEdgeFunction = 'delete-account';
 }

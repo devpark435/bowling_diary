@@ -8,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:bowling_diary/core/constants/supabase_constants.dart';
 import 'package:bowling_diary/features/auth/data/models/user_model.dart';
 import 'package:bowling_diary/features/auth/domain/entities/user_entity.dart';
 
@@ -98,26 +99,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   // --- Google 네이티브 로그인 ---
+  /// Google Sign-In 7.x — 로그아웃/연결 해제 전에도 동일 설정 필요
+  Future<void> _initializeGoogleSignIn() async {
+    const webClientId = String.fromEnvironment(
+      'GOOGLE_WEB_CLIENT_ID',
+      defaultValue: '',
+    );
+    const iosClientId = String.fromEnvironment(
+      'GOOGLE_IOS_CLIENT_ID',
+      defaultValue: '',
+    );
+    await GoogleSignIn.instance.initialize(
+      clientId: iosClientId.isNotEmpty ? iosClientId : null,
+      serverClientId: webClientId.isNotEmpty ? webClientId : null,
+    );
+  }
+
   Future<void> signInWithGoogle() async {
     state = AuthStateLoading();
     try {
-      // TODO: Google Cloud Console에서 발급받은 Client ID로 교체 필요
-      const webClientId = String.fromEnvironment(
-        'GOOGLE_WEB_CLIENT_ID',
-        defaultValue: '',
-      );
-      const iosClientId = String.fromEnvironment(
-        'GOOGLE_IOS_CLIENT_ID',
-        defaultValue: '',
-      );
-
+      await _initializeGoogleSignIn();
       final googleSignIn = GoogleSignIn.instance;
-      await googleSignIn.initialize(
-        clientId: iosClientId.isNotEmpty ? iosClientId : null,
-        serverClientId: webClientId.isNotEmpty ? webClientId : null,
-      );
 
-      final googleUser = await googleSignIn.authenticate();
+      final googleUser =
+          await googleSignIn.attemptLightweightAuthentication() ??
+              await googleSignIn.authenticate();
+
+      final scopes = ['email', 'profile'];
+      final authorization =
+          await googleUser.authorizationClient.authorizationForScopes(scopes) ??
+              await googleUser.authorizationClient.authorizeScopes(scopes);
 
       final idToken = googleUser.authentication.idToken;
 
@@ -129,10 +140,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final response = await _supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
+        accessToken: authorization.accessToken,
       );
 
       if (response.session == null) {
         state = AuthStateError('Google 로그인에 실패했습니다');
+      } else {
+        await _loadUserProfile(response.session!.user.id);
       }
     } on GoogleSignInException catch (e) {
       debugPrint('Google 로그인 에러: $e');
@@ -176,6 +190,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (response.session == null) {
         state = AuthStateError('Apple 로그인에 실패했습니다');
+      } else {
+        await _loadUserProfile(response.session!.user.id);
       }
     } catch (e) {
       debugPrint('Apple 로그인 에러: $e');
@@ -206,14 +222,50 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    await _signOutGoogleNative();
     await _supabase.auth.signOut();
     state = AuthStateUnauthenticated();
+  }
+
+  /// Supabase만 로그아웃하면 Google SDK에 이전 계정이 남아
+  /// `attemptLightweightAuthentication`으로 무통장 로그인되므로 네이티브에서도 해제
+  Future<void> _signOutGoogleNative() async {
+    try {
+      await _initializeGoogleSignIn();
+      await GoogleSignIn.instance.signOut();
+    } catch (e) {
+      debugPrint('Google signOut (무시 가능): $e');
+    }
+  }
+
+  /// 회원 탈퇴 시 앱에 부여된 Google 권한까지 제거
+  Future<void> _disconnectGoogleNative() async {
+    try {
+      await _initializeGoogleSignIn();
+      await GoogleSignIn.instance.disconnect();
+    } catch (e) {
+      debugPrint('Google disconnect (무시 가능): $e');
+    }
   }
 
   Future<void> deleteAccount() async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
     await _supabase.from('users').delete().eq('id', userId);
+
+    // 서버에서 auth.users 삭제 — Edge Function 배포 필요 (supabase/README.md)
+    try {
+      await _supabase.functions.invoke(SupabaseConstants.deleteAccountEdgeFunction);
+    } on FunctionException catch (e) {
+      debugPrint(
+        '회원탈퇴: Auth 원격 삭제 실패(Edge Function 배포·이름 확인): '
+        '${e.status} ${e.details}',
+      );
+    } catch (e) {
+      debugPrint('회원탈퇴: Auth 원격 삭제 실패: $e');
+    }
+
+    await _disconnectGoogleNative();
     await _supabase.auth.signOut();
     state = AuthStateUnauthenticated();
   }
