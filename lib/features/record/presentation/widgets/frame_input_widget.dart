@@ -36,10 +36,11 @@ class _FrameInputWidgetState extends State<FrameInputWidget> {
           _frames[idx].firstThrow = f.firstThrow;
           _frames[idx].secondThrow = f.secondThrow;
           _frames[idx].thirdThrow = f.thirdThrow;
-          _frames[idx].isComplete = true;
+          _frames[idx].isComplete = _isFrameComplete(f);
         }
       }
       _findNextInput();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _notify());
     }
   }
 
@@ -78,6 +79,18 @@ class _FrameInputWidgetState extends State<FrameInputWidget> {
     }
     _currentFrame = 9;
     _currentThrow = -1;
+  }
+
+  /// FrameData가 완전한 프레임인지 판별
+  bool _isFrameComplete(FrameData f) {
+    if (f.frameNumber < 10) {
+      return f.firstThrow == 10 || f.secondThrow != null;
+    }
+    // 10프레임
+    if (f.secondThrow == null) return false;
+    final needsThird =
+        f.firstThrow == 10 || (f.firstThrow + f.secondThrow!) == 10;
+    return needsThird ? f.thirdThrow != null : true;
   }
 
   bool get _isGameComplete => _frames.every((f) => f.isComplete);

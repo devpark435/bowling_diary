@@ -57,5 +57,7 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSCameraUsageDescription</key>
+		<string>볼링 점수판을 촬영하여 자동으로 점수를 입력합니다</string>
 	</dict>
 </plist>
