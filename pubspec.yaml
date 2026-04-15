@@ -54,15 +54,17 @@ dev_dependencies:
 flutter_native_splash:
   color: "#FFFBF5"
   image: assets/splash/splash_logo.png
-  color_dark: "#0D0D0D"
+  # 다크 모드에서도 동일 크림 배경 (시스템 다크 시 검은 네이티브 스플래시 → 크림 UI 깜빡임 방지)
+  color_dark: "#FFFBF5"
   image_dark: assets/splash/splash_logo.png
   android_12:
     color: "#FFFBF5"
     image: assets/splash/splash_logo.png
-    color_dark: "#0D0D0D"
+    color_dark: "#FFFBF5"
     image_dark: assets/splash/splash_logo.png
   ios: true
   android: true
+  web: false
 
 flutter_launcher_icons:
   android: true
