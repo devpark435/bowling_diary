@@ -132,40 +132,19 @@ class BowlingOcrService {
         break;
       }
     }
-    debugPrint('[OCR] 프레임 헤더 행: ${headerRowIdx != null ? "행[$headerRowIdx]에서 발견" : "!! 미발견 (열 위치 매핑 불가)"}');
+    debugPrint('[OCR] 프레임 헤더 행: ${headerRowIdx != null ? "행[$headerRowIdx]에서 발견" : "!! 미발견"}');
 
-    // 플레이어 이름이 포함된 행 감지 (한글 텍스트)
-    final playerGroups = <_PlayerRowGroup>[];
+    // 1차: 한글 이름으로 플레이어 감지
+    var playerGroups = _detectPlayersByKoreanName(rows, headerRowIdx);
 
-    for (int i = 0; i < rows.length; i++) {
-      if (i == headerRowIdx) continue;
-
-      final koreanName = _extractKoreanName(rows[i]);
-      if (koreanName != null) {
-        debugPrint('[OCR] 플레이어 이름 발견: "$koreanName" (행[$i])');
-
-        // 이름이 있는 행 = 핀 카운트 행
-        // 바로 다음 행 = 누적 점수 행 (숫자만 있는 행)
-        _TextRow? cumulativeRow;
-        if (i + 1 < rows.length && _isNumericRow(rows[i + 1])) {
-          cumulativeRow = rows[i + 1];
-          final cumTexts = cumulativeRow.elements.map((e) => e.text).join(', ');
-          debugPrint('[OCR]   누적 점수 행 발견 (행[${i + 1}]): $cumTexts');
-        } else {
-          debugPrint('[OCR]   !! 누적 점수 행 미발견 (행[${i + 1}]이 숫자 행이 아님)');
-        }
-
-        playerGroups.add(_PlayerRowGroup(
-          name: koreanName,
-          pinCountRow: rows[i],
-          cumulativeRow: cumulativeRow,
-        ));
-      }
+    // 2차: 한글 이름 실패 시, "K" 마커 + 행 패턴으로 감지
+    if (playerGroups.isEmpty) {
+      debugPrint('[OCR] 한글 이름 감지 실패 → "K" 마커 기반 감지 시도');
+      playerGroups = _detectPlayersByMarker(rows, headerRowIdx);
     }
 
     if (playerGroups.isEmpty) {
-      debugPrint('[OCR] !! 한글 이름을 가진 행이 없음 - 플레이어 감지 실패');
-      debugPrint('[OCR]    각 행의 내용을 확인하세요:');
+      debugPrint('[OCR] !! 모든 감지 방법 실패');
       for (int i = 0; i < rows.length; i++) {
         final texts = rows[i].elements.map((e) => '"${e.text}"').join(', ');
         debugPrint('[OCR]    행[$i]: $texts');
@@ -182,6 +161,125 @@ class BowlingOcrService {
     return playerGroups
         .map((g) => _parsePlayerGroup(g, columnPositions))
         .toList();
+  }
+
+  /// 1차 감지: 한글 이름으로 플레이어 행 찾기
+  List<_PlayerRowGroup> _detectPlayersByKoreanName(
+    List<_TextRow> rows,
+    int? headerRowIdx,
+  ) {
+    final groups = <_PlayerRowGroup>[];
+
+    for (int i = 0; i < rows.length; i++) {
+      if (i == headerRowIdx) continue;
+
+      final koreanName = _extractKoreanName(rows[i]);
+      if (koreanName != null) {
+        debugPrint('[OCR] 한글 이름 발견: "$koreanName" (행[$i])');
+
+        _TextRow? cumulativeRow;
+        if (i + 1 < rows.length && _isNumericRow(rows[i + 1])) {
+          cumulativeRow = rows[i + 1];
+        }
+
+        groups.add(_PlayerRowGroup(
+          name: koreanName,
+          pinCountRow: rows[i],
+          cumulativeRow: cumulativeRow,
+        ));
+      }
+    }
+
+    return groups;
+  }
+
+  /// 2차 감지: "K" 마커 또는 행 패턴으로 플레이어 찾기
+  /// 볼링장 모니터에서 한글 이름이 OCR로 인식 안 될 때 사용
+  List<_PlayerRowGroup> _detectPlayersByMarker(
+    List<_TextRow> rows,
+    int? headerRowIdx,
+  ) {
+    final groups = <_PlayerRowGroup>[];
+    final usedRows = <int>{};
+    if (headerRowIdx != null) usedRows.add(headerRowIdx);
+
+    // "K" 마커가 있는 행 = 핀 카운트 행(플레이어 시작점)
+    // 볼링장 모니터에서 각 플레이어 행 왼쪽에 "K" 레이블이 표시됨
+    int playerNum = 0;
+    for (int i = 0; i < rows.length; i++) {
+      if (usedRows.contains(i)) continue;
+
+      final hasKMarker = _hasPlayerMarker(rows[i]);
+      if (!hasKMarker) continue;
+
+      playerNum++;
+      usedRows.add(i);
+
+      // 이 행에서 한글 이름 추출 시도 (실패하면 "플레이어 N")
+      final name = _extractKoreanName(rows[i]) ?? '플레이어 $playerNum';
+      debugPrint('[OCR] "K" 마커 감지 → "$name" (행[$i])');
+
+      // 다음 행이 누적 점수 행인지 확인
+      _TextRow? cumulativeRow;
+      if (i + 1 < rows.length && !usedRows.contains(i + 1)) {
+        if (_isNumericRow(rows[i + 1])) {
+          cumulativeRow = rows[i + 1];
+          usedRows.add(i + 1);
+          final cumTexts = cumulativeRow.elements.map((e) => e.text).join(', ');
+          debugPrint('[OCR]   누적 점수 행: 행[${i + 1}] → $cumTexts');
+        }
+      }
+
+      // "K"만 단독 행인 경우: 핀 카운트가 별도 행에 있을 수 있음
+      // 행[3]: "K" (단독) → 다음 행이 누적 점수면, 핀 카운트 행이 없는 것
+      if (rows[i].elements.length <= 1 && cumulativeRow != null) {
+        debugPrint('[OCR]   "K" 단독 행 → 핀 카운트 없이 누적 점수만 사용');
+        groups.add(_PlayerRowGroup(
+          name: name,
+          pinCountRow: rows[i],
+          cumulativeRow: cumulativeRow,
+        ));
+        continue;
+      }
+
+      // "K"만 단독이고 다음 2행이 핀+누적일 수 있음
+      if (rows[i].elements.length <= 1 && cumulativeRow == null) {
+        // 다음 행 = 핀 카운트, 그 다음 행 = 누적 점수
+        if (i + 1 < rows.length && !usedRows.contains(i + 1)) {
+          final pinRow = rows[i + 1];
+          usedRows.add(i + 1);
+          _TextRow? cumRow;
+          if (i + 2 < rows.length && !usedRows.contains(i + 2) && _isNumericRow(rows[i + 2])) {
+            cumRow = rows[i + 2];
+            usedRows.add(i + 2);
+          }
+          debugPrint('[OCR]   "K" 단독 → 핀: 행[${i + 1}], 누적: ${cumRow != null ? "행[${i + 2}]" : "없음"}');
+          groups.add(_PlayerRowGroup(
+            name: name,
+            pinCountRow: pinRow,
+            cumulativeRow: cumRow,
+          ));
+          continue;
+        }
+      }
+
+      groups.add(_PlayerRowGroup(
+        name: name,
+        pinCountRow: rows[i],
+        cumulativeRow: cumulativeRow,
+      ));
+    }
+
+    return groups;
+  }
+
+  /// 행에 "K" 같은 플레이어 마커가 있는지 확인
+  bool _hasPlayerMarker(_TextRow row) {
+    for (final e in row.elements) {
+      final text = e.text.trim().toUpperCase();
+      if (text == 'K') return true;
+    }
+    return false;
   }
 
   /// 프레임 헤더 행인지 확인 (1~10 숫자 시퀀스)
@@ -332,32 +430,92 @@ class BowlingOcrService {
     List<double>? columnPositions,
     Map<int, int> result,
   ) {
-    // 열 위치 기반 매핑
-    if (columnPositions != null && columnPositions.isNotEmpty) {
-      for (final e in row.elements) {
-        final score = int.tryParse(e.text.trim());
-        if (score == null || score < 0 || score > 300) continue;
+    // 먼저 각 요소에서 숫자를 추출 (합쳐진 숫자, 파이프 문자 처리)
+    final scores = <int>[];
+    for (final e in row.elements) {
+      final extracted = _extractScoresFromText(e.text);
+      scores.addAll(extracted);
+    }
 
-        final frameNum = _matchToColumn(e.rect.center.dx, columnPositions);
-        if (frameNum != null) {
-          result[frameNum] = score;
-        }
+    debugPrint('[OCR]   누적 점수 추출 원본: $scores');
+
+    // 누적 점수는 단조 증가해야 함
+    final validScores = _filterMonotonic(scores);
+    debugPrint('[OCR]   단조 증가 필터 후: $validScores');
+
+    for (int i = 0; i < min(validScores.length, 10); i++) {
+      result[i + 1] = validScores[i];
+    }
+  }
+
+  /// 텍스트에서 누적 점수 숫자들을 추출
+  /// "102111|" → [102, 111], "85|105" → [85, 105], "152172" → [152, 172]
+  List<int> _extractScoresFromText(String text) {
+    // 파이프, 슬래시 등 구분자로 먼저 분리
+    final cleaned = text.replaceAll(RegExp(r'[|/\\]'), ' ');
+    final parts = cleaned.split(RegExp(r'\s+'));
+
+    final results = <int>[];
+    for (final part in parts) {
+      final trimmed = part.trim();
+      if (trimmed.isEmpty) continue;
+
+      // 숫자만 추출
+      final digitsOnly = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digitsOnly.isEmpty) continue;
+
+      final n = int.tryParse(digitsOnly);
+      if (n != null && n >= 0 && n <= 300) {
+        results.add(n);
+        continue;
       }
-    } else {
-      // 열 위치를 모를 경우, 좌→우 순서대로 1~10프레임에 매핑
-      final scores = <int>[];
-      for (final e in row.elements) {
-        final score = int.tryParse(e.text.trim());
-        if (score != null && score >= 0 && score <= 300) {
-          scores.add(score);
-        }
-      }
-      // 누적 점수는 단조 증가해야 함
-      final validScores = _filterMonotonic(scores);
-      for (int i = 0; i < min(validScores.length, 10); i++) {
-        result[i + 1] = validScores[i];
+
+      // 300 초과면 합쳐진 숫자 → 2~3자리씩 분리 시도
+      if (n != null && n > 300) {
+        results.addAll(_splitConcatenatedScores(digitsOnly));
       }
     }
+    return results;
+  }
+
+  /// "102111" → [102, 111], "152172" → [152, 172] 등 합쳐진 점수 분리
+  List<int> _splitConcatenatedScores(String digits) {
+    final results = <int>[];
+    int i = 0;
+
+    while (i < digits.length) {
+      // 3자리 시도 (100~300 범위)
+      if (i + 3 <= digits.length) {
+        final three = int.tryParse(digits.substring(i, i + 3));
+        if (three != null && three >= 100 && three <= 300) {
+          results.add(three);
+          i += 3;
+          continue;
+        }
+      }
+      // 2자리 시도 (10~99 범위)
+      if (i + 2 <= digits.length) {
+        final two = int.tryParse(digits.substring(i, i + 2));
+        if (two != null && two >= 10 && two <= 99) {
+          results.add(two);
+          i += 2;
+          continue;
+        }
+      }
+      // 1자리 시도 (1~9 범위)
+      if (i + 1 <= digits.length) {
+        final one = int.tryParse(digits.substring(i, i + 1));
+        if (one != null && one >= 1 && one <= 9) {
+          results.add(one);
+          i += 1;
+          continue;
+        }
+      }
+      i++;
+    }
+
+    debugPrint('[OCR]     합쳐진 숫자 분리: "$digits" → $results');
+    return results;
   }
 
   /// 단조 증가하는 부분 수열 추출
@@ -529,28 +687,34 @@ class BowlingOcrService {
   /// 핀 카운트 텍스트를 숫자로 변환
   int? _parsePinValue(String text) {
     if (text.isEmpty) return null;
-    final upper = text.toUpperCase();
+    final upper = text.toUpperCase().trim();
 
-    // 스트라이크
-    if (upper == 'X' || upper == 'x') return 10;
+    // 스트라이크 (X 및 OCR 오인식 패턴: M, N, W, K 등 대각선 모양 글자)
+    if (_isStrikeText(text)) return 10;
     // 거터/미스
     if (upper == '-' || upper == '0') return 0;
+    // 스페어
+    if (_isSpareText(text)) return null;
     // 숫자
     final n = int.tryParse(text);
     if (n != null && n >= 0 && n <= 10) return n;
-    // 스페어는 이전 투구 없이 해석 불가 → null
-    if (upper == '/') return null;
 
+    debugPrint('[OCR]     핀 값 변환 실패: "$text"');
     return null;
   }
 
+  /// 스트라이크 텍스트 판별 (OCR 오인식 패턴 포함)
+  /// "K"는 볼링장 모니터의 플레이어 마커이므로 제외 (필터에서 이미 제거됨)
   bool _isStrikeText(String text) {
     final upper = text.toUpperCase().trim();
-    return upper == 'X' || upper == 'x';
+    // 볼링 모니터의 대각선 스트라이크 마크가 OCR에서 다양한 글자로 인식됨
+    const strikePatterns = {'X', 'M', 'N', 'W', 'Y', 'V'};
+    return strikePatterns.contains(upper);
   }
 
   bool _isSpareText(String text) {
-    return text.trim() == '/';
+    final trimmed = text.trim();
+    return trimmed == '/' || trimmed == '|' || trimmed == 'l';
   }
 
   /// throw 값들로 OcrFrameResult 생성
