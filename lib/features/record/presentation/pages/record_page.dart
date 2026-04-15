@@ -276,6 +276,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
 
     if (!mounted) return;
     setState(() => _isLoading = true);
+    debugPrint('[OCR] 이미지 선택 완료: $imagePath');
 
     try {
       final result = await _ocrService.processImage(imagePath);
@@ -284,9 +285,12 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       setState(() => _isLoading = false);
 
       if (result.isEmpty) {
+        debugPrint('[OCR] !! 결과가 비어있음 - 플레이어를 한 명도 감지하지 못함');
         _showOcrError('점수를 인식하지 못했습니다.\n모니터가 잘 보이도록 다시 촬영해주세요.');
         return;
       }
+
+      debugPrint('[OCR] 인식 성공 - ${result.players.length}명 감지');
 
       // 다중 플레이어 → 선택
       OcrPlayerResult? selectedPlayer;

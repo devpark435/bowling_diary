@@ -12,20 +12,53 @@ class BowlingOcrService {
 
   Future<OcrResult> processImage(String imagePath) async {
     try {
+      debugPrint('[OCR] === 이미지 처리 시작 ===');
+      debugPrint('[OCR] 이미지 경로: $imagePath');
+
       final inputImage = InputImage.fromFilePath(imagePath);
       final recognizedText = await _textRecognizer.processImage(inputImage);
 
+      debugPrint('[OCR] ML Kit 인식 완료 - 블록 수: ${recognizedText.blocks.length}');
+      for (final block in recognizedText.blocks) {
+        debugPrint('[OCR]   블록: "${block.text}" '
+            '(${block.boundingBox.left.toInt()}, ${block.boundingBox.top.toInt()}) '
+            '${block.boundingBox.width.toInt()}x${block.boundingBox.height.toInt()}');
+      }
+
       final elements = _extractAllElements(recognizedText);
+      debugPrint('[OCR] 추출된 텍스트 요소 수: ${elements.length}');
       if (elements.isEmpty) {
+        debugPrint('[OCR] !! 텍스트 요소가 0개 - 이미지에서 글자를 전혀 인식하지 못함');
         return OcrResult(players: [], imagePath: imagePath);
       }
 
-      final rows = _groupIntoRows(elements);
-      final players = _parsePlayerRows(rows);
+      for (final e in elements) {
+        debugPrint('[OCR]   요소: "${e.text}" '
+            'at (${e.rect.left.toInt()}, ${e.rect.top.toInt()}) '
+            '${e.rect.width.toInt()}x${e.rect.height.toInt()}');
+      }
 
+      final rows = _groupIntoRows(elements);
+      debugPrint('[OCR] 행 그룹핑 결과: ${rows.length}개 행');
+      for (int i = 0; i < rows.length; i++) {
+        final texts = rows[i].elements.map((e) => e.text).join(' | ');
+        debugPrint('[OCR]   행[$i] Y=${rows[i].centerY.toInt()}: $texts');
+      }
+
+      final players = _parsePlayerRows(rows);
+      debugPrint('[OCR] 감지된 플레이어 수: ${players.length}');
+      for (final p in players) {
+        debugPrint('[OCR]   플레이어: "${p.playerName}" - '
+            '프레임 ${p.frames.length}개, '
+            '완료 ${p.completedFrameCount}개, '
+            '총점 ${p.totalScore ?? "없음"}');
+      }
+
+      debugPrint('[OCR] === 이미지 처리 완료 ===');
       return OcrResult(players: players, imagePath: imagePath);
-    } catch (e) {
-      debugPrint('OCR 처리 오류: $e');
+    } catch (e, stackTrace) {
+      debugPrint('[OCR] !! 처리 중 예외 발생: $e');
+      debugPrint('[OCR] $stackTrace');
       return OcrResult(players: [], imagePath: imagePath);
     }
   }
@@ -86,7 +119,10 @@ class BowlingOcrService {
 
   /// 행 데이터에서 플레이어별 프레임 정보를 파싱
   List<OcrPlayerResult> _parsePlayerRows(List<_TextRow> rows) {
-    if (rows.isEmpty) return [];
+    if (rows.isEmpty) {
+      debugPrint('[OCR] !! 행이 0개 - 파싱할 데이터 없음');
+      return [];
+    }
 
     // 프레임 헤더 행 감지 (1~10 숫자가 연속으로 나오는 행)
     int? headerRowIdx;
@@ -96,6 +132,7 @@ class BowlingOcrService {
         break;
       }
     }
+    debugPrint('[OCR] 프레임 헤더 행: ${headerRowIdx != null ? "행[$headerRowIdx]에서 발견" : "!! 미발견 (열 위치 매핑 불가)"}');
 
     // 플레이어 이름이 포함된 행 감지 (한글 텍스트)
     final playerGroups = <_PlayerRowGroup>[];
@@ -105,11 +142,17 @@ class BowlingOcrService {
 
       final koreanName = _extractKoreanName(rows[i]);
       if (koreanName != null) {
+        debugPrint('[OCR] 플레이어 이름 발견: "$koreanName" (행[$i])');
+
         // 이름이 있는 행 = 핀 카운트 행
         // 바로 다음 행 = 누적 점수 행 (숫자만 있는 행)
         _TextRow? cumulativeRow;
         if (i + 1 < rows.length && _isNumericRow(rows[i + 1])) {
           cumulativeRow = rows[i + 1];
+          final cumTexts = cumulativeRow.elements.map((e) => e.text).join(', ');
+          debugPrint('[OCR]   누적 점수 행 발견 (행[${i + 1}]): $cumTexts');
+        } else {
+          debugPrint('[OCR]   !! 누적 점수 행 미발견 (행[${i + 1}]이 숫자 행이 아님)');
         }
 
         playerGroups.add(_PlayerRowGroup(
@@ -120,10 +163,20 @@ class BowlingOcrService {
       }
     }
 
+    if (playerGroups.isEmpty) {
+      debugPrint('[OCR] !! 한글 이름을 가진 행이 없음 - 플레이어 감지 실패');
+      debugPrint('[OCR]    각 행의 내용을 확인하세요:');
+      for (int i = 0; i < rows.length; i++) {
+        final texts = rows[i].elements.map((e) => '"${e.text}"').join(', ');
+        debugPrint('[OCR]    행[$i]: $texts');
+      }
+    }
+
     // 헤더 행에서 프레임 열 위치 매핑
     List<double>? columnPositions;
     if (headerRowIdx != null) {
       columnPositions = _extractColumnPositions(rows[headerRowIdx]);
+      debugPrint('[OCR] 열 위치: ${columnPositions.map((p) => p.toInt()).toList()}');
     }
 
     return playerGroups
@@ -213,6 +266,7 @@ class BowlingOcrService {
     _PlayerRowGroup group,
     List<double>? columnPositions,
   ) {
+    debugPrint('[OCR] --- "${group.name}" 파싱 시작 ---');
     final frames = <int, OcrFrameResult>{};
 
     // 1. 누적 점수 파싱 (신뢰도 높음)
@@ -223,6 +277,9 @@ class BowlingOcrService {
         columnPositions,
         cumulativeScores,
       );
+      debugPrint('[OCR]   누적 점수 파싱 결과: $cumulativeScores');
+    } else {
+      debugPrint('[OCR]   !! 누적 점수 행 없음');
     }
 
     // 2. 핀 카운트 파싱
@@ -232,6 +289,13 @@ class BowlingOcrService {
       columnPositions,
       frames,
     );
+    debugPrint('[OCR]   핀 카운트 파싱 결과: ${frames.length}개 프레임');
+    for (final entry in frames.entries) {
+      final f = entry.value;
+      debugPrint('[OCR]     프레임${f.frameNumber}: '
+          '1투=${f.firstThrow} 2투=${f.secondThrow} 3투=${f.thirdThrow} '
+          '신뢰도=${f.confidence.name}');
+    }
 
     // 3. 누적 점수를 프레임에 매핑
     for (final entry in cumulativeScores.entries) {
@@ -255,6 +319,7 @@ class BowlingOcrService {
     final sortedFrames = frames.values.toList()
       ..sort((a, b) => a.frameNumber.compareTo(b.frameNumber));
 
+    debugPrint('[OCR] --- "${group.name}" 최종: ${sortedFrames.length}개 프레임 ---');
     return OcrPlayerResult(
       playerName: group.name,
       frames: sortedFrames,
@@ -314,6 +379,9 @@ class BowlingOcrService {
     List<double>? columnPositions,
     Map<int, OcrFrameResult> frames,
   ) {
+    final allTexts = row.elements.map((e) => '"${e.text}"').join(', ');
+    debugPrint('[OCR]   핀 카운트 행 원본 요소: $allTexts');
+
     // 이름과 프레임 번호 등 불필요한 요소를 제외한 핀 카운트 요소 수집
     final pinElements = <_OcrElement>[];
     final koreanRegex = RegExp(r'[가-힣]');
@@ -321,11 +389,15 @@ class BowlingOcrService {
 
     for (final e in row.elements) {
       final text = e.text.trim();
-      if (text.isEmpty) continue;
-      if (koreanRegex.hasMatch(text)) continue;
-      if (skipTexts.contains(text.toUpperCase())) continue;
+      if (text.isEmpty) { debugPrint('[OCR]     필터: "$text" → 빈 문자열 제외'); continue; }
+      if (koreanRegex.hasMatch(text)) { debugPrint('[OCR]     필터: "$text" → 한글 포함 제외'); continue; }
+      if (skipTexts.contains(text.toUpperCase())) { debugPrint('[OCR]     필터: "$text" → 스킵 키워드 제외'); continue; }
       pinElements.add(e);
     }
+
+    final filteredTexts = pinElements.map((e) => '"${e.text}"').join(', ');
+    debugPrint('[OCR]   필터링 후 핀 요소 ${pinElements.length}개: $filteredTexts');
+    debugPrint('[OCR]   열 위치 매핑 방식: ${columnPositions != null && columnPositions.isNotEmpty ? "열 기반" : "순서 기반"}');
 
     if (columnPositions != null && columnPositions.isNotEmpty) {
       _parsePinCountsByColumn(pinElements, columnPositions, frames);
