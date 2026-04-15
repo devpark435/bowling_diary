@@ -2,6 +2,18 @@ import 'package:bowling_diary/features/record/domain/entities/game_entity.dart';
 
 enum OcrConfidence { high, low, unrecognized }
 
+/// 프레임별 검증 상태 (CumulativeScoreValidator 결과)
+enum OcrValidationStatus {
+  /// 아직 검증 안 됨
+  none,
+  /// 순방향 계산과 누적 점수 일치
+  validated,
+  /// 역추론으로 보정됨
+  corrected,
+  /// 검증 불가 (데이터 부족)
+  unverified,
+}
+
 /// OCR로 인식된 개별 프레임 결과
 class OcrFrameResult {
   final int frameNumber;
@@ -10,6 +22,7 @@ class OcrFrameResult {
   final int? thirdThrow;
   final int? cumulativeScore;
   final OcrConfidence confidence;
+  final OcrValidationStatus validationStatus;
 
   const OcrFrameResult({
     required this.frameNumber,
@@ -18,6 +31,7 @@ class OcrFrameResult {
     this.thirdThrow,
     this.cumulativeScore,
     this.confidence = OcrConfidence.unrecognized,
+    this.validationStatus = OcrValidationStatus.none,
   });
 
   bool get isComplete {
@@ -48,6 +62,7 @@ class OcrFrameResult {
     int? thirdThrow,
     int? cumulativeScore,
     OcrConfidence? confidence,
+    OcrValidationStatus? validationStatus,
   }) {
     return OcrFrameResult(
       frameNumber: frameNumber,
@@ -56,6 +71,7 @@ class OcrFrameResult {
       thirdThrow: thirdThrow ?? this.thirdThrow,
       cumulativeScore: cumulativeScore ?? this.cumulativeScore,
       confidence: confidence ?? this.confidence,
+      validationStatus: validationStatus ?? this.validationStatus,
     );
   }
 }
@@ -88,6 +104,32 @@ class OcrPlayerResult {
         .map((f) => f.toFrameData()!)
         .toList();
   }
+}
+
+/// OCR 결과 적용 방식 (총점만 vs 프레임 상세)
+enum OcrApplyMode { totalOnly, frameDetail }
+
+/// OCR 결과 적용 결과
+class OcrApplyResult {
+  final OcrApplyMode mode;
+  final int? totalScore;
+  final List<FrameData>? frames;
+
+  const OcrApplyResult({
+    required this.mode,
+    this.totalScore,
+    this.frames,
+  });
+
+  const OcrApplyResult.totalOnly(int score)
+      : mode = OcrApplyMode.totalOnly,
+        totalScore = score,
+        frames = null;
+
+  OcrApplyResult.frameDetail(List<FrameData> frameData)
+      : mode = OcrApplyMode.frameDetail,
+        totalScore = null,
+        frames = frameData;
 }
 
 /// OCR 전체 결과

@@ -304,7 +304,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       if (!mounted) return;
 
       // 결과 확인 페이지
-      final frameData = await Navigator.push<List<FrameData>>(
+      final applyResult = await Navigator.push<OcrApplyResult>(
         context,
         MaterialPageRoute(
           builder: (_) => OcrResultPage(
@@ -314,10 +314,14 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         ),
       );
 
-      if (frameData == null || !mounted) return;
+      if (applyResult == null || !mounted) return;
 
-      // 프레임 데이터 적용
-      _applyOcrFrames(gameIndex, frameData);
+      // 적용 모드에 따라 분기
+      if (applyResult.mode == OcrApplyMode.totalOnly) {
+        _applyOcrTotalOnly(gameIndex, applyResult.totalScore!);
+      } else {
+        _applyOcrFrames(gameIndex, applyResult.frames ?? []);
+      }
     } catch (e) {
       debugPrint('OCR 오류: $e');
       if (mounted) {
@@ -362,6 +366,22 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             const SizedBox(height: 12),
           ],
         ),
+      ),
+    );
+  }
+
+  void _applyOcrTotalOnly(int gameIndex, int totalScore) {
+    setState(() {
+      final game = _games[gameIndex];
+      game.useFrameInput = false;
+      game.scoreController.text = '$totalScore';
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('총점 $totalScore점이 입력되었습니다.'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

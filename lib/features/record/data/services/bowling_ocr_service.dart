@@ -4,11 +4,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
+import 'package:bowling_diary/features/record/data/services/cumulative_score_validator.dart';
+import 'package:bowling_diary/features/record/data/services/score_cell_analyzer.dart';
 import 'package:bowling_diary/features/record/domain/entities/ocr_result.dart';
 
 class BowlingOcrService {
   final TextRecognizer _textRecognizer =
       TextRecognizer(script: TextRecognitionScript.korean);
+  final ScoreCellAnalyzer _cellAnalyzer = ScoreCellAnalyzer();
+  final CumulativeScoreValidator _validator = CumulativeScoreValidator();
 
   Future<OcrResult> processImage(String imagePath) async {
     try {
@@ -45,7 +49,7 @@ class BowlingOcrService {
         debugPrint('[OCR]   행[$i] Y=${rows[i].centerY.toInt()}: $texts');
       }
 
-      final players = _parsePlayerRows(rows);
+      final players = await _parsePlayerRows(rows, imagePath);
       debugPrint('[OCR] 감지된 플레이어 수: ${players.length}');
       for (final p in players) {
         debugPrint('[OCR]   플레이어: "${p.playerName}" - '
@@ -118,7 +122,7 @@ class BowlingOcrService {
   }
 
   /// 행 데이터에서 플레이어별 프레임 정보를 파싱
-  List<OcrPlayerResult> _parsePlayerRows(List<_TextRow> rows) {
+  Future<List<OcrPlayerResult>> _parsePlayerRows(List<_TextRow> rows, String imagePath) async {
     if (rows.isEmpty) {
       debugPrint('[OCR] !! 행이 0개 - 파싱할 데이터 없음');
       return [];
@@ -143,6 +147,12 @@ class BowlingOcrService {
       playerGroups = _detectPlayersByMarker(rows, headerRowIdx);
     }
 
+    // 3차: 누적 점수 행 패턴으로 감지 (범용 - K 마커 없는 볼링장 대응)
+    if (playerGroups.isEmpty) {
+      debugPrint('[OCR] "K" 마커 감지 실패 → 누적 점수 패턴 기반 감지 시도');
+      playerGroups = _detectPlayersByCumulativePattern(rows, headerRowIdx);
+    }
+
     if (playerGroups.isEmpty) {
       debugPrint('[OCR] !! 모든 감지 방법 실패');
       for (int i = 0; i < rows.length; i++) {
@@ -158,9 +168,11 @@ class BowlingOcrService {
       debugPrint('[OCR] 열 위치: ${columnPositions.map((p) => p.toInt()).toList()}');
     }
 
-    return playerGroups
-        .map((g) => _parsePlayerGroup(g, columnPositions))
-        .toList();
+    final results = <OcrPlayerResult>[];
+    for (final g in playerGroups) {
+      results.add(await _parsePlayerGroup(g, columnPositions, imagePath));
+    }
+    return results;
   }
 
   /// 1차 감지: 한글 이름으로 플레이어 행 찾기
@@ -282,6 +294,65 @@ class BowlingOcrService {
     return false;
   }
 
+  /// 3차 감지: 누적 점수 행 패턴으로 플레이어 찾기
+  /// 단조 증가 + 0~300 범위 + 숫자 3개 이상인 행을 누적 점수 행으로 판별
+  List<_PlayerRowGroup> _detectPlayersByCumulativePattern(
+    List<_TextRow> rows,
+    int? headerRowIdx,
+  ) {
+    final groups = <_PlayerRowGroup>[];
+    final usedRows = <int>{};
+    if (headerRowIdx != null) usedRows.add(headerRowIdx);
+
+    int playerNum = 0;
+    for (int i = 0; i < rows.length; i++) {
+      if (usedRows.contains(i)) continue;
+
+      if (_isCumulativeScoreRow(rows[i])) {
+        playerNum++;
+        usedRows.add(i);
+
+        // 바로 위 행을 핀 카운트 행으로 사용 (사용되지 않은 경우)
+        _TextRow? pinCountRow;
+        if (i - 1 >= 0 && !usedRows.contains(i - 1) && i - 1 != headerRowIdx) {
+          pinCountRow = rows[i - 1];
+          usedRows.add(i - 1);
+        }
+
+        final name = (pinCountRow != null ? _extractKoreanName(pinCountRow) : null)
+            ?? '플레이어 $playerNum';
+
+        debugPrint('[OCR] 누적 점수 패턴 감지 → "$name" (누적: 행[$i]${pinCountRow != null ? ", 핀: 행[${i - 1}]" : ""})');
+
+        groups.add(_PlayerRowGroup(
+          name: name,
+          pinCountRow: pinCountRow ?? rows[i],
+          cumulativeRow: rows[i],
+        ));
+      }
+    }
+
+    return groups;
+  }
+
+  /// 행이 누적 점수 행인지 판별
+  /// 조건: 숫자 3개 이상 + 단조 증가 + 0~300 범위
+  bool _isCumulativeScoreRow(_TextRow row) {
+    final scores = <int>[];
+    for (final e in row.elements) {
+      final extracted = _extractScoresFromText(e.text);
+      scores.addAll(extracted);
+    }
+    if (scores.length < 3) return false;
+
+    final monotonic = _filterMonotonic(scores);
+    // 원본의 70% 이상이 단조 증가 패턴을 유지하고, 마지막 값이 10 이상이면 누적 점수 행
+    return monotonic.length >= scores.length * 0.7 &&
+        monotonic.length >= 3 &&
+        monotonic.last >= 10 &&
+        monotonic.last <= 300;
+  }
+
   /// 프레임 헤더 행인지 확인 (1~10 숫자 시퀀스)
   bool _isFrameHeaderRow(_TextRow row) {
     final numbers = <int>[];
@@ -360,10 +431,11 @@ class BowlingOcrService {
   }
 
   /// 플레이어 그룹을 파싱하여 OcrPlayerResult 생성
-  OcrPlayerResult _parsePlayerGroup(
+  Future<OcrPlayerResult> _parsePlayerGroup(
     _PlayerRowGroup group,
     List<double>? columnPositions,
-  ) {
+    String imagePath,
+  ) async {
     debugPrint('[OCR] --- "${group.name}" 파싱 시작 ---');
     final frames = <int, OcrFrameResult>{};
 
@@ -395,7 +467,23 @@ class BowlingOcrService {
           '신뢰도=${f.confidence.name}');
     }
 
-    // 3. 누적 점수를 프레임에 매핑
+    // 3. 셀 이미지 분석 (스트라이크/스페어 그래픽 감지)
+    if (columnPositions != null && columnPositions.isNotEmpty) {
+      final cellResults = await _analyzeCellImages(
+        imagePath: imagePath,
+        pinCountRow: group.pinCountRow,
+        columnPositions: columnPositions,
+      );
+      if (cellResults.isNotEmpty) {
+        debugPrint('[OCR]   셀 이미지 분석 결과: ${cellResults.length}개');
+        for (final cr in cellResults) {
+          debugPrint('[OCR]     $cr');
+        }
+        _applyCellAnalysisResults(frames, cellResults);
+      }
+    }
+
+    // 4. 누적 점수를 프레임에 매핑
     for (final entry in cumulativeScores.entries) {
       final frameNum = entry.key;
       if (frames.containsKey(frameNum)) {
@@ -411,11 +499,26 @@ class BowlingOcrService {
       }
     }
 
-    // 4. 누적 점수로 프레임 데이터 보완/검증
+    // 5. 기본 누적 점수 보완 (누적 점수만 있고 프레임 데이터 없는 경우)
     _validateAndFillFromCumulative(frames, cumulativeScores);
 
-    final sortedFrames = frames.values.toList()
+    // 6. CumulativeScoreValidator로 교차 검증 + 역추론 보정
+    final frameList = frames.values.toList()
       ..sort((a, b) => a.frameNumber.compareTo(b.frameNumber));
+
+    final validationResult = _validator.validate(
+      frames: frameList,
+      cumulativeScores: cumulativeScores,
+    );
+
+    debugPrint('[OCR]   검증 결과: 불일치 ${validationResult.mismatchedFrames.length}개, '
+        '완전 검증=${validationResult.isFullyValidated}');
+    if (validationResult.mismatchedFrames.isNotEmpty) {
+      debugPrint('[OCR]   불일치 프레임: ${validationResult.mismatchedFrames}');
+    }
+
+    // 7. 최종 결과 조합
+    final sortedFrames = validationResult.correctedFrames;
 
     debugPrint('[OCR] --- "${group.name}" 최종: ${sortedFrames.length}개 프레임 ---');
     return OcrPlayerResult(
@@ -772,6 +875,223 @@ class BowlingOcrService {
     }
   }
 
+  /// 핀 카운트 행의 바운딩 박스와 열 위치로 각 셀 영역을 계산하고 이미지 분석
+  Future<List<CellAnalysisResult>> _analyzeCellImages({
+    required String imagePath,
+    required _TextRow pinCountRow,
+    required List<double> columnPositions,
+  }) async {
+    if (columnPositions.length < 2) return [];
+
+    // 열 간격 평균
+    double avgGap = 0;
+    for (int i = 1; i < columnPositions.length; i++) {
+      avgGap += columnPositions[i] - columnPositions[i - 1];
+    }
+    avgGap /= (columnPositions.length - 1);
+
+    // 핀 카운트 행의 Y 범위
+    double minY = double.infinity, maxY = 0;
+    for (final e in pinCountRow.elements) {
+      if (e.rect.top < minY) minY = e.rect.top;
+      if (e.rect.bottom > maxY) maxY = e.rect.bottom;
+    }
+    final cellHeight = maxY - minY;
+    if (cellHeight < 5) return [];
+
+    final cellWidth = avgGap * 0.45;
+
+    final cells = <_CellInfo>[];
+    for (int frameIdx = 0; frameIdx < columnPositions.length && frameIdx < 10; frameIdx++) {
+      final frameNum = frameIdx + 1;
+      final centerX = columnPositions[frameIdx];
+
+      if (frameNum < 10) {
+        // 1~9 프레임: 1투, 2투 (좌/우 반분할)
+        cells.add(_CellInfo(
+          rect: ui.Rect.fromCenter(
+            center: ui.Offset(centerX - cellWidth * 0.5, (minY + maxY) / 2),
+            width: cellWidth,
+            height: cellHeight,
+          ),
+          frameNumber: frameNum,
+          throwIndex: 0,
+        ));
+        cells.add(_CellInfo(
+          rect: ui.Rect.fromCenter(
+            center: ui.Offset(centerX + cellWidth * 0.5, (minY + maxY) / 2),
+            width: cellWidth,
+            height: cellHeight,
+          ),
+          frameNumber: frameNum,
+          throwIndex: 1,
+        ));
+      } else {
+        // 10프레임: 3분할
+        final thirdWidth = cellWidth * 0.7;
+        cells.add(_CellInfo(
+          rect: ui.Rect.fromCenter(
+            center: ui.Offset(centerX - thirdWidth, (minY + maxY) / 2),
+            width: thirdWidth,
+            height: cellHeight,
+          ),
+          frameNumber: 10,
+          throwIndex: 0,
+        ));
+        cells.add(_CellInfo(
+          rect: ui.Rect.fromCenter(
+            center: ui.Offset(centerX, (minY + maxY) / 2),
+            width: thirdWidth,
+            height: cellHeight,
+          ),
+          frameNumber: 10,
+          throwIndex: 1,
+        ));
+        cells.add(_CellInfo(
+          rect: ui.Rect.fromCenter(
+            center: ui.Offset(centerX + thirdWidth, (minY + maxY) / 2),
+            width: thirdWidth,
+            height: cellHeight,
+          ),
+          frameNumber: 10,
+          throwIndex: 2,
+        ));
+      }
+    }
+
+    if (cells.isEmpty) return [];
+
+    final results = <CellAnalysisResult>[];
+    for (final cell in cells) {
+      final result = await _cellAnalyzer.analyzeCell(
+        imagePath: imagePath,
+        cellRect: cell.rect,
+        frameNumber: cell.frameNumber,
+        throwIndex: cell.throwIndex,
+      );
+      results.add(result);
+    }
+
+    return results;
+  }
+
+  /// 셀 분석 결과를 프레임에 적용
+  void _applyCellAnalysisResults(
+    Map<int, OcrFrameResult> frames,
+    List<CellAnalysisResult> cellResults,
+  ) {
+    // 프레임별로 셀 결과를 그룹핑
+    final grouped = <int, List<CellAnalysisResult>>{};
+    for (final cr in cellResults) {
+      grouped.putIfAbsent(cr.frameNumber, () => []).add(cr);
+    }
+
+    for (final entry in grouped.entries) {
+      final frameNum = entry.key;
+      final cells = entry.value..sort((a, b) => a.throwIndex.compareTo(b.throwIndex));
+      final existing = frames[frameNum];
+
+      if (frameNum < 10) {
+        _applyCellToNormalFrame(frames, frameNum, cells, existing);
+      } else {
+        _applyCellToTenthFrame(frames, cells, existing);
+      }
+    }
+  }
+
+  void _applyCellToNormalFrame(
+    Map<int, OcrFrameResult> frames,
+    int frameNum,
+    List<CellAnalysisResult> cells,
+    OcrFrameResult? existing,
+  ) {
+    final firstCell = cells.firstWhere((c) => c.throwIndex == 0,
+        orElse: () => cells.first);
+    final secondCell = cells.length > 1
+        ? cells.firstWhere((c) => c.throwIndex == 1, orElse: () => cells.last)
+        : null;
+
+    int? firstThrow = existing?.firstThrow;
+    int? secondThrow = existing?.secondThrow;
+    var confidence = existing?.confidence ?? OcrConfidence.unrecognized;
+
+    // 셀 = strike이고 ML Kit에서 스트라이크로 인식 못한 경우 → 셀 결과 적용
+    if (firstCell.type == CellType.strike && firstCell.confidence > 0.5) {
+      if (firstThrow != 10) {
+        debugPrint('[OCR]   셀 분석 보정: F$frameNum 1투 → 스트라이크');
+        firstThrow = 10;
+        secondThrow = null;
+        confidence = OcrConfidence.high;
+      }
+    }
+
+    // 2투 셀 = spare
+    if (secondCell != null &&
+        secondCell.type == CellType.spare &&
+        secondCell.confidence > 0.5 &&
+        firstThrow != null &&
+        firstThrow < 10) {
+      final spareVal = 10 - firstThrow;
+      if (secondThrow != spareVal) {
+        debugPrint('[OCR]   셀 분석 보정: F$frameNum 2투 → 스페어($spareVal)');
+        secondThrow = spareVal;
+        confidence = OcrConfidence.high;
+      }
+    }
+
+    if (firstThrow != existing?.firstThrow || secondThrow != existing?.secondThrow) {
+      frames[frameNum] = OcrFrameResult(
+        frameNumber: frameNum,
+        firstThrow: firstThrow,
+        secondThrow: secondThrow,
+        cumulativeScore: existing?.cumulativeScore,
+        confidence: confidence,
+      );
+    }
+  }
+
+  void _applyCellToTenthFrame(
+    Map<int, OcrFrameResult> frames,
+    List<CellAnalysisResult> cells,
+    OcrFrameResult? existing,
+  ) {
+    int? first = existing?.firstThrow;
+    int? second = existing?.secondThrow;
+    int? third = existing?.thirdThrow;
+    var confidence = existing?.confidence ?? OcrConfidence.unrecognized;
+
+    for (final cell in cells) {
+      if (cell.confidence < 0.5) continue;
+
+      if (cell.throwIndex == 0 && cell.type == CellType.strike && first != 10) {
+        first = 10;
+        confidence = OcrConfidence.high;
+      }
+      if (cell.throwIndex == 1) {
+        if (cell.type == CellType.strike && second != 10) {
+          second = 10;
+          confidence = OcrConfidence.high;
+        } else if (cell.type == CellType.spare && first != null && first < 10) {
+          second = 10 - first;
+          confidence = OcrConfidence.high;
+        }
+      }
+      if (cell.throwIndex == 2 && cell.type == CellType.strike && third != 10) {
+        third = 10;
+        confidence = OcrConfidence.high;
+      }
+    }
+
+    frames[10] = OcrFrameResult(
+      frameNumber: 10,
+      firstThrow: first,
+      secondThrow: second,
+      thirdThrow: third,
+      cumulativeScore: existing?.cumulativeScore,
+      confidence: confidence,
+    );
+  }
+
   /// 누적 점수로 프레임 데이터 보완/검증
   void _validateAndFillFromCumulative(
     Map<int, OcrFrameResult> frames,
@@ -851,5 +1171,17 @@ class _PlayerRowGroup {
     required this.name,
     required this.pinCountRow,
     this.cumulativeRow,
+  });
+}
+
+class _CellInfo {
+  final ui.Rect rect;
+  final int frameNumber;
+  final int throwIndex;
+
+  const _CellInfo({
+    required this.rect,
+    required this.frameNumber,
+    required this.throwIndex,
   });
 }

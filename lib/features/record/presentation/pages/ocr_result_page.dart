@@ -44,6 +44,9 @@ class _OcrResultPageState extends State<OcrResultPage> {
   int get _recognizedCount =>
       _frames.where((f) => f.confidence != OcrConfidence.unrecognized && f.firstThrow != null).length;
 
+  List<OcrFrameResult> get _correctedFrames =>
+      _frames.where((f) => f.validationStatus == OcrValidationStatus.corrected).toList();
+
   int? get _estimatedTotal {
     final last = _frames.lastWhere(
       (f) => f.cumulativeScore != null,
@@ -52,7 +55,13 @@ class _OcrResultPageState extends State<OcrResultPage> {
     return last.cumulativeScore;
   }
 
-  void _confirmAndReturn() {
+  void _applyTotalOnly() {
+    final total = _estimatedTotal;
+    if (total == null) return;
+    Navigator.pop(context, OcrApplyResult.totalOnly(total));
+  }
+
+  void _applyFrameDetail() {
     final frameDataList = _frames
         .where((f) => f.firstThrow != null)
         .map((f) => FrameData(
@@ -62,7 +71,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
               thirdThrow: f.thirdThrow,
             ))
         .toList();
-    Navigator.pop(context, frameDataList);
+    Navigator.pop(context, OcrApplyResult.frameDetail(frameDataList));
   }
 
   @override
@@ -72,9 +81,9 @@ class _OcrResultPageState extends State<OcrResultPage> {
         title: const Text('인식 결과 확인'),
         actions: [
           TextButton(
-            onPressed: _confirmAndReturn,
+            onPressed: _applyFrameDetail,
             child: Text(
-              '적용',
+              '프레임 적용',
               style: TextStyle(
                 color: AppColors.neonOrange,
                 fontWeight: FontWeight.w700,
@@ -189,16 +198,23 @@ class _OcrResultPageState extends State<OcrResultPage> {
   Widget _buildFrameCell(OcrFrameResult frame) {
     final isTenth = frame.frameNumber == 10;
     final isRecognized = frame.firstThrow != null;
-    final isLowConfidence = frame.confidence == OcrConfidence.low;
-    final isUnrecognized = frame.confidence == OcrConfidence.unrecognized;
 
     Color borderColor;
-    if (isUnrecognized || !isRecognized) {
-      borderColor = AppColors.textHint;
-    } else if (isLowConfidence) {
-      borderColor = AppColors.neonOrange;
-    } else {
-      borderColor = AppColors.mint;
+    switch (frame.validationStatus) {
+      case OcrValidationStatus.validated:
+        borderColor = AppColors.success;
+      case OcrValidationStatus.corrected:
+        borderColor = AppColors.neonOrange;
+      case OcrValidationStatus.unverified:
+        borderColor = AppColors.textHint;
+      case OcrValidationStatus.none:
+        if (!isRecognized || frame.confidence == OcrConfidence.unrecognized) {
+          borderColor = AppColors.textHint;
+        } else if (frame.confidence == OcrConfidence.low) {
+          borderColor = AppColors.neonOrange;
+        } else {
+          borderColor = AppColors.mint;
+        }
     }
 
     return Container(
@@ -358,12 +374,13 @@ class _OcrResultPageState extends State<OcrResultPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 범례
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
           children: [
+            _legendDot(AppColors.success, '검증 통과'),
             _legendDot(AppColors.mint, '인식 완료'),
-            const SizedBox(width: 16),
-            _legendDot(AppColors.neonOrange, '낮은 신뢰도'),
-            const SizedBox(width: 16),
+            _legendDot(AppColors.neonOrange, '보정됨'),
             _legendDot(AppColors.textHint, '미인식'),
           ],
         ),
@@ -394,7 +411,36 @@ class _OcrResultPageState extends State<OcrResultPage> {
             ),
           ),
         ],
-        if (lowConfidence.isNotEmpty && unrecognized.isEmpty) ...[
+        if (_correctedFrames.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.neonOrange.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: AppColors.neonOrange.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.auto_fix_high_rounded,
+                    color: AppColors.neonOrange, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${_correctedFrames.map((f) => '${f.frameNumber}프레임').join(', ')}이 누적 점수 기반으로 보정되었습니다.',
+                    style: TextStyle(
+                      color: AppColors.neonOrange,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (lowConfidence.isNotEmpty && unrecognized.isEmpty && _correctedFrames.isEmpty) ...[
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
@@ -447,21 +493,46 @@ class _OcrResultPageState extends State<OcrResultPage> {
   }
 
   Widget _buildActionButtons() {
+    final hasTotal = _estimatedTotal != null;
+
     return Column(
       children: [
+        if (hasTotal)
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _applyTotalOnly,
+              icon: const Icon(Icons.speed_rounded, size: 20),
+              label: Text(
+                '총점만 저장 ($_estimatedTotal점)',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        if (hasTotal) const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           height: 50,
-          child: ElevatedButton.icon(
-            onPressed: _confirmAndReturn,
-            icon: const Icon(Icons.check_rounded, size: 20),
-            label: Text(
-              _recognizedCount == 10
-                  ? '결과 적용하기'
-                  : '적용 후 나머지 직접 입력',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
-          ),
+          child: _recognizedCount > 0
+              ? ElevatedButton.icon(
+                  onPressed: _applyFrameDetail,
+                  icon: const Icon(Icons.grid_on_rounded, size: 20),
+                  label: Text(
+                    _recognizedCount == 10
+                        ? '프레임 상세 적용'
+                        : '프레임 적용 후 나머지 직접 입력',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  style: hasTotal
+                      ? ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.darkCard,
+                          foregroundColor: AppColors.neonOrange,
+                          side: BorderSide(color: AppColors.neonOrange),
+                        )
+                      : null,
+                )
+              : const SizedBox.shrink(),
         ),
         const SizedBox(height: 10),
         SizedBox(
