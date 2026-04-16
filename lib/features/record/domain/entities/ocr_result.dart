@@ -23,6 +23,10 @@ class OcrFrameResult {
   final int? cumulativeScore;
   final OcrConfidence confidence;
   final OcrValidationStatus validationStatus;
+  /// 스페어 확정 플래그 (firstThrow 미상일 때도 스페어임을 명시)
+  final bool isSpare;
+  /// 스트라이크 확정 플래그 (firstThrow=10과 함께 명시적으로 마킹)
+  final bool isStrike;
 
   const OcrFrameResult({
     required this.frameNumber,
@@ -32,11 +36,17 @@ class OcrFrameResult {
     this.cumulativeScore,
     this.confidence = OcrConfidence.unrecognized,
     this.validationStatus = OcrValidationStatus.none,
+    this.isSpare = false,
+    this.isStrike = false,
   });
 
   bool get isComplete {
     if (frameNumber < 10) {
-      return firstThrow != null && (firstThrow == 10 || secondThrow != null);
+      // 스트라이크 (플래그 또는 firstThrow=10)
+      if (isStrike || firstThrow == 10) return true;
+      // 스페어 확정 (firstThrow 미상이어도 완료로 간주)
+      if (isSpare) return true;
+      return firstThrow != null && secondThrow != null;
     }
     // 10프레임: 스트라이크나 스페어 시 3투 필요
     if (firstThrow == null) return false;
@@ -47,6 +57,24 @@ class OcrFrameResult {
   }
 
   FrameData? toFrameData() {
+    // 스트라이크
+    if (isStrike || firstThrow == 10) {
+      return FrameData(
+        frameNumber: frameNumber,
+        firstThrow: firstThrow ?? 10,
+        secondThrow: secondThrow,
+        thirdThrow: thirdThrow,
+      );
+    }
+    // 스페어 확정이지만 첫 번째 투구 미상 → 0/10으로 저장
+    if (isSpare && firstThrow == null) {
+      return FrameData(
+        frameNumber: frameNumber,
+        firstThrow: 0,
+        secondThrow: 10,
+        thirdThrow: thirdThrow,
+      );
+    }
     if (firstThrow == null) return null;
     return FrameData(
       frameNumber: frameNumber,
@@ -63,6 +91,8 @@ class OcrFrameResult {
     int? cumulativeScore,
     OcrConfidence? confidence,
     OcrValidationStatus? validationStatus,
+    bool? isSpare,
+    bool? isStrike,
   }) {
     return OcrFrameResult(
       frameNumber: frameNumber,
@@ -72,6 +102,8 @@ class OcrFrameResult {
       cumulativeScore: cumulativeScore ?? this.cumulativeScore,
       confidence: confidence ?? this.confidence,
       validationStatus: validationStatus ?? this.validationStatus,
+      isSpare: isSpare ?? this.isSpare,
+      isStrike: isStrike ?? this.isStrike,
     );
   }
 }
@@ -104,8 +136,8 @@ class OcrPlayerResult {
 
   List<FrameData> toFrameDataList() {
     return frames
-        .where((f) => f.firstThrow != null)
-        .map((f) => f.toFrameData()!)
+        .map((f) => f.toFrameData())
+        .whereType<FrameData>()
         .toList();
   }
 }

@@ -91,6 +91,13 @@ class CumulativeScoreValidator {
             confidence: OcrConfidence.high,
             validationStatus: OcrValidationStatus.validated,
           );
+        } else if (forwardScore == null && frame.confidence == OcrConfidence.high) {
+          // 보너스 투구 미확정으로 순방향 계산 불가 + 고신뢰도 OCR → 덮어쓰지 않음
+          debugPrint('[Validator]   F$i: 보너스 미확정, 고신뢰도 OCR 유지 (diff=$diff)');
+          corrected[i] = frame.copyWith(
+            cumulativeScore: cumScore,
+            validationStatus: OcrValidationStatus.unverified,
+          );
         } else {
           debugPrint('[Validator]   F$i: 불일치 (순방향=${forwardScore ?? "?"}, diff=$diff) → 역추론 시도');
           final reversed = _reverseInfer(i, diff, frame, frameMap);
@@ -130,10 +137,12 @@ class CumulativeScoreValidator {
       // 역순 처리: F10 먼저 확정 후 앞 프레임을 연쇄 추론
       for (int i = 10; i >= 1; i--) {
         final frame = corrected[i];
-        // 이미 고신뢰도로 채워진 프레임은 스킵
+        // 이미 고신뢰도로 채워진 프레임은 스킵 (isSpare/isStrike 포함)
         if (frame != null &&
-            frame.firstThrow != null &&
-            frame.confidence == OcrConfidence.high) continue;
+            frame.confidence == OcrConfidence.high &&
+            (frame.firstThrow != null || frame.isSpare || frame.isStrike)) {
+          continue;
+        }
 
         final cumScore = cumulativeScores[i];
         if (cumScore == null) continue;
@@ -256,11 +265,11 @@ class CumulativeScoreValidator {
       final nextFirst = _getNextFirstThrow(allFrames, frameNum);
       if (nextFirst != null && diff == 10 + nextFirst) {
         debugPrint('[Validator]     → 스페어 확정 (10+$nextFirst=$diff)');
-        final first = existing.firstThrow ?? 0;
         return OcrFrameResult(
           frameNumber: frameNum,
-          firstThrow: first,
-          secondThrow: 10 - first,
+          firstThrow: existing.firstThrow,
+          secondThrow: existing.firstThrow != null ? 10 - existing.firstThrow! : null,
+          isSpare: true,
           confidence: OcrConfidence.high,
         );
       }
@@ -274,6 +283,7 @@ class CumulativeScoreValidator {
         return OcrFrameResult(
           frameNumber: frameNum,
           firstThrow: 10,
+          isStrike: true,
           confidence: OcrConfidence.high,
         );
       }
@@ -308,6 +318,7 @@ class CumulativeScoreValidator {
       return OcrFrameResult(
         frameNumber: frameNum,
         firstThrow: 10,
+        isStrike: true,
         confidence: OcrConfidence.high,
       );
     }
@@ -320,6 +331,7 @@ class CumulativeScoreValidator {
       return OcrFrameResult(
         frameNumber: frameNum,
         firstThrow: 10,
+        isStrike: true,
         confidence: OcrConfidence.high,
       );
     }
@@ -327,23 +339,23 @@ class CumulativeScoreValidator {
     final nextFirst = _getNextFirstThrow(allFrames, frameNum);
     if (nextFirst != null && diff == 10 + nextFirst) {
       final existing = allFrames[frameNum];
-      final first = existing?.firstThrow ?? 0;
       debugPrint('[Validator] F$frameNum: diff=$diff → 스페어 자동 채움 (confidence=high)');
       return OcrFrameResult(
         frameNumber: frameNum,
-        firstThrow: first,
-        secondThrow: 10 - first,
+        firstThrow: existing?.firstThrow,
+        secondThrow: existing?.firstThrow != null ? 10 - existing!.firstThrow! : null,
+        isSpare: true,
         confidence: OcrConfidence.high,
       );
     }
     // 판정 불가: 보수적 스페어 가정 (diff 10~20은 스페어 가능성)
     debugPrint('[Validator] F$frameNum: diff=$diff → 스페어 가정 (보수적, confidence=low)');
     final existing = allFrames[frameNum];
-    final first = existing?.firstThrow ?? 0;
     return OcrFrameResult(
       frameNumber: frameNum,
-      firstThrow: first,
-      secondThrow: 10 - first,
+      firstThrow: existing?.firstThrow,
+      secondThrow: existing?.firstThrow != null ? 10 - existing!.firstThrow! : null,
+      isSpare: true,
       confidence: OcrConfidence.low,
     );
   }

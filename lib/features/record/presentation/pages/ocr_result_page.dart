@@ -42,7 +42,10 @@ class _OcrResultPageState extends State<OcrResultPage> {
   }
 
   int get _recognizedCount =>
-      _frames.where((f) => f.confidence != OcrConfidence.unrecognized && f.firstThrow != null).length;
+      _frames.where((f) =>
+        f.confidence != OcrConfidence.unrecognized &&
+        (f.firstThrow != null || f.isSpare || f.isStrike)
+      ).length;
 
   List<OcrFrameResult> get _correctedFrames =>
       _frames.where((f) => f.validationStatus == OcrValidationStatus.corrected).toList();
@@ -63,13 +66,8 @@ class _OcrResultPageState extends State<OcrResultPage> {
 
   void _applyFrameDetail() {
     final frameDataList = _frames
-        .where((f) => f.firstThrow != null)
-        .map((f) => FrameData(
-              frameNumber: f.frameNumber,
-              firstThrow: f.firstThrow!,
-              secondThrow: f.secondThrow,
-              thirdThrow: f.thirdThrow,
-            ))
+        .map((f) => f.toFrameData())
+        .whereType<FrameData>()
         .toList();
     Navigator.pop(context, OcrApplyResult.frameDetail(frameDataList));
   }
@@ -197,7 +195,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
 
   Widget _buildFrameCell(OcrFrameResult frame) {
     final isTenth = frame.frameNumber == 10;
-    final isRecognized = frame.firstThrow != null;
+    final isRecognized = frame.firstThrow != null || frame.isSpare || frame.isStrike;
 
     Color borderColor;
     switch (frame.validationStatus) {
@@ -283,15 +281,22 @@ class _OcrResultPageState extends State<OcrResultPage> {
     String first = '';
     String second = '';
 
-    if (frame.firstThrow != null) {
-      first = frame.firstThrow == 10 ? 'X' : '${frame.firstThrow}';
-    }
-    if (frame.secondThrow != null && frame.firstThrow != 10) {
-      if (frame.firstThrow != null &&
-          (frame.firstThrow! + frame.secondThrow!) == 10) {
-        second = '/';
-      } else {
-        second = '${frame.secondThrow}';
+    if (frame.isStrike || frame.firstThrow == 10) {
+      // 스트라이크
+      first = 'X';
+    } else if (frame.isSpare) {
+      // 스페어 확정: firstThrow가 있으면 표시, 없으면 '?'
+      first = frame.firstThrow != null ? '${frame.firstThrow}' : '?';
+      second = '/';
+    } else if (frame.firstThrow != null) {
+      // 일반 오픈 또는 미완성 프레임
+      first = '${frame.firstThrow}';
+      if (frame.secondThrow != null) {
+        if ((frame.firstThrow! + frame.secondThrow!) == 10) {
+          second = '/';
+        } else {
+          second = '${frame.secondThrow}';
+        }
       }
     }
 
@@ -365,7 +370,8 @@ class _OcrResultPageState extends State<OcrResultPage> {
   Widget _buildStatusInfo() {
     final unrecognized = _frames
         .where((f) =>
-            f.confidence == OcrConfidence.unrecognized || f.firstThrow == null)
+            f.confidence == OcrConfidence.unrecognized ||
+            (!f.isSpare && !f.isStrike && f.firstThrow == null))
         .toList();
     final lowConfidence =
         _frames.where((f) => f.confidence == OcrConfidence.low).toList();

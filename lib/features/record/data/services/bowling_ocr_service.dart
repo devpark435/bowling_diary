@@ -712,7 +712,16 @@ class BowlingOcrService {
     // 각 프레임 열에 속하는 요소를 그룹핑
     final frameElements = <int, List<_OcrElement>>{};
     for (final e in elements) {
-      final frameNum = _matchToColumn(e.rect.center.dx, columnPositions);
+      // 스페어("/") 요소는 인접 스트라이크 그래픽으로 인해 바운딩 박스가
+      // 좌측으로 늘어나 center가 잘못된 프레임에 매핑될 수 있음.
+      // "/" 문자는 우측에 위치하므로 rect.right - height/2 를 기준 좌표로 사용
+      double refX = e.rect.center.dx;
+      if (e.text.trim().endsWith('/') && e.rect.width > e.rect.height) {
+        refX = e.rect.right - e.rect.height * 0.5;
+        debugPrint('[OCR]     스페어 열 보정: "${e.text}" '
+            'center=${e.rect.center.dx.toInt()} → ref=${refX.toInt()}');
+      }
+      final frameNum = _matchToColumn(refX, columnPositions);
       if (frameNum == null) continue;
       frameElements.putIfAbsent(frameNum, () => []).add(e);
     }
