@@ -88,11 +88,15 @@ class OcrPlayerResult {
 
   int? get totalScore {
     if (frames.isEmpty) return null;
-    final last = frames.lastWhere(
-      (f) => f.cumulativeScore != null,
-      orElse: () => frames.last,
-    );
-    return last.cumulativeScore;
+    int? maxCumulative;
+    for (final frame in frames) {
+      final score = frame.cumulativeScore;
+      if (score == null) continue;
+      if (maxCumulative == null || score > maxCumulative) {
+        maxCumulative = score;
+      }
+    }
+    return maxCumulative;
   }
 
   int get completedFrameCount => frames.where((f) => f.isComplete).length;

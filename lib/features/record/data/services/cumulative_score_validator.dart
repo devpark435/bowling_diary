@@ -119,6 +119,42 @@ class CumulativeScoreValidator {
       }
     }
 
+    // === 다중 패스: 빈 프레임 연쇄 채우기 (역순 처리로 후반→전반 순서 보장) ===
+    for (int pass = 0; pass < 3; pass++) {
+      // 패스 시작 시 corrected 결과로 frameMap 갱신
+      for (final entry in corrected.entries) {
+        frameMap[entry.key] = entry.value;
+      }
+      bool anyFilled = false;
+
+      // 역순 처리: F10 먼저 확정 후 앞 프레임을 연쇄 추론
+      for (int i = 10; i >= 1; i--) {
+        final frame = corrected[i];
+        // 이미 고신뢰도로 채워진 프레임은 스킵
+        if (frame != null &&
+            frame.firstThrow != null &&
+            frame.confidence == OcrConfidence.high) continue;
+
+        final cumScore = cumulativeScores[i];
+        if (cumScore == null) continue;
+        final prevCum = i == 1 ? 0 : cumulativeScores[i - 1];
+        if (i > 1 && prevCum == null) continue;
+        final diff = cumScore - (i == 1 ? 0 : prevCum!);
+
+        final inferred = _inferFromDiff(i, diff, frameMap);
+        if (inferred.firstThrow != null) {
+          corrected[i] = inferred.copyWith(
+            cumulativeScore: cumScore,
+            validationStatus: OcrValidationStatus.corrected,
+          );
+          // 즉시 frameMap 반영 → 같은 패스 내 앞 프레임 연쇄 추론 가능
+          frameMap[i] = corrected[i]!;
+          if (inferred.confidence == OcrConfidence.high) anyFilled = true;
+        }
+      }
+      if (!anyFilled) break;
+    }
+
     final result = corrected.values.toList()
       ..sort((a, b) => a.frameNumber.compareTo(b.frameNumber));
 
@@ -205,8 +241,8 @@ class CumulativeScoreValidator {
     Map<int, OcrFrameResult> allFrames,
   ) {
     if (frameNum == 10) {
-      // 10프레임은 diff = 1투+2투+3투
-      return existing;
+      // 10프레임은 diff 역산으로 투구값 채우기
+      return _inferTenthFrame(diff, existing);
     }
 
     // diff <= 9: 오픈 프레임 확정
@@ -254,44 +290,128 @@ class CumulativeScoreValidator {
     Map<int, OcrFrameResult> allFrames,
   ) {
     if (frameNum == 10) {
+      return _inferTenthFrame(diff, allFrames[10]);
+    }
+
+    // diff <= 9: 오픈 프레임 (개별 투구 수 불명)
+    if (diff >= 0 && diff <= 9) {
+      final existing = allFrames[frameNum];
+      if (existing?.firstThrow != null) {
+        return existing!.copyWith(confidence: OcrConfidence.high);
+      }
+      return OcrFrameResult(frameNumber: frameNum, confidence: OcrConfidence.low);
+    }
+
+    // diff > 20: 수학적으로 스트라이크 확정 (스페어 최대 10+10=20 초과 불가)
+    if (diff > 20 && diff <= 30) {
+      debugPrint('[Validator] F$frameNum: diff=$diff → 스트라이크 자동 채움 (diff>20, confidence=high)');
       return OcrFrameResult(
-        frameNumber: 10,
-        confidence: OcrConfidence.unrecognized,
+        frameNumber: frameNum,
+        firstThrow: 10,
+        confidence: OcrConfidence.high,
       );
     }
 
-    // diff <= 9: 오픈 프레임
-    if (diff >= 0 && diff <= 9) {
+    // diff 10~20: 스트라이크 또는 스페어 판별
+    // 스트라이크 체크 (다음 2구 합산)
+    final nextTwo = _getNextNBalls(allFrames, frameNum, 2);
+    if (nextTwo != null && diff == 10 + nextTwo) {
+      debugPrint('[Validator] F$frameNum: diff=$diff → 스트라이크 자동 채움 (confidence=high)');
       return OcrFrameResult(
         frameNumber: frameNum,
+        firstThrow: 10,
+        confidence: OcrConfidence.high,
+      );
+    }
+    // 스페어 체크 (다음 1구)
+    final nextFirst = _getNextFirstThrow(allFrames, frameNum);
+    if (nextFirst != null && diff == 10 + nextFirst) {
+      final existing = allFrames[frameNum];
+      final first = existing?.firstThrow ?? 0;
+      debugPrint('[Validator] F$frameNum: diff=$diff → 스페어 자동 채움 (confidence=high)');
+      return OcrFrameResult(
+        frameNumber: frameNum,
+        firstThrow: first,
+        secondThrow: 10 - first,
+        confidence: OcrConfidence.high,
+      );
+    }
+    // 판정 불가: 보수적 스페어 가정 (diff 10~20은 스페어 가능성)
+    debugPrint('[Validator] F$frameNum: diff=$diff → 스페어 가정 (보수적, confidence=low)');
+    final existing = allFrames[frameNum];
+    final first = existing?.firstThrow ?? 0;
+    return OcrFrameResult(
+      frameNumber: frameNum,
+      firstThrow: first,
+      secondThrow: 10 - first,
+      confidence: OcrConfidence.low,
+    );
+  }
+
+  /// 누적 점수 diff로 10프레임 투구 역산
+  OcrFrameResult _inferTenthFrame(int diff, OcrFrameResult? existing) {
+    if (diff == 30) {
+      debugPrint('[Validator] F10: diff=30 → X-X-X 자동 채움 (confidence=high)');
+      return OcrFrameResult(
+        frameNumber: 10,
+        firstThrow: 10, secondThrow: 10, thirdThrow: 10,
+        confidence: OcrConfidence.high,
+      );
+    }
+
+    if (diff >= 20 && diff < 30) {
+      // 1투 스트라이크, 나머지 두 투 합 = diff - 10
+      final remaining = diff - 10;
+      // OCR 힌트 활용: thirdThrow 우선, 없으면 secondThrow 중 유효 범위 값 사용
+      int? hint = existing?.thirdThrow;
+      if (hint == null &&
+          existing?.secondThrow != null &&
+          existing!.secondThrow! > 0 &&
+          existing.secondThrow! <= remaining) {
+        hint = existing.secondThrow;
+      }
+      if (hint != null && hint >= 0 && hint <= remaining) {
+        final third = hint;
+        final second = remaining - third;
+        debugPrint('[Validator] F10: diff=$diff → X-$second-$third 자동 채움 (hint=$hint, confidence=high)');
+        return OcrFrameResult(
+          frameNumber: 10,
+          firstThrow: 10,
+          secondThrow: second,
+          thirdThrow: third,
+          confidence: OcrConfidence.high,
+        );
+      }
+      // 힌트 없음: X-X-(diff-20) 추정
+      debugPrint('[Validator] F10: diff=$diff → X-X-${diff - 20} 추정 (confidence=low)');
+      return OcrFrameResult(
+        frameNumber: 10,
+        firstThrow: 10, secondThrow: 10, thirdThrow: diff - 20,
         confidence: OcrConfidence.low,
       );
     }
 
-    // 스트라이크 체크
-    if (diff >= 10 && diff <= 30) {
-      final nextTwo = _getNextNBalls(allFrames, frameNum, 2);
-      if (nextTwo != null && diff == 10 + nextTwo) {
-        return OcrFrameResult(
-          frameNumber: frameNum,
-          firstThrow: 10,
-          confidence: OcrConfidence.high,
-        );
-      }
-
-      // 스페어 체크
-      final nextFirst = _getNextFirstThrow(allFrames, frameNum);
-      if (nextFirst != null && diff == 10 + nextFirst) {
-        return OcrFrameResult(
-          frameNumber: frameNum,
-          confidence: OcrConfidence.low,
-        );
-      }
+    if (diff >= 10 && diff < 20) {
+      // 스페어 + 보너스 1투
+      final bonus = diff - 10;
+      final first = existing?.firstThrow ?? 0;
+      final second = existing?.secondThrow ?? (10 - first);
+      debugPrint('[Validator] F10: diff=$diff → 스페어+$bonus 자동 채움 (confidence=low)');
+      return OcrFrameResult(
+        frameNumber: 10,
+        firstThrow: first, secondThrow: second, thirdThrow: bonus,
+        confidence: OcrConfidence.low,
+      );
     }
 
+    // diff <= 9: 오픈
+    final first = existing?.firstThrow ?? diff;
+    final second = existing?.secondThrow ?? (diff - first).clamp(0, 10);
+    debugPrint('[Validator] F10: diff=$diff → 오픈 자동 채움 (confidence=low)');
     return OcrFrameResult(
-      frameNumber: frameNum,
-      confidence: OcrConfidence.unrecognized,
+      frameNumber: 10,
+      firstThrow: first, secondThrow: second,
+      confidence: OcrConfidence.low,
     );
   }
 

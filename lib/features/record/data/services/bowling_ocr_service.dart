@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'package:bowling_diary/features/record/data/services/cumulative_score_validator.dart';
+// ignore: unused_import
 import 'package:bowling_diary/features/record/data/services/score_cell_analyzer.dart';
 import 'package:bowling_diary/features/record/domain/entities/ocr_result.dart';
 
@@ -468,20 +469,21 @@ class BowlingOcrService {
     }
 
     // 3. 셀 이미지 분석 (스트라이크/스페어 그래픽 감지)
-    if (columnPositions != null && columnPositions.isNotEmpty) {
-      final cellResults = await _analyzeCellImages(
-        imagePath: imagePath,
-        pinCountRow: group.pinCountRow,
-        columnPositions: columnPositions,
-      );
-      if (cellResults.isNotEmpty) {
-        debugPrint('[OCR]   셀 이미지 분석 결과: ${cellResults.length}개');
-        for (final cr in cellResults) {
-          debugPrint('[OCR]     $cr');
-        }
-        _applyCellAnalysisResults(frames, cellResults);
-      }
-    }
+    // TODO: CellAnalyzer crop 좌표 버그로 전 셀 100% 스트라이크 오판정 중 → 임시 비활성화
+    // if (columnPositions != null && columnPositions.isNotEmpty) {
+    //   final cellResults = await _analyzeCellImages(
+    //     imagePath: imagePath,
+    //     pinCountRow: group.pinCountRow,
+    //     columnPositions: columnPositions,
+    //   );
+    //   if (cellResults.isNotEmpty) {
+    //     debugPrint('[OCR]   셀 이미지 분석 결과: ${cellResults.length}개');
+    //     for (final cr in cellResults) {
+    //       debugPrint('[OCR]     $cr');
+    //     }
+    //     _applyCellAnalysisResults(frames, cellResults);
+    //   }
+    // }
 
     // 4. 누적 점수를 프레임에 매핑
     for (final entry in cumulativeScores.entries) {
@@ -545,10 +547,8 @@ class BowlingOcrService {
     // 누적 점수는 단조 증가해야 함
     final validScores = _filterMonotonic(scores);
     debugPrint('[OCR]   단조 증가 필터 후: $validScores');
-
-    for (int i = 0; i < min(validScores.length, 10); i++) {
-      result[i + 1] = validScores[i];
-    }
+    _mapCumulativeScoresToFrames(validScores, result);
+    debugPrint('[OCR]   볼링 규칙 매핑 후: $result');
   }
 
   /// 텍스트에서 누적 점수 숫자들을 추출
@@ -581,56 +581,82 @@ class BowlingOcrService {
     return results;
   }
 
-  /// "102111" → [102, 111], "152172" → [152, 172] 등 합쳐진 점수 분리
-  List<int> _splitConcatenatedScores(String digits) {
-    final results = <int>[];
-    int i = 0;
+  /// 단조증가 제약 기반 백트래킹으로 합쳐진 점수를 분리
+  /// "939" (prevScore=0) → [9, 39], "152172" → [152, 172]
+  /// 길이 3→2→1 순서로 시도하되, 단조증가 제약을 만족 못하면 백트래킹
+  List<int> _splitConcatenatedScores(String digits, {int prevScore = 0}) {
+    final result = <int>[];
+    final success = _splitRecursive(digits, 0, prevScore, result);
+    debugPrint('[OCR]     합쳐진 숫자 분리 (prevScore=$prevScore): "$digits" → '
+        '${success ? result.toString() : "분리 실패 []"}');
+    return success ? result : [];
+  }
 
-    while (i < digits.length) {
-      // 3자리 시도 (100~300 범위)
-      if (i + 3 <= digits.length) {
-        final three = int.tryParse(digits.substring(i, i + 3));
-        if (three != null && three >= 100 && three <= 300) {
-          results.add(three);
-          i += 3;
-          continue;
-        }
-      }
-      // 2자리 시도 (10~99 범위)
-      if (i + 2 <= digits.length) {
-        final two = int.tryParse(digits.substring(i, i + 2));
-        if (two != null && two >= 10 && two <= 99) {
-          results.add(two);
-          i += 2;
-          continue;
-        }
-      }
-      // 1자리 시도 (1~9 범위)
-      if (i + 1 <= digits.length) {
-        final one = int.tryParse(digits.substring(i, i + 1));
-        if (one != null && one >= 1 && one <= 9) {
-          results.add(one);
-          i += 1;
-          continue;
-        }
-      }
-      i++;
+  /// [_splitConcatenatedScores] 의 백트래킹 구현체
+  bool _splitRecursive(String digits, int start, int prevScore, List<int> result) {
+    if (start == digits.length) return true;
+
+    // 3자리 → 2자리 → 1자리 순서로 시도 (큰 단위 우선, 실패 시 백트래킹)
+    for (final len in [3, 2, 1]) {
+      if (start + len > digits.length) continue;
+      final n = int.tryParse(digits.substring(start, start + len));
+      if (n == null || n <= prevScore || n > 300) continue;
+
+      result.add(n);
+      if (_splitRecursive(digits, start + len, n, result)) return true;
+      result.removeLast();
     }
-
-    debugPrint('[OCR]     합쳐진 숫자 분리: "$digits" → $results');
-    return results;
+    return false;
   }
 
   /// 단조 증가하는 부분 수열 추출
   List<int> _filterMonotonic(List<int> scores) {
     if (scores.isEmpty) return [];
-    final result = <int>[scores.first];
-    for (int i = 1; i < scores.length; i++) {
-      if (scores[i] >= result.last) {
-        result.add(scores[i]);
+    final n = scores.length;
+    final dp = List<int>.filled(n, 1);
+    final prev = List<int>.filled(n, -1);
+
+    int bestEnd = 0;
+    for (int i = 0; i < n; i++) {
+      for (int j = 0; j < i; j++) {
+        if (scores[j] <= scores[i] && dp[j] + 1 > dp[i]) {
+          dp[i] = dp[j] + 1;
+          prev[i] = j;
+        }
+      }
+      if (dp[i] > dp[bestEnd]) {
+        bestEnd = i;
       }
     }
-    return result;
+
+    final result = <int>[];
+    int idx = bestEnd;
+    while (idx != -1) {
+      result.add(scores[idx]);
+      idx = prev[idx];
+    }
+    return result.reversed.toList();
+  }
+
+  /// 누적 점수를 프레임 번호에 매핑 (볼링 규칙 반영)
+  void _mapCumulativeScoresToFrames(List<int> scores, Map<int, int> result) {
+    int minFrame = 1;
+    int prevScore = 0;
+
+    for (final score in scores) {
+      if (score < prevScore || score < 0 || score > 300) continue;
+
+      int frame = max(minFrame, (score + 29) ~/ 30); // ceil(score / 30)
+      while (frame <= 10 && score > frame * 30) {
+        frame++;
+      }
+      if (frame > 10) continue;
+
+      result[frame] = score;
+      prevScore = score;
+      minFrame = frame + 1;
+      if (minFrame > 10) break;
+    }
   }
 
   /// 핀 카운트 행에서 프레임 데이터 파싱
@@ -648,11 +674,21 @@ class BowlingOcrService {
     final koreanRegex = RegExp(r'[가-힣]');
     final skipTexts = {'K', 'LANE', 'LEAGUE', 'NORMAL'};
 
+    // F1 열 왼쪽 경계: 첫 번째 열 위치 - 열 간격의 절반
+    // 이 경계보다 왼쪽에 있는 요소는 레인 번호 등 노이즈로 제외
+    final double? leftBoundary = (columnPositions != null && columnPositions.length >= 2)
+        ? columnPositions.first - (columnPositions[1] - columnPositions[0]) * 0.5
+        : null;
+
     for (final e in row.elements) {
       final text = e.text.trim();
       if (text.isEmpty) { debugPrint('[OCR]     필터: "$text" → 빈 문자열 제외'); continue; }
       if (koreanRegex.hasMatch(text)) { debugPrint('[OCR]     필터: "$text" → 한글 포함 제외'); continue; }
       if (skipTexts.contains(text.toUpperCase())) { debugPrint('[OCR]     필터: "$text" → 스킵 키워드 제외'); continue; }
+      if (leftBoundary != null && e.rect.center.dx < leftBoundary) {
+        debugPrint('[OCR]     필터: "$text" → F1 왼쪽 영역 제외');
+        continue;
+      }
       pinElements.add(e);
     }
 
@@ -686,15 +722,20 @@ class BowlingOcrService {
       final elems = entry.value;
       elems.sort((a, b) => a.rect.left.compareTo(b.rect.left));
 
-      final throws = <int?>[];
+      final throwTexts = <String>[];
       for (final e in elems) {
-        throws.add(_parsePinValue(e.text.trim()));
+        throwTexts.addAll(_splitPinToken(e.text.trim()));
+      }
+
+      final throws = <int?>[];
+      for (final token in throwTexts) {
+        throws.add(_parsePinValue(token));
       }
 
       frames[frameNum] = _buildFrameFromThrows(
         frameNum,
         throws,
-        elems.map((e) => e.text.trim()).toList(),
+        throwTexts,
       );
     }
   }
@@ -710,8 +751,11 @@ class BowlingOcrService {
     final throwTexts = <String>[];
 
     for (final e in elements) {
-      throwValues.add(_parsePinValue(e.text.trim()));
-      throwTexts.add(e.text.trim());
+      final tokens = _splitPinToken(e.text.trim());
+      for (final token in tokens) {
+        throwValues.add(_parsePinValue(token));
+        throwTexts.add(token);
+      }
     }
 
     int i = 0;
@@ -790,7 +834,7 @@ class BowlingOcrService {
   /// 핀 카운트 텍스트를 숫자로 변환
   int? _parsePinValue(String text) {
     if (text.isEmpty) return null;
-    final upper = text.toUpperCase().trim();
+    final upper = text.toUpperCase().trim().replaceAll('O', '0');
 
     // 스트라이크 (X 및 OCR 오인식 패턴: M, N, W, K 등 대각선 모양 글자)
     if (_isStrikeText(text)) return 10;
@@ -799,11 +843,34 @@ class BowlingOcrService {
     // 스페어
     if (_isSpareText(text)) return null;
     // 숫자
-    final n = int.tryParse(text);
+    final n = int.tryParse(upper);
     if (n != null && n >= 0 && n <= 10) return n;
 
     debugPrint('[OCR]     핀 값 변환 실패: "$text"');
     return null;
+  }
+
+  /// OCR로 붙어서 인식된 핀 텍스트를 투구 단위로 분리
+  List<String> _splitPinToken(String text) {
+    final normalized = text.toUpperCase().trim().replaceAll('O', '0');
+    if (normalized.isEmpty) return [];
+
+    final isDigit = RegExp(r'^\d$');
+    if (normalized.length == 2) {
+      final a = normalized.substring(0, 1);
+      final b = normalized.substring(1, 2);
+
+      // 예: "72" -> "7", "2"
+      if (isDigit.hasMatch(a) && isDigit.hasMatch(b)) return [a, b];
+      // 예: "9/" -> "9", "/"
+      if (isDigit.hasMatch(a) && b == '/') return [a, '/'];
+      // 예: "M7" -> "M", "7" (M은 스트라이크 오인식)
+      if (_isStrikeText(a) && isDigit.hasMatch(b)) return [a, b];
+      // 예: "7X" -> "7", "X"
+      if (isDigit.hasMatch(a) && _isStrikeText(b)) return [a, b];
+    }
+
+    return [normalized];
   }
 
   /// 스트라이크 텍스트 판별 (OCR 오인식 패턴 포함)
