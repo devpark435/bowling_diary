@@ -25,6 +25,7 @@ migrate_working_dir/
 .env
 .env.*
 !.env.example
+dart_defines.json
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -50,3 +51,6 @@ app.*.map.json
 # Claude Code (AI 도구 로컬 설정)
 .claude/
 CLAUDE.MD
+
+# Superpowers 플랜/문서 (로컬 작업용)
+docs/superpowers/

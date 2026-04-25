@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'package:bowling_diary/features/record/data/services/cumulative_score_validator.dart';
+import 'package:bowling_diary/features/record/data/services/gemini_ocr_service.dart';
 // ignore: unused_import
 import 'package:bowling_diary/features/record/data/services/score_cell_analyzer.dart';
 import 'package:bowling_diary/features/record/domain/entities/ocr_result.dart';
@@ -14,10 +15,35 @@ class BowlingOcrService {
       TextRecognizer(script: TextRecognitionScript.korean);
   final ScoreCellAnalyzer _cellAnalyzer = ScoreCellAnalyzer();
   final CumulativeScoreValidator _validator = CumulativeScoreValidator();
+  final GeminiOcrService _geminiService = GeminiOcrService();
 
   Future<OcrResult> processImage(String imagePath) async {
+    // 1단계: Gemini API 시도
     try {
-      debugPrint('[OCR] === 이미지 처리 시작 ===');
+      debugPrint('[OCR] === Gemini OCR 시도 ===');
+      final players = await _geminiService.processImage(imagePath);
+      debugPrint('[OCR] Gemini 성공 - ${players.length}명 감지');
+      return OcrResult(players: players, imagePath: imagePath);
+    } on GeminiNotConfiguredException {
+      debugPrint('[OCR] Gemini 키 미설정 → ML Kit으로 직접 진행');
+    } catch (e) {
+      debugPrint('[OCR] Gemini 실패 ($e) → ML Kit 폴백');
+      final mlkitResult = await _runMlKit(imagePath);
+      return OcrResult(
+        players: mlkitResult.players,
+        imagePath: imagePath,
+        usedGeminiFallback: true,
+      );
+    }
+
+    // 2단계: API 키 미설정 시 ML Kit 직접 실행 (폴백 아님)
+    return _runMlKit(imagePath);
+  }
+
+  /// ML Kit 기반 OCR 파이프라인
+  Future<OcrResult> _runMlKit(String imagePath) async {
+    try {
+      debugPrint('[OCR] === ML Kit 이미지 처리 시작 ===');
       debugPrint('[OCR] 이미지 경로: $imagePath');
 
       final inputImage = InputImage.fromFilePath(imagePath);
@@ -59,10 +85,10 @@ class BowlingOcrService {
             '총점 ${p.totalScore ?? "없음"}');
       }
 
-      debugPrint('[OCR] === 이미지 처리 완료 ===');
+      debugPrint('[OCR] === ML Kit 처리 완료 ===');
       return OcrResult(players: players, imagePath: imagePath);
     } catch (e, stackTrace) {
-      debugPrint('[OCR] !! 처리 중 예외 발생: $e');
+      debugPrint('[OCR] !! ML Kit 처리 중 예외 발생: $e');
       debugPrint('[OCR] $stackTrace');
       return OcrResult(players: [], imagePath: imagePath);
     }

@@ -284,6 +284,15 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
+      if (result.usedGeminiFallback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('AI 인식 한도 초과 — 기본 인식으로 대체합니다'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
       if (result.isEmpty) {
         debugPrint('[OCR] !! 결과가 비어있음 - 플레이어를 한 명도 감지하지 못함');
         _showOcrError('점수를 인식하지 못했습니다.\n모니터가 잘 보이도록 다시 촬영해주세요.');

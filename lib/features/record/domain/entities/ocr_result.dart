@@ -172,10 +172,13 @@ class OcrApplyResult {
 class OcrResult {
   final List<OcrPlayerResult> players;
   final String imagePath;
+  /// Gemini를 시도했지만 실패하여 ML Kit으로 폴백된 경우 true
+  final bool usedGeminiFallback;
 
   const OcrResult({
     required this.players,
     required this.imagePath,
+    this.usedGeminiFallback = false,
   });
 
   bool get hasMultiplePlayers => players.length > 1;
