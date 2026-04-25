@@ -111,9 +111,10 @@ jobs:
             -exportOptionsPlist ios/ExportOptions.plist
 
       - name: Upload to TestFlight
-        uses: apple-actions/upload-testflight-build@v3
-        with:
-          app-path: ${{ runner.temp }}/Runner/bowling_diary.ipa
-          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          xcrun altool --upload-app \
+            -t ios \
+            -f $RUNNER_TEMP/Runner/bowling_diary.ipa \
+            --apiKey ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
+            --apiIssuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
+            --output-format xml
