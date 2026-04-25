@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 
 import 'package:bowling_diary/core/constants/app_config.dart';
 import 'package:bowling_diary/features/record/domain/entities/ocr_result.dart';
@@ -17,10 +18,9 @@ class GeminiOcrService {
 
     debugPrint('[Gemini] 이미지 인식 시작: $imagePath');
 
-    final imageBytes = await File(imagePath).readAsBytes();
-    final base64Image = base64Encode(imageBytes);
-    final mimeType =
-        imagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    final compressed = await _compressImage(imagePath);
+    final base64Image = base64Encode(compressed);
+    const mimeType = 'image/jpeg';
 
     final response = await http
         .post(
@@ -45,7 +45,7 @@ class GeminiOcrService {
             },
           }),
         )
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 60));
 
     debugPrint('[Gemini] 응답 코드: ${response.statusCode}');
 
@@ -58,6 +58,30 @@ class GeminiOcrService {
     }
 
     return _parseResponse(response.body);
+  }
+
+  /// 장축 기준 1280px로 리사이즈 후 JPEG 85% 품질로 압축
+  Future<List<int>> _compressImage(String imagePath) async {
+    final bytes = await File(imagePath).readAsBytes();
+    final original = img.decodeImage(bytes);
+    if (original == null) return bytes;
+
+    const maxDimension = 1280;
+    final needsResize = original.width > maxDimension || original.height > maxDimension;
+
+    final target = needsResize
+        ? img.copyResize(
+            original,
+            width: original.width > original.height ? maxDimension : -1,
+            height: original.height >= original.width ? maxDimension : -1,
+          )
+        : original;
+
+    final compressed = img.encodeJpg(target, quality: 85);
+    debugPrint('[Gemini] 이미지 압축: '
+        '${(bytes.length / 1024).toStringAsFixed(0)}KB → '
+        '${(compressed.length / 1024).toStringAsFixed(0)}KB');
+    return compressed;
   }
 
   String _buildPrompt() => '''
