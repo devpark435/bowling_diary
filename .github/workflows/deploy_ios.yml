@@ -46,20 +46,28 @@ jobs:
           cd ios
           pod install --repo-update
 
-      - name: Import Apple Distribution Certificate
+      - name: Import Apple Certificates
         env:
-          CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          DIST_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          DIST_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          DEV_CERTIFICATE_BASE64: ${{ secrets.APPLE_DEV_CERTIFICATE_BASE64 }}
+          DEV_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEV_CERTIFICATE_PASSWORD }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           security create-keychain -p "" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "" $KEYCHAIN_PATH
 
-          echo "$CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 \
-            -P "$CERTIFICATE_PASSWORD" \
+          echo "$DIST_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/dist.p12
+          security import $RUNNER_TEMP/dist.p12 \
+            -P "$DIST_CERTIFICATE_PASSWORD" \
             -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+
+          echo "$DEV_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/dev.p12
+          security import $RUNNER_TEMP/dev.p12 \
+            -P "$DEV_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+
           security set-key-partition-list -S apple-tool:,apple: -k "" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
