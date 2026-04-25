@@ -87,7 +87,12 @@ jobs:
             > ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
 
       - name: Build Flutter iOS (no codesign)
-        run: flutter build ios --release --no-codesign --dart-define-from-file=dart_defines.json
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+          flutter build ios --release --no-codesign \
+            --dart-define-from-file=dart_defines.json \
+            --build-name=$VERSION \
+            --build-number=$((GITHUB_RUN_NUMBER + 10))
 
       - name: Archive
         run: |
