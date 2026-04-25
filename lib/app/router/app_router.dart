@@ -13,6 +13,7 @@ import 'package:bowling_diary/features/balls/presentation/pages/ball_form_page.d
 import 'package:bowling_diary/features/balls/presentation/pages/balls_page.dart';
 import 'package:bowling_diary/features/settings/presentation/pages/settings_page.dart';
 import 'package:bowling_diary/features/admin/presentation/pages/catalog_manage_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/analysis_tab_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -106,6 +107,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/analysis',
+                builder: (context, state) => const AnalysisTabPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/balls',
                 builder: (context, state) => const BallsPage(),
               ),
@@ -156,6 +165,11 @@ class ScaffoldWithNavBar extends StatelessWidget {
               icon: Icon(Icons.bar_chart_outlined),
               activeIcon: Icon(Icons.bar_chart),
               label: '통계',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.videocam_outlined),
+              activeIcon: Icon(Icons.videocam),
+              label: '분석',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.sports_baseball_outlined),

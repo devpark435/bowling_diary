@@ -42,7 +42,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>볼링 점수판을 촬영하여 자동으로 점수를 입력합니다</string>
+	<string>볼링 점수판 촬영 및 투구 영상 녹화에 카메라 접근이 필요합니다</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>영상 녹화를 위해 마이크 접근이 필요합니다</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
