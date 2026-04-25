@@ -52,5 +52,5 @@ app.*.map.json
 .claude/
 CLAUDE.MD
 
-# Superpowers 플랜/문서 (로컬 작업용)
-docs/superpowers/
+# 로컬 문서/플랜
+docs/
