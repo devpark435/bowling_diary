@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
@@ -11,9 +13,13 @@ import 'package:bowling_diary/features/auth/presentation/providers/auth_provider
 import 'package:bowling_diary/features/balls/domain/entities/ball_entity.dart';
 import 'package:bowling_diary/features/balls/presentation/providers/ball_provider.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
+import 'package:bowling_diary/features/record/data/services/bowling_ocr_service.dart';
 import 'package:bowling_diary/features/record/domain/entities/game_entity.dart';
+import 'package:bowling_diary/features/record/domain/entities/ocr_result.dart';
+import 'package:bowling_diary/features/record/presentation/pages/ocr_result_page.dart';
 import 'package:bowling_diary/features/record/presentation/widgets/alley_search_sheet.dart';
 import 'package:bowling_diary/features/record/presentation/widgets/frame_input_widget.dart';
+import 'package:bowling_diary/features/record/presentation/widgets/ocr_player_select_sheet.dart';
 
 class RecordPage extends ConsumerStatefulWidget {
   const RecordPage({super.key, this.editSession});
@@ -58,6 +64,7 @@ class _GameEntry {
   VoidCallback? _listener;
   bool useFrameInput = false;
   List<FrameData>? frames;
+  Key? ocrKey;
 
   _GameEntry() : scoreController = TextEditingController();
 
@@ -113,9 +120,11 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   void _onScoreChanged() => setState(() {});
   bool _isLoading = false;
   bool _didRestoreBalls = false;
+  final BowlingOcrService _ocrService = BowlingOcrService();
 
   @override
   void dispose() {
+    _ocrService.dispose();
     _alleyNameController.dispose();
     _laneNumberController.dispose();
     _oilPatternController.dispose();
@@ -234,6 +243,240 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         },
       );
     });
+  }
+
+  Future<void> _startOcr(int gameIndex) async {
+    final source = await _showImageSourceDialog();
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: source,
+      imageQuality: 90,
+      maxWidth: 1920,
+    );
+    if (picked == null) return;
+
+    // 이미지 크롭 (선택)
+    String imagePath = picked.path;
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: '점수판 영역 선택',
+          toolbarColor: AppColors.darkBg,
+          toolbarWidgetColor: AppColors.textPrimary,
+          backgroundColor: AppColors.darkBg,
+          activeControlsWidgetColor: AppColors.neonOrange,
+        ),
+        IOSUiSettings(title: '점수판 영역 선택'),
+      ],
+    );
+    if (cropped != null) imagePath = cropped.path;
+
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    debugPrint('[OCR] 이미지 선택 완료: $imagePath');
+
+    try {
+      final result = await _ocrService.processImage(imagePath);
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (result.usedGeminiFallback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('AI 인식 한도 초과 — 기본 인식으로 대체합니다'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      if (result.isEmpty) {
+        debugPrint('[OCR] !! 결과가 비어있음 - 플레이어를 한 명도 감지하지 못함');
+        _showOcrError('점수를 인식하지 못했습니다.\n모니터가 잘 보이도록 다시 촬영해주세요.');
+        return;
+      }
+
+      debugPrint('[OCR] 인식 성공 - ${result.players.length}명 감지');
+
+      // 다중 플레이어 → 선택
+      OcrPlayerResult? selectedPlayer;
+      if (result.hasMultiplePlayers) {
+        selectedPlayer = await showOcrPlayerSelectSheet(context, result.players);
+        if (selectedPlayer == null) return;
+      } else {
+        selectedPlayer = result.players.first;
+      }
+
+      if (!mounted) return;
+
+      // 결과 확인 페이지
+      final applyResult = await Navigator.push<OcrApplyResult>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OcrResultPage(
+            playerResult: selectedPlayer!,
+            imagePath: imagePath,
+          ),
+        ),
+      );
+
+      if (applyResult == null || !mounted) return;
+
+      // 적용 모드에 따라 분기
+      if (applyResult.mode == OcrApplyMode.totalOnly) {
+        _applyOcrTotalOnly(gameIndex, applyResult.totalScore!);
+      } else {
+        _applyOcrFrames(gameIndex, applyResult.frames ?? []);
+      }
+    } catch (e) {
+      debugPrint('OCR 오류: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showOcrError('OCR 처리 중 오류가 발생했습니다.');
+      }
+    }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.darkCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('사진 가져오기', style: AppTextStyles.headingSmall),
+            ),
+            Divider(color: AppColors.darkDivider, height: 1),
+            ListTile(
+              leading: Icon(Icons.camera_alt, color: AppColors.neonOrange),
+              title: Text('카메라 촬영',
+                  style: TextStyle(color: AppColors.textPrimary)),
+              subtitle: Text('모니터를 직접 촬영합니다',
+                  style: AppTextStyles.bodySmall),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library, color: AppColors.mint),
+              title: Text('갤러리에서 선택',
+                  style: TextStyle(color: AppColors.textPrimary)),
+              subtitle: Text('저장된 사진을 선택합니다',
+                  style: AppTextStyles.bodySmall),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyOcrTotalOnly(int gameIndex, int totalScore) {
+    setState(() {
+      final game = _games[gameIndex];
+      game.useFrameInput = false;
+      game.scoreController.text = '$totalScore';
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('총점 $totalScore점이 입력되었습니다.'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _applyOcrFrames(int gameIndex, List<FrameData> frameData) {
+    setState(() {
+      final game = _games[gameIndex];
+      game.useFrameInput = true;
+      game.frames = frameData;
+
+      // 프레임 데이터에서 총점 계산
+      final total = _calculateTotalFromFrames(frameData);
+      if (total > 0) {
+        game.scoreController.text = '$total';
+      }
+
+      // FrameInputWidget을 새로 생성하도록 key 갱신
+      game.ocrKey = UniqueKey();
+    });
+
+    final unrecognized = 10 - frameData.length;
+    if (unrecognized > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${frameData.length}프레임 적용 완료! 나머지 $unrecognized프레임을 입력해주세요.'),
+          backgroundColor: AppColors.mint,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('전체 프레임이 적용되었습니다!'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  int _calculateTotalFromFrames(List<FrameData> frames) {
+    if (frames.isEmpty) return 0;
+
+    int total = 0;
+    for (int i = 0; i < frames.length; i++) {
+      final f = frames[i];
+      if (f.frameNumber <= 9) {
+        if (f.isStrike) {
+          total += 10 + _ocrNextTwoBalls(frames, i);
+        } else if (f.isSpare) {
+          total += 10 + _ocrNextOneBall(frames, i);
+        } else {
+          total += f.firstThrow + (f.secondThrow ?? 0);
+        }
+      } else {
+        total += f.firstThrow + (f.secondThrow ?? 0) + (f.thirdThrow ?? 0);
+      }
+    }
+    return total;
+  }
+
+  int _ocrNextOneBall(List<FrameData> frames, int idx) {
+    final nextIdx = frames.indexWhere((f) => f.frameNumber == frames[idx].frameNumber + 1);
+    if (nextIdx < 0) return 0;
+    return frames[nextIdx].firstThrow;
+  }
+
+  int _ocrNextTwoBalls(List<FrameData> frames, int idx) {
+    final nextFrame = frames[idx].frameNumber + 1;
+    final nextIdx = frames.indexWhere((f) => f.frameNumber == nextFrame);
+    if (nextIdx < 0) return 0;
+    final f = frames[nextIdx];
+    if (f.frameNumber < 10 && f.isStrike) {
+      return 10 + _ocrNextOneBall(frames, nextIdx);
+    }
+    return f.firstThrow + (f.secondThrow ?? 0);
+  }
+
+  void _showOcrError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -539,11 +782,14 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 selected: game.useFrameInput,
                 onTap: () => setState(() => game.useFrameInput = true),
               ),
+              const Spacer(),
+              _OcrButton(onTap: () => _startOcr(index)),
             ],
           ),
           const SizedBox(height: 14),
           if (game.useFrameInput)
             FrameInputWidget(
+              key: game.ocrKey,
               initialFrames: game.frames,
               onFramesChanged: (frames) {
                 game.frames = frames;
@@ -714,6 +960,42 @@ class _MaxScoreFormatter extends TextInputFormatter {
     final value = int.tryParse(newValue.text);
     if (value == null || value > max) return oldValue;
     return newValue;
+  }
+}
+
+class _OcrButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _OcrButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.mint.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.mint.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.camera_alt_outlined, size: 14, color: AppColors.mint),
+            const SizedBox(width: 4),
+            Text(
+              '사진 인식',
+              style: TextStyle(
+                color: AppColors.mint,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

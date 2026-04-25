@@ -40,6 +40,9 @@ dependencies:
   flutter_slidable: ^4.0.3
   http: ^1.2.2
   new_version_plus: ^1.0.1
+  google_mlkit_text_recognition: ^0.15.1
+  image_cropper: ^12.2.1
+  image: ^4.5.3
 
 dev_dependencies:
   flutter_test:
