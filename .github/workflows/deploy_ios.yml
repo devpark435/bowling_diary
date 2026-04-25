@@ -24,14 +24,20 @@ jobs:
         run: flutter pub get
 
       - name: Create dart_defines.json
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
         run: |
-          cat > dart_defines.json << 'EOF'
+          cat > dart_defines.json << EOF
           {
-            "SUPABASE_URL": "${{ secrets.SUPABASE_URL }}",
-            "SUPABASE_ANON_KEY": "${{ secrets.SUPABASE_ANON_KEY }}",
-            "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
-            "GOOGLE_WEB_CLIENT_ID": "${{ secrets.GOOGLE_WEB_CLIENT_ID }}",
-            "GOOGLE_IOS_CLIENT_ID": "${{ secrets.GOOGLE_IOS_CLIENT_ID }}"
+            "SUPABASE_URL": "$SUPABASE_URL",
+            "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY",
+            "GEMINI_API_KEY": "$GEMINI_API_KEY",
+            "GOOGLE_WEB_CLIENT_ID": "$GOOGLE_WEB_CLIENT_ID",
+            "GOOGLE_IOS_CLIENT_ID": "$GOOGLE_IOS_CLIENT_ID"
           }
           EOF
 
@@ -39,6 +45,23 @@ jobs:
         run: |
           cd ios
           pod install --repo-update
+
+      - name: Import Apple Distribution Certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "" $KEYCHAIN_PATH
+
+          echo "$CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
 
       - name: Setup App Store Connect API Key
         run: |
@@ -49,7 +72,7 @@ jobs:
       - name: Build Flutter iOS (no codesign)
         run: flutter build ios --release --no-codesign --dart-define-from-file=dart_defines.json
 
-      - name: Archive (automatic signing)
+      - name: Archive
         run: |
           xcodebuild archive \
             -workspace ios/Runner.xcworkspace \
@@ -60,7 +83,8 @@ jobs:
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
             -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8 \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}
 
       - name: Export IPA
