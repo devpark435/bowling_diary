@@ -19,9 +19,8 @@ jobs:
           sudo xcode-select -s /Applications/$XCODE_PATH/Contents/Developer
           xcodebuild -version
 
-      - name: Install iOS 26 Platform
-        run: xcodebuild -downloadPlatform iOS
-        timeout-minutes: 10
+      - name: Xcode 첫 실행 초기화 (CI)
+        run: sudo xcodebuild -runFirstLaunch
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
