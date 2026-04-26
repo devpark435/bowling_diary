@@ -47,8 +47,7 @@ class AnalysisTabPage extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.neonOrange,
-        onPressed: () => Navigator.push(
-          context,
+        onPressed: () => Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute(builder: (_) => const AnalysisGuidePage()),
         ).then((_) => ref.invalidate(analysisHistoryProvider)),
         child: const Icon(Icons.videocam, color: Colors.black),
