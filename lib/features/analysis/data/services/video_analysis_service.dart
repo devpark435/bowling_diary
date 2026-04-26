@@ -77,6 +77,66 @@ class VideoAnalysisService {
     );
   }
 
+  /// 갤러리 영상 프레임(img.Image) 분석 — sampleFps는 추출 시 사용한 fps
+  AnalysisData analyzeImages(
+    List<img.Image> frames,
+    int originalFps, {
+    int sampleFps = 10,
+  }) {
+    debugPrint('[Analysis] 갤러리 분석 시작: ${frames.length}개 프레임, 원본 ${originalFps}fps, 샘플 ${sampleFps}fps');
+
+    if (frames.length < 5) {
+      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: originalFps);
+    }
+
+    final positions = <_BallPosition?>[];
+    img.Image? prevGray;
+
+    for (final frame in frames) {
+      final gray = img.grayscale(frame);
+      if (prevGray != null) {
+        positions.add(_detectBallByMotion(prevGray, gray));
+      } else {
+        positions.add(null);
+      }
+      prevGray = gray;
+    }
+
+    final detected = positions.asMap().entries.where((e) => e.value != null).toList();
+
+    if (detected.length < 3) {
+      debugPrint('[Analysis] 볼 감지 실패 → 속도 0 반환');
+      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: originalFps);
+    }
+
+    final releaseIdx = detected.first.key;
+    final impactIdx = detected.last.key;
+    final sampleInterval = (originalFps / sampleFps).round().clamp(1, 999);
+    final actualFrameCount = (impactIdx - releaseIdx) * sampleInterval;
+    final elapsedSec = actualFrameCount / originalFps;
+
+    if (elapsedSec <= 0) {
+      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: originalFps);
+    }
+
+    final speedKmh = (_laneLength / elapsedSec) * 3.6;
+    debugPrint('[Analysis] 속도: ${speedKmh.toStringAsFixed(1)}km/h');
+
+    final rpm = _estimateRpm(
+      detected.map((e) => e.value!).toList(),
+      originalFps,
+      sampleInterval: sampleInterval,
+    );
+    debugPrint('[Analysis] RPM 추정: $rpm');
+
+    return AnalysisData(
+      speedKmh: double.parse(speedKmh.toStringAsFixed(1)),
+      rpmEstimated: rpm,
+      framesAnalyzed: frames.length,
+      fpsUsed: originalFps,
+    );
+  }
+
   /// CameraImage(YUV420) → 그레이스케일 (Y 채널만 사용)
   img.Image? _toGrayscale(CameraImage frame) {
     try {
@@ -123,7 +183,11 @@ class VideoAnalysisService {
   }
 
   /// 볼의 X 좌표 진동 주기로 RPM 추정
-  int? _estimateRpm(List<_BallPosition> positions, int fps) {
+  int? _estimateRpm(
+    List<_BallPosition> positions,
+    int fps, {
+    int sampleInterval = 10,
+  }) {
     if (positions.length < 4) return null;
 
     int directionChanges = 0;
@@ -135,14 +199,13 @@ class VideoAnalysisService {
       if (dx.abs() > 1) prevDx = dx;
     }
 
-    final sampleFps = fps / 10.0;
-    final durationSec = positions.length / sampleFps;
+    final effectiveFps = fps / sampleInterval;
+    final durationSec = positions.length / effectiveFps;
     if (durationSec <= 0) return null;
 
     final rotationsPerSec = directionChanges / 2.0 / durationSec;
     final rpm = (rotationsPerSec * 60).round();
 
-    // 볼링 RPM 현실 범위 벗어나면 null
     if (rpm < 100 || rpm > 500) return null;
     return rpm;
   }
