@@ -6,11 +6,13 @@ class RecordingSession {
   final String videoPath;
   final List<CameraImage> sampledFrames;
   final int fps;
+  final int sampleInterval;
 
   const RecordingSession({
     required this.videoPath,
     required this.sampledFrames,
     required this.fps,
+    required this.sampleInterval,
   });
 }
 
@@ -83,6 +85,7 @@ class CameraRecordingService {
       videoPath: xfile.path,
       sampledFrames: List.unmodifiable(_frames),
       fps: _fps,
+      sampleInterval: 10,
     );
   }
 

@@ -6,6 +6,7 @@ import 'package:bowling_diary/features/analysis/data/services/video_analysis_ser
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/bowling_pin_character.dart';
 
 class AnalysisSelectionPage extends StatefulWidget {
@@ -19,12 +20,16 @@ class _AnalysisSelectionPageState extends State<AnalysisSelectionPage> {
   final _frameExtractor = VideoFrameExtractorService();
   final _analysisService = VideoAnalysisService();
   bool _isAnalyzing = false;
+  String? _analyzingVideoPath;
 
   Future<void> _pickFromGallery() async {
     final video = await ImagePicker().pickVideo(source: ImageSource.gallery);
     if (video == null || !mounted) return;
 
-    setState(() => _isAnalyzing = true);
+    setState(() {
+      _isAnalyzing = true;
+      _analyzingVideoPath = video.path;
+    });
     try {
       final result = await _frameExtractor.extract(video.path);
       final analysisData = _analysisService.analyzeImages(
@@ -66,16 +71,7 @@ class _AnalysisSelectionPageState extends State<AnalysisSelectionPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('볼 분석')),
       body: _isAnalyzing
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: AppColors.neonOrange),
-                  const SizedBox(height: 24),
-                  Text('영상 분석 중...', style: AppTextStyles.bodyLarge),
-                ],
-              ),
-            )
+          ? AnalysisLoadingWidget(videoPath: _analyzingVideoPath)
           : Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(

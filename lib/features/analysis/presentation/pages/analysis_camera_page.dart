@@ -1,10 +1,10 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/camera_recording_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/camera_guide_overlay.dart';
 
 class AnalysisCameraPage extends StatefulWidget {
@@ -22,6 +22,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
   bool _isInitialized = false;
   bool _isRecording = false;
   bool _isAnalyzing = false;
+  String? _analyzingVideoPath;
   String? _error;
 
   @override
@@ -62,6 +63,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
 
     try {
       final session = await _cameraService.stopRecording();
+      if (mounted) setState(() => _analyzingVideoPath = session.videoPath);
       final analysisData =
           _analysisService.analyze(session.sampledFrames, session.fps);
 
@@ -109,16 +111,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
 
     if (_isAnalyzing) {
       return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.neonOrange),
-              const SizedBox(height: 24),
-              Text('영상 분석 중...', style: AppTextStyles.bodyLarge),
-            ],
-          ),
-        ),
+        body: AnalysisLoadingWidget(videoPath: _analyzingVideoPath),
       );
     }
 
