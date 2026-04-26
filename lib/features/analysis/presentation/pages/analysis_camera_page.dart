@@ -2,7 +2,9 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/camera_recording_service.dart';
+import 'package:bowling_diary/features/analysis/data/services/gemini_analysis_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/camera_guide_overlay.dart';
@@ -16,7 +18,9 @@ class AnalysisCameraPage extends StatefulWidget {
 
 class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
   final _cameraService = CameraRecordingService();
-  final _analysisService = VideoAnalysisService();
+  final _frameExtractor = VideoFrameExtractorService();
+  final _geminiService = GeminiAnalysisService();
+  final _fallbackService = VideoAnalysisService();
 
   CameraController? _controller;
   bool _isInitialized = false;
@@ -64,8 +68,18 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
     try {
       final session = await _cameraService.stopRecording();
       if (mounted) setState(() => _analyzingVideoPath = session.videoPath);
-      final analysisData =
-          _analysisService.analyze(session.sampledFrames, session.fps);
+
+      final extracted = await _frameExtractor.extract(session.videoPath);
+      AnalysisData analysisData;
+      try {
+        analysisData = await _geminiService.analyze(extracted.frames, extracted.originalFps);
+      } on GeminiQuotaExceededException {
+        debugPrint('[Analysis] Gemini 할당량 초과 → 로컬 분석 fallback');
+        analysisData = _fallbackService.analyzeImages(extracted.frames, extracted.originalFps);
+      } on GeminiApiException catch (e) {
+        debugPrint('[Analysis] Gemini 오류 → fallback: $e');
+        analysisData = _fallbackService.analyzeImages(extracted.frames, extracted.originalFps);
+      }
 
       if (!mounted) return;
       setState(() => _isAnalyzing = false);

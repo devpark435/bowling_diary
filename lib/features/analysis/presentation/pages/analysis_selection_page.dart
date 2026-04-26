@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/features/analysis/data/services/gemini_analysis_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
@@ -18,7 +19,8 @@ class AnalysisSelectionPage extends StatefulWidget {
 
 class _AnalysisSelectionPageState extends State<AnalysisSelectionPage> {
   final _frameExtractor = VideoFrameExtractorService();
-  final _analysisService = VideoAnalysisService();
+  final _geminiService = GeminiAnalysisService();
+  final _fallbackService = VideoAnalysisService();
   bool _isAnalyzing = false;
   String? _analyzingVideoPath;
 
@@ -32,10 +34,7 @@ class _AnalysisSelectionPageState extends State<AnalysisSelectionPage> {
     });
     try {
       final result = await _frameExtractor.extract(video.path);
-      final analysisData = _analysisService.analyzeImages(
-        result.frames,
-        result.originalFps,
-      );
+      final analysisData = await _analyzeWithFallback(result.frames, result.originalFps);
 
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
@@ -56,6 +55,22 @@ class _AnalysisSelectionPageState extends State<AnalysisSelectionPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('영상 분석 실패: $e')),
       );
+    }
+  }
+
+  Future<AnalysisData> _analyzeWithFallback(
+      List<dynamic> frames, int originalFps) async {
+    try {
+      return await _geminiService.analyze(
+        frames.cast(),
+        originalFps,
+      );
+    } on GeminiQuotaExceededException {
+      debugPrint('[Analysis] Gemini 할당량 초과 → 로컬 분석으로 fallback');
+      return _fallbackService.analyzeImages(frames.cast(), originalFps);
+    } on GeminiApiException catch (e) {
+      debugPrint('[Analysis] Gemini 오류 → fallback: $e');
+      return _fallbackService.analyzeImages(frames.cast(), originalFps);
     }
   }
 
