@@ -33,8 +33,7 @@ class _AnalysisSelectionPageState extends State<AnalysisSelectionPage> {
       _analyzingVideoPath = video.path;
     });
     try {
-      final result = await _frameExtractor.extract(video.path);
-      final analysisData = await _analyzeWithFallback(result.frames, result.originalFps);
+      final analysisData = await _analyzeWithFallback(video.path, 60);
 
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
@@ -58,19 +57,17 @@ class _AnalysisSelectionPageState extends State<AnalysisSelectionPage> {
     }
   }
 
-  Future<AnalysisData> _analyzeWithFallback(
-      List<dynamic> frames, int originalFps) async {
+  Future<AnalysisData> _analyzeWithFallback(String videoPath, int fps) async {
     try {
-      return await _geminiService.analyze(
-        frames.cast(),
-        originalFps,
-      );
+      return await _geminiService.analyzeVideo(videoPath, fps);
     } on GeminiQuotaExceededException {
-      debugPrint('[Analysis] Gemini 할당량 초과 → 로컬 분석으로 fallback');
-      return _fallbackService.analyzeImages(frames.cast(), originalFps);
+      debugPrint('[Analysis] Gemini 할당량 초과 → 로컬 분석 fallback');
+      final result = await _frameExtractor.extract(videoPath);
+      return _fallbackService.analyzeImages(result.frames, result.originalFps);
     } on GeminiApiException catch (e) {
       debugPrint('[Analysis] Gemini 오류 → fallback: $e');
-      return _fallbackService.analyzeImages(frames.cast(), originalFps);
+      final result = await _frameExtractor.extract(videoPath);
+      return _fallbackService.analyzeImages(result.frames, result.originalFps);
     }
   }
 

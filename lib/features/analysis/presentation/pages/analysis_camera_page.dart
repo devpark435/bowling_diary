@@ -69,15 +69,16 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
       final session = await _cameraService.stopRecording();
       if (mounted) setState(() => _analyzingVideoPath = session.videoPath);
 
-      final extracted = await _frameExtractor.extract(session.videoPath);
       AnalysisData analysisData;
       try {
-        analysisData = await _geminiService.analyze(extracted.frames, extracted.originalFps);
+        analysisData = await _geminiService.analyzeVideo(session.videoPath, session.fps);
       } on GeminiQuotaExceededException {
         debugPrint('[Analysis] Gemini 할당량 초과 → 로컬 분석 fallback');
+        final extracted = await _frameExtractor.extract(session.videoPath);
         analysisData = _fallbackService.analyzeImages(extracted.frames, extracted.originalFps);
       } on GeminiApiException catch (e) {
         debugPrint('[Analysis] Gemini 오류 → fallback: $e');
+        final extracted = await _frameExtractor.extract(session.videoPath);
         analysisData = _fallbackService.analyzeImages(extracted.frames, extracted.originalFps);
       }
 
