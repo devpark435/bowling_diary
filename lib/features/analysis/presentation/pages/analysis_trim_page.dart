@@ -177,31 +177,36 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
       appBar: AppBar(title: const Text('구간 선택')),
       body: Column(
         children: [
-          // 영상 미리보기
-          GestureDetector(
-            onTap: _togglePlay,
-            child: AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  VideoPlayer(_controller!),
-                  if (!_controller!.value.isPlaying)
-                    Container(
-                      color: Colors.black38,
-                      child: const Icon(
-                        Icons.play_arrow,
-                        color: Colors.white,
-                        size: 64,
+          // 영상 미리보기 (최대 화면 45%)
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.45,
+            ),
+            child: GestureDetector(
+              onTap: _togglePlay,
+              child: AspectRatio(
+                aspectRatio: _controller!.value.aspectRatio,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    VideoPlayer(_controller!),
+                    if (!_controller!.value.isPlaying)
+                      Container(
+                        color: Colors.black38,
+                        child: const Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                          size: 64,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
 
           Expanded(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
               child: Column(
                 children: [
@@ -250,7 +255,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
                     textAlign: TextAlign.center,
                   ),
 
-                  const Spacer(),
+                  const SizedBox(height: 24),
 
                   SizedBox(
                     width: double.infinity,
