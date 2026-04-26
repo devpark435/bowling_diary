@@ -1,7 +1,7 @@
 name: bowling_diary
 description: "볼링 기록 & 분석 앱 - 나의 볼링 성장 일기장"
 publish_to: 'none'
-version: 1.1.0+1
+version: 1.2.0+1
 
 environment:
   sdk: ^3.5.0
