@@ -152,19 +152,30 @@ class GeminiAnalysisService {
   }
 
   String _buildPrompt() => '''
-볼링 투구 영상입니다. 다음 기준으로 분석해 JSON만 반환하세요.
+볼링 투구 영상입니다. JSON만 반환하세요.
 
-[구속]
-볼링 레인 파울라인~헤드핀 = 18.29m.
-영상에서 볼링공이 파울라인을 넘는 시점과 헤드핀에 도달하는 시점 사이의 시간으로 speed_kmh를 계산하세요.
-볼을 감지할 수 없으면 0.
+[볼링 레인 규격 — USBC 공식]
+파울라인 ~ 헤드핀(1번 핀) 중심 = 정확히 60피트 = 18.288m
+레인 폭 = 41.5인치 = 1.054m
 
-[RPM]
-볼링공 표면의 텍스처, 로고, 광택 반사 패턴이 영상 전반에 걸쳐 어떻게 변화하는지 분석해 rpm_estimate를 추정하세요.
+[구속 계산 방법]
+1. release_sec: 볼링공이 파울라인을 넘어가는 순간의 영상 타임스탬프 (초)
+2. impact_sec: 볼링공이 헤드핀에 최초 접촉하는 순간의 영상 타임스탬프 (초)
+3. elapsed = impact_sec - release_sec
+4. speed_kmh = (18.288 / elapsed) × 3.6
+※ 볼 감지 불가 시 release_sec, impact_sec 모두 null, speed_kmh = 0
+※ 참고: 일반 볼러 약 19~25 km/h, 상급자 약 25~35 km/h
+
+[RPM 계산 방법]
+release_sec ~ impact_sec 구간에서 볼링공 표면의 텍스처·로고·광택 반사 패턴 변화를 분석해
+회전수를 추정하세요. elapsed 동안의 총 회전수 → RPM = (총 회전수 / elapsed) × 60
 추정 불가 시 null.
+※ 참고: 일반 볼러 약 150~250 RPM, 상급자 약 300~450 RPM
 
 {
-  "speed_kmh": 18.5,
+  "release_sec": 1.2,
+  "impact_sec": 3.8,
+  "speed_kmh": 25.2,
   "rpm_estimate": 280
 }''';
 
@@ -174,9 +185,24 @@ class GeminiAnalysisService {
       final text = json['candidates'][0]['content']['parts'][0]['text'] as String;
       final data = jsonDecode(text) as Map<String, dynamic>;
 
-      final speedKmh = (data['speed_kmh'] as num?)?.toDouble() ?? 0.0;
-      final rpm = data['rpm_estimate'] as int?;
+      final releaseSec = (data['release_sec'] as num?)?.toDouble();
+      final impactSec = (data['impact_sec'] as num?)?.toDouble();
+      double speedKmh = (data['speed_kmh'] as num?)?.toDouble() ?? 0.0;
 
+      // 타임스탬프가 있으면 우리가 직접 재계산 (더 정확)
+      if (releaseSec != null && impactSec != null) {
+        final elapsed = impactSec - releaseSec;
+        if (elapsed > 0.1) {
+          final calculated = (18.288 / elapsed) * 3.6;
+          // 볼링 현실 범위(15~45 km/h) 내면 채택
+          if (calculated >= 15 && calculated <= 45) {
+            speedKmh = calculated;
+          }
+        }
+        debugPrint('[GeminiAnalysis] 릴리즈=${releaseSec}s 임팩트=${impactSec}s elapsed=${(impactSec - releaseSec).toStringAsFixed(2)}s');
+      }
+
+      final rpm = data['rpm_estimate'] as int?;
       debugPrint('[GeminiAnalysis] 결과: ${speedKmh.toStringAsFixed(1)}km/h, RPM=$rpm');
 
       return AnalysisData(
