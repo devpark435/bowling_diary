@@ -39,19 +39,18 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
   }
 
   Future<void> _initVideo() async {
-    final videoCtrl =
-        VideoPlayerController.file(dart_io.File(widget.videoPath));
-    await videoCtrl.initialize();
-    await videoCtrl.setPlaybackSpeed(0.25);
-    await videoCtrl.setLooping(true);
+    final ctrl = VideoPlayerController.file(dart_io.File(widget.videoPath));
+    await ctrl.initialize();
+    await ctrl.setPlaybackSpeed(0.25);
+    await ctrl.setLooping(true);
+    await ctrl.play();
     if (!mounted) return;
-    setState(() => _videoController = videoCtrl);
+    setState(() => _videoController = ctrl);
   }
 
   Future<void> _save({String? linkedSessionId}) async {
     final auth = ref.read(authNotifierProvider);
     if (auth is! AuthStateAuthenticated) return;
-
     setState(() => _isSaving = true);
 
     final entity = AnalysisResultEntity(
@@ -67,7 +66,6 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
     );
 
     await ref.read(analysisRepositoryProvider).save(entity);
-
     if (!mounted) return;
     setState(() => _isSaving = false);
     Navigator.of(context).popUntil((r) => r.isFirst);
@@ -77,10 +75,8 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
     final auth = ref.read(authNotifierProvider);
     if (auth is! AuthStateAuthenticated) return;
 
-    final sessions = await ref.read(
-      sameDaySessionsProvider(widget.recordedAt).future,
-    );
-
+    final sessions =
+        await ref.read(sameDaySessionsProvider(widget.recordedAt).future);
     if (!mounted) return;
 
     if (sessions.isEmpty) {
@@ -92,9 +88,16 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
       context: context,
       builder: (_) => _SessionLinkSheet(sessions: sessions),
     );
-
     if (!mounted) return;
     await _save(linkedSessionId: picked);
+  }
+
+  void _togglePlay() {
+    if (_videoController == null) return;
+    _videoController!.value.isPlaying
+        ? _videoController!.pause()
+        : _videoController!.play();
+    setState(() {});
   }
 
   @override
@@ -106,145 +109,229 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
   @override
   Widget build(BuildContext context) {
     final data = widget.analysisData;
+    final isVideoReady =
+        _videoController != null && _videoController!.value.isInitialized;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('측정 결과')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_videoController != null &&
-                _videoController!.value.isInitialized)
-              Column(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text('측정 결과'),
+      ),
+      body: Column(
+        children: [
+          // 영상 + 오버레이
+          Expanded(
+            child: GestureDetector(
+              onTap: _togglePlay,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: _videoController!.value.aspectRatio,
-                      child: VideoPlayer(_videoController!),
+                  // 영상
+                  if (isVideoReady)
+                    FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _videoController!.value.size.width,
+                        height: _videoController!.value.size.height,
+                        child: VideoPlayer(_videoController!),
+                      ),
+                    )
+                  else
+                    const Center(
+                      child: CircularProgressIndicator(),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          _videoController!.value.isPlaying
-                              ? _videoController!.pause()
-                              : _videoController!.play();
-                          setState(() {});
-                        },
-                        icon: Icon(
-                          _videoController!.value.isPlaying
-                              ? Icons.pause
-                              : Icons.play_arrow,
-                          color: AppColors.neonOrange,
+
+                  // 하단 그라데이션
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.7),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
                         ),
                       ),
-                      Text('0.25× 슬로우모션',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textSecondary)),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 24),
+
+                  // 재생/일시정지 중앙 아이콘 (일시정지 시만)
+                  if (isVideoReady && !_videoController!.value.isPlaying)
+                    Center(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.play_arrow,
+                            color: Colors.white, size: 40),
+                      ),
+                    ),
+
+                  // 슬로우모션 뱃지
+                  Positioned(
+                    top: 12,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '0.25× 슬로우모션',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.white70),
+                      ),
+                    ),
+                  ),
+
+                  // 구속 · RPM 오버레이 (하단)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 20,
+                    child: Row(
+                      children: [
+                        _StatOverlayCard(
+                          label: '구속',
+                          value: data.speedKmh > 0
+                              ? data.speedKmh.toStringAsFixed(1)
+                              : '—',
+                          unit: 'km/h',
+                          isMain: true,
+                        ),
+                        const SizedBox(width: 12),
+                        _StatOverlayCard(
+                          label: 'RPM',
+                          value: data.rpmEstimated != null
+                              ? data.rpmEstimated.toString()
+                              : '—',
+                          unit: 'rpm',
+                          isMain: false,
+                          note: '추정값',
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              )
-            else
-              const Center(child: CircularProgressIndicator()),
-            _ResultTile(
-              label: '구속',
-              value: data.speedKmh > 0
-                  ? '${data.speedKmh.toStringAsFixed(1)} km/h'
-                  : '측정 불가',
-              isMain: true,
-            ),
-            const SizedBox(height: 12),
-            _ResultTile(
-              label: 'RPM (추정값)',
-              value: data.rpmEstimated != null
-                  ? '${data.rpmEstimated} RPM'
-                  : '측정 불가',
-              isMain: false,
-              note: 'RPM은 후방 촬영 특성상 추정값입니다',
-            ),
-            const SizedBox(height: 8),
-            Text(
-                '분석 프레임: ${data.framesAnalyzed}개 / ${data.fpsUsed}fps',
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textHint)),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.neonOrange,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: _isSaving ? null : _onSavePressed,
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text('저장',
-                        style: AppTextStyles.bodyLarge
-                            .copyWith(fontWeight: FontWeight.bold)),
               ),
             ),
-          ],
-        ),
+          ),
+
+          // 저장 버튼
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.neonOrange,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: _isSaving ? null : _onSavePressed,
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text('저장',
+                          style: AppTextStyles.bodyLarge
+                              .copyWith(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ResultTile extends StatelessWidget {
+class _StatOverlayCard extends StatelessWidget {
   final String label;
   final String value;
+  final String unit;
   final bool isMain;
   final String? note;
 
-  const _ResultTile(
-      {required this.label,
-      required this.value,
-      required this.isMain,
-      this.note});
+  const _StatOverlayCard({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.isMain,
+    this.note,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.darkCard,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: AppTextStyles.bodySmall
-                  .copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: isMain
-                ? AppTextStyles.headingLarge
-                    .copyWith(color: AppColors.neonOrange)
-                : AppTextStyles.headingSmall
-                    .copyWith(color: AppColors.textPrimary),
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isMain
+                ? AppColors.neonOrange.withValues(alpha: 0.6)
+                : Colors.white24,
+            width: 1,
           ),
-          if (note != null) ...[
-            const SizedBox(height: 4),
-            Text(note!,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style:
+                  AppTextStyles.bodySmall.copyWith(color: Colors.white60),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: isMain ? 32 : 28,
+                    fontWeight: FontWeight.bold,
+                    color: isMain ? AppColors.neonOrange : Colors.white,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    unit,
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: Colors.white60),
+                  ),
+                ),
+              ],
+            ),
+            if (note != null)
+              Text(
+                note!,
                 style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textHint)),
+                    .copyWith(color: Colors.white38, fontSize: 10),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -265,9 +352,11 @@ class _SessionLinkSheet extends StatelessWidget {
           children: [
             Text('오늘 기록에 연결할까요?', style: AppTextStyles.headingSmall),
             const SizedBox(height: 8),
-            Text('연결하면 해당 세션에서 볼 분석 결과를 확인할 수 있어요.',
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSecondary)),
+            Text(
+              '연결하면 해당 세션에서 볼 분석 결과를 확인할 수 있어요.',
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 16),
             ...sessions.map((s) => ListTile(
                   title: Text(s.alleyName ?? '볼링장 미입력',
