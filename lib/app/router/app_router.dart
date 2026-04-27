@@ -80,6 +80,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/balls',
+        builder: (context, state) => const BallsPage(),
+      ),
+      GoRoute(
         path: '/admin/catalog',
         builder: (context, state) => const CatalogManagePage(),
       ),
@@ -109,14 +113,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/analysis',
                 builder: (context, state) => const AnalysisTabPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/balls',
-                builder: (context, state) => const BallsPage(),
               ),
             ],
           ),
@@ -172,14 +168,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
               label: '분석',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.sports_baseball_outlined),
-              activeIcon: Icon(Icons.sports_baseball),
-              label: '내 볼',
-            ),
-            BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
-              label: '설정',
+              label: '마이페이지',
             ),
           ],
         ),
