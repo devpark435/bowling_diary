@@ -1,9 +1,11 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/camera_recording_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/camera_guide_overlay.dart';
 
@@ -17,6 +19,7 @@ class AnalysisCameraPage extends StatefulWidget {
 class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
   final _cameraService = CameraRecordingService();
   final _analysisService = VideoAnalysisService();
+  final _frameExtractor = VideoFrameExtractorService();
 
   CameraController? _controller;
   bool _isInitialized = false;
@@ -51,6 +54,40 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
       await _cameraService.startRecording();
       if (!mounted) return;
       setState(() => _isRecording = true);
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    final video = await ImagePicker().pickVideo(source: ImageSource.gallery);
+    if (video == null || !mounted) return;
+
+    setState(() => _isAnalyzing = true);
+    try {
+      final result = await _frameExtractor.extract(video.path);
+      final analysisData = _analysisService.analyzeImages(
+        result.frames,
+        result.originalFps,
+      );
+
+      if (!mounted) return;
+      setState(() => _isAnalyzing = false);
+
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AnalysisResultPage(
+            analysisData: analysisData,
+            videoPath: video.path,
+            recordedAt: DateTime.now(),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isAnalyzing = false;
+        _error = '갤러리 영상 분석 오류: $e';
+      });
     }
   }
 
@@ -157,10 +194,31 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
             right: 40,
             child: Text(
               '${_cameraService.fps}fps',
-              style:
-                  AppTextStyles.bodySmall.copyWith(color: Colors.white70),
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
             ),
           ),
+          if (!_isRecording)
+            Positioned(
+              bottom: 68,
+              left: 40,
+              child: GestureDetector(
+                onTap: _pickFromGallery,
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black45,
+                    border: Border.all(color: Colors.white54, width: 1.5),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_outlined,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
