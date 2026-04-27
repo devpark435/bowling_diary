@@ -8,17 +8,39 @@ import 'package:bowling_diary/features/analysis/presentation/providers/analysis_
 import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_history_card.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
 
-class AnalysisTabPage extends ConsumerWidget {
+class AnalysisTabPage extends ConsumerStatefulWidget {
   const AnalysisTabPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnalysisTabPage> createState() => _AnalysisTabPageState();
+}
+
+class _AnalysisTabPageState extends ConsumerState<AnalysisTabPage> {
+  // 로컬에서 먼저 제거한 ID 목록 — Supabase 응답 전까지 화면에서 숨김
+  final Set<String> _deletedIds = {};
+
+  Future<void> _delete(String id) async {
+    setState(() => _deletedIds.add(id));
+    try {
+      await ref.read(analysisRepositoryProvider).delete(id);
+      ref.invalidate(analysisHistoryProvider);
+    } catch (_) {
+      // 실패 시 복원
+      setState(() => _deletedIds.remove(id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final history = ref.watch(analysisHistoryProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('분석')),
       body: history.when(
-        data: (items) {
+        data: (allItems) {
+          final items =
+              allItems.where((e) => !_deletedIds.contains(e.id)).toList();
+
           if (items.isEmpty) {
             return Center(
               child: Column(
@@ -37,6 +59,7 @@ class AnalysisTabPage extends ConsumerWidget {
               ),
             );
           }
+
           return ListView.builder(
             padding: const EdgeInsets.only(top: 8, bottom: 80),
             itemCount: items.length,
@@ -68,7 +91,8 @@ class AnalysisTabPage extends ConsumerWidget {
                         onPressed: () =>
                             Navigator.of(dialogContext).pop(false),
                         child: Text('취소',
-                            style: TextStyle(color: AppColors.textSecondary)),
+                            style:
+                                TextStyle(color: AppColors.textSecondary)),
                       ),
                       TextButton(
                         onPressed: () =>
@@ -79,10 +103,7 @@ class AnalysisTabPage extends ConsumerWidget {
                     ],
                   ),
                 ),
-                onDismissed: (_) async {
-                  await ref.read(analysisRepositoryProvider).delete(item.id);
-                  ref.invalidate(analysisHistoryProvider);
-                },
+                onDismissed: (_) => _delete(item.id),
                 child: AnalysisHistoryCard(
                   result: item,
                   onTap: () =>
