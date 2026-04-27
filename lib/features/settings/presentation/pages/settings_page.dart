@@ -245,7 +245,7 @@ class _ColorThemeSelector extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: AppColorTheme.values.map((theme) {
-          final palette = ColorThemes.fromTheme(theme);
+          final palette = ColorThemes.previewLight(theme);
           final isSelected = theme == currentTheme;
           return GestureDetector(
             onTap: () => ref.read(colorThemeProvider.notifier).setTheme(theme),
@@ -296,14 +296,12 @@ class _ColorThemeSelector extends StatelessWidget {
 
   String _themeName(AppColorTheme theme) {
     switch (theme) {
-      case AppColorTheme.dark:
-        return '다크';
+      case AppColorTheme.blue:
+        return '블루';
       case AppColorTheme.cream:
         return '크림';
       case AppColorTheme.lavender:
         return '라벤더';
-      case AppColorTheme.tossBlue:
-        return '블루';
     }
   }
 }

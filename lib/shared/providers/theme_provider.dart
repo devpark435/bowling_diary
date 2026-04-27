@@ -4,38 +4,43 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/color_themes.dart';
 
-final colorThemeProvider = StateNotifierProvider<ColorThemeNotifier, AppColorTheme>((ref) {
+/// 사용자가 선택한 테마 스타일 (3종)
+final colorThemeProvider =
+    StateNotifierProvider<ColorThemeNotifier, AppColorTheme>((ref) {
   return ColorThemeNotifier();
 });
 
-final themeProvider = Provider<ThemeMode>((ref) {
-  final colorTheme = ref.watch(colorThemeProvider);
-  final palette = ColorThemes.fromTheme(colorTheme);
-  return palette.brightness == Brightness.light ? ThemeMode.light : ThemeMode.dark;
+/// 디바이스 밝기 — app.dart의 WidgetsBindingObserver가 업데이트
+final platformBrightnessProvider =
+    StateProvider<Brightness>((ref) {
+  return WidgetsBinding.instance.platformDispatcher.platformBrightness;
+});
+
+/// 현재 활성 팔레트 (테마 + 밝기 조합)
+final activePaletteProvider = Provider<ColorPalette>((ref) {
+  final theme = ref.watch(colorThemeProvider);
+  final brightness = ref.watch(platformBrightnessProvider);
+  final palette = ColorThemes.palette(theme, brightness);
+  AppColors.setPalette(palette);
+  return palette;
 });
 
 class ColorThemeNotifier extends StateNotifier<AppColorTheme> {
-  ColorThemeNotifier() : super(AppColorTheme.cream) {
+  ColorThemeNotifier() : super(AppColorTheme.blue) {
     _load();
   }
 
-  static const _key = 'color_theme';
+  static const _key = 'color_theme_v2';
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final idx = prefs.getInt(_key);
     if (idx != null && idx >= 0 && idx < AppColorTheme.values.length) {
-      final theme = AppColorTheme.values[idx];
-      AppColors.setPalette(ColorThemes.fromTheme(theme));
-      state = theme;
-    } else {
-      AppColors.setPalette(ColorThemes.cream);
-      state = AppColorTheme.cream;
+      state = AppColorTheme.values[idx];
     }
   }
 
   Future<void> setTheme(AppColorTheme theme) async {
-    AppColors.setPalette(ColorThemes.fromTheme(theme));
     state = theme;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_key, theme.index);
