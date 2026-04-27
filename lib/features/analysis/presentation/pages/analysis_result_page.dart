@@ -3,6 +3,7 @@ import 'dart:io' as dart_io;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
@@ -140,8 +141,8 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
                         },
                         icon: Icon(
                           _videoController!.value.isPlaying
-                              ? Icons.pause
-                              : Icons.play_arrow,
+                              ? PhosphorIconsFill.pause
+                              : PhosphorIconsFill.play,
                           color: AppColors.neonOrange,
                         ),
                       ),
@@ -276,7 +277,7 @@ class _SessionLinkSheet extends StatelessWidget {
                       style: AppTextStyles.bodyMedium),
                   subtitle: Text('${s.date.month}/${s.date.day}',
                       style: AppTextStyles.bodySmall),
-                  trailing: const Icon(Icons.link),
+                  trailing: const Icon(PhosphorIconsRegular.link),
                   onTap: () => Navigator.pop(context, s.id),
                 )),
             ListTile(

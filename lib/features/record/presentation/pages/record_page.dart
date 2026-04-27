@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
@@ -191,7 +192,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                     children: [
                       Text('사용한 볼 선택', style: AppTextStyles.headingSmall),
                       IconButton(
-                        icon: Icon(Icons.close, color: AppColors.textSecondary),
+                        icon: Icon(PhosphorIconsRegular.x, color: AppColors.textSecondary),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
@@ -199,7 +200,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 ),
                 Divider(color: AppColors.darkDivider, height: 1),
                 ListTile(
-                  leading: Icon(Icons.clear, color: AppColors.textHint),
+                  leading: Icon(PhosphorIconsRegular.x, color: AppColors.textHint),
                   title: Text('선택 안 함', style: TextStyle(color: AppColors.textSecondary)),
                   onTap: () {
                     setState(() => _games[gameIndex].selectedBall = null);
@@ -221,7 +222,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                         color: AppColors.darkDivider,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 20),
+                      child: Icon(PhosphorIconsFill.bowlingBall, color: AppColors.neonOrange, size: 20),
                     ),
                     title: Text(ball.name, style: TextStyle(color: AppColors.textPrimary)),
                     subtitle: ball.brand != null 
@@ -229,7 +230,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                           style: AppTextStyles.bodySmall)
                       : null,
                     trailing: _games[gameIndex].selectedBall?.id == ball.id
-                      ? Icon(Icons.check_circle, color: AppColors.neonOrange)
+                      ? Icon(PhosphorIconsFill.checkCircle, color: AppColors.neonOrange)
                       : null,
                     onTap: () {
                       setState(() => _games[gameIndex].selectedBall = ball);
@@ -357,7 +358,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             ),
             Divider(color: AppColors.darkDivider, height: 1),
             ListTile(
-              leading: Icon(Icons.camera_alt, color: AppColors.neonOrange),
+              leading: Icon(PhosphorIconsFill.camera, color: AppColors.neonOrange),
               title: Text('카메라 촬영',
                   style: TextStyle(color: AppColors.textPrimary)),
               subtitle: Text('모니터를 직접 촬영합니다',
@@ -365,7 +366,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: Icon(Icons.photo_library, color: AppColors.mint),
+              leading: Icon(PhosphorIconsFill.images, color: AppColors.mint),
               title: Text('갤러리에서 선택',
                   style: TextStyle(color: AppColors.textPrimary)),
               subtitle: Text('저장된 사진을 선택합니다',
@@ -632,14 +633,14 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today, color: AppColors.neonOrange, size: 20),
+                Icon(PhosphorIconsRegular.calendarBlank, color: AppColors.neonOrange, size: 20),
                 const SizedBox(width: 12),
                 Text(
                   DateFormat('yyyy년 M월 d일 (E)', 'ko').format(_selectedDate),
                   style: TextStyle(color: AppColors.textPrimary, fontSize: 15),
                 ),
                 const Spacer(),
-                Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
+                Icon(PhosphorIconsRegular.caretRight, color: AppColors.textHint, size: 20),
               ],
             ),
           ),
@@ -659,8 +660,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
               style: TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: '볼링장 검색',
-                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.textHint, size: 20),
-                suffixIcon: Icon(Icons.search, color: AppColors.textHint, size: 20),
+                prefixIcon: Icon(PhosphorIconsRegular.mapPin, color: AppColors.textHint, size: 20),
+                suffixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, color: AppColors.textHint, size: 20),
               ),
             ),
           ),
@@ -678,7 +679,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   hintText: '레인 번호',
-                  prefixIcon: Icon(Icons.tag, color: AppColors.textHint, size: 18),
+                  prefixIcon: Icon(PhosphorIconsRegular.hash, color: AppColors.textHint, size: 18),
                 ),
               ),
             ),
@@ -689,7 +690,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 style: TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: '오일 패턴 (예: Kegel Middle Road)',
-                  prefixIcon: Icon(Icons.water_drop_outlined, color: AppColors.textHint, size: 18),
+                  prefixIcon: Icon(PhosphorIconsRegular.drop, color: AppColors.textHint, size: 18),
                 ),
               ),
             ),
@@ -709,7 +710,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             Text('게임 점수', style: AppTextStyles.headingSmall),
             TextButton.icon(
               onPressed: _games.length < 10 ? _addGame : null,
-              icon: const Icon(Icons.add, size: 18),
+              icon: const Icon(PhosphorIconsRegular.plus, size: 18),
               label: const Text('게임 추가'),
               style: TextButton.styleFrom(foregroundColor: AppColors.neonOrange),
             ),
@@ -763,7 +764,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
               if (_games.length > 1)
                 GestureDetector(
                   onTap: () => _removeGame(index),
-                  child: Icon(Icons.remove_circle_outline, color: AppColors.error, size: 22),
+                  child: Icon(PhosphorIconsRegular.minusCircle, color: AppColors.error, size: 22),
                 ),
             ],
           ),
@@ -843,7 +844,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.sports_baseball,
+                    PhosphorIconsFill.bowlingBall,
                     color: game.selectedBall != null ? AppColors.neonOrange : AppColors.textHint,
                     size: 18,
                   ),
@@ -856,7 +857,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                     ),
                   ),
                   const Spacer(),
-                  Icon(Icons.chevron_right, color: AppColors.textHint, size: 18),
+                  Icon(PhosphorIconsRegular.caretRight, color: AppColors.textHint, size: 18),
                 ],
               ),
             ),
@@ -880,7 +881,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             hintText: '오늘의 컨디션, 느낀점 등을 자유롭게 기록하세요',
             prefixIcon: Padding(
               padding: EdgeInsets.only(bottom: 48),
-              child: Icon(Icons.edit_note, color: AppColors.textHint, size: 20),
+              child: Icon(PhosphorIconsRegular.notepad, color: AppColors.textHint, size: 20),
             ),
           ),
         ),
@@ -982,7 +983,7 @@ class _OcrButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.camera_alt_outlined, size: 14, color: AppColors.mint),
+            Icon(PhosphorIconsRegular.camera, size: 14, color: AppColors.mint),
             const SizedBox(width: 4),
             Text(
               '사진 인식',

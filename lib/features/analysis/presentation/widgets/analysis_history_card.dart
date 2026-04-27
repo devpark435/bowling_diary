@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_result_entity.dart';
@@ -23,7 +24,7 @@ class AnalysisHistoryCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 32),
+            Icon(PhosphorIconsFill.bowlingBall, color: AppColors.neonOrange, size: 32),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -45,7 +46,7 @@ class AnalysisHistoryCard extends StatelessWidget {
               ),
             ),
             if (result.linkedSessionId != null)
-              Icon(Icons.link, color: AppColors.neonOrange, size: 18),
+              Icon(PhosphorIconsRegular.link, color: AppColors.neonOrange, size: 18),
           ],
         ),
       ),

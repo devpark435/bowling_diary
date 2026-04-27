@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/features/auth/presentation/pages/login_page.dart';
 import 'package:bowling_diary/features/auth/presentation/pages/onboarding_page.dart';
@@ -177,23 +178,23 @@ class ScaffoldWithNavBar extends StatelessWidget {
           ),
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
+              icon: Icon(PhosphorIconsRegular.house),
+              activeIcon: Icon(PhosphorIconsFill.house),
               label: '홈',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_outlined),
-              activeIcon: Icon(Icons.bar_chart),
+              icon: Icon(PhosphorIconsRegular.chartBar),
+              activeIcon: Icon(PhosphorIconsFill.chartBar),
               label: '통계',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.videocam_outlined),
-              activeIcon: Icon(Icons.videocam),
+              icon: Icon(PhosphorIconsRegular.videoCamera),
+              activeIcon: Icon(PhosphorIconsFill.videoCamera),
               label: '분석',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
+              icon: Icon(PhosphorIconsRegular.user),
+              activeIcon: Icon(PhosphorIconsFill.user),
               label: '마이페이지',
             ),
           ],

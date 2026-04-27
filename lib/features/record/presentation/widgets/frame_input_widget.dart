@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/record/domain/entities/game_entity.dart';
@@ -515,12 +516,12 @@ class _FrameInputWidgetState extends State<FrameInputWidget> {
         ),
         TextButton.icon(
           onPressed: _undo,
-          icon: Icon(Icons.undo, size: 16, color: AppColors.textSecondary),
+          icon: Icon(PhosphorIconsRegular.arrowCounterClockwise, size: 16, color: AppColors.textSecondary),
           label: Text('되돌리기', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
         ),
         TextButton.icon(
           onPressed: _reset,
-          icon: Icon(Icons.refresh, size: 16, color: AppColors.textHint),
+          icon: Icon(PhosphorIconsRegular.arrowClockwise, size: 16, color: AppColors.textHint),
           label: Text('초기화', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
         ),
       ],

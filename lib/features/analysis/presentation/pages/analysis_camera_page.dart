@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/camera_recording_service.dart';
@@ -173,7 +174,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
                     border: Border.all(color: Colors.white, width: 4),
                   ),
                   child: Icon(
-                    _isRecording ? Icons.stop : Icons.fiber_manual_record,
+                    _isRecording ? PhosphorIconsFill.stop : PhosphorIconsFill.record,
                     color: _isRecording ? Colors.white : Colors.red,
                     size: 32,
                   ),
@@ -204,7 +205,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
                     border: Border.all(color: Colors.white54, width: 1.5),
                   ),
                   child: const Icon(
-                    Icons.photo_library_outlined,
+                    PhosphorIconsRegular.images,
                     color: Colors.white,
                     size: 26,
                   ),

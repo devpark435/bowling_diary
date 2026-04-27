@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
@@ -196,7 +197,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
         actions: [
           if (ball != null)
             IconButton(
-              icon: Icon(Icons.delete_outline, color: AppColors.error),
+              icon: Icon(PhosphorIconsRegular.trash, color: AppColors.error),
               onPressed: () async {
                 final ok = await showDialog<bool>(
                   context: context,
@@ -232,7 +233,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
                     height: 48,
                     child: OutlinedButton.icon(
                       onPressed: _openCatalogSearch,
-                      icon: const Icon(Icons.search, size: 20),
+                      icon: const Icon(PhosphorIconsRegular.magnifyingGlass, size: 20),
                       label: const Text('카탈로그에서 볼 검색'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.neonOrange,
@@ -392,7 +393,7 @@ class _BallFormPageState extends ConsumerState<BallFormPage> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.add_photo_alternate, size: 48, color: AppColors.textHint),
+        Icon(PhosphorIconsRegular.cameraPlus, size: 48, color: AppColors.textHint),
         const SizedBox(height: 8),
         Text('사진 추가', style: AppTextStyles.bodySmall),
       ],
@@ -459,10 +460,10 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
             style: TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: '볼 이름 또는 브랜드 검색',
-              prefixIcon: Icon(Icons.search, color: AppColors.textHint),
+              prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, color: AppColors.textHint),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear, color: AppColors.textHint, size: 20),
+                      icon: Icon(PhosphorIconsRegular.x, color: AppColors.textHint, size: 20),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _query = '');
@@ -505,10 +506,10 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
                   color: AppColors.neonOrange.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 20),
+                child: Icon(PhosphorIconsFill.bowlingBall, color: AppColors.neonOrange, size: 20),
               ),
               title: Text(brand, style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-              trailing: Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
+              trailing: Icon(PhosphorIconsRegular.caretRight, color: AppColors.textHint, size: 20),
               onTap: () {
                 _searchController.text = brand;
                 setState(() => _query = brand);
@@ -534,7 +535,7 @@ class _CatalogSearchSheetState extends ConsumerState<_CatalogSearchSheet> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.search_off, size: 48, color: AppColors.textHint),
+                Icon(PhosphorIconsRegular.magnifyingGlassMinus, size: 48, color: AppColors.textHint),
                 const SizedBox(height: 12),
                 Text('"$_query" 검색 결과가 없습니다', style: AppTextStyles.bodySmall),
                 const SizedBox(height: 8),
@@ -600,10 +601,10 @@ class _CatalogBallTile extends StatelessWidget {
                       child: Image.network(
                         ball.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 24),
+                        errorBuilder: (_, __, ___) => Icon(PhosphorIconsFill.bowlingBall, color: AppColors.neonOrange, size: 24),
                       ),
                     )
-                  : Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 24),
+                  : Icon(PhosphorIconsFill.bowlingBall, color: AppColors.neonOrange, size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(

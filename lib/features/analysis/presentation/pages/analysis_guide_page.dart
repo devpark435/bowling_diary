@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/bowling_pin_character.dart';
@@ -20,19 +21,19 @@ class _AnalysisGuidePageState extends State<AnalysisGuidePage> {
       emotion: 'normal',
       title: '파울라인 뒤에 서주세요',
       body: '파울라인에서 1~1.5m 뒤에 서서\n레인을 향해 카메라를 준비하세요.',
-      icon: Icons.straighten,
+      icon: PhosphorIconsRegular.ruler,
     ),
     _GuideStep(
       emotion: 'normal',
       title: '허리 높이로 맞춰주세요',
       body: '카메라를 허리 높이(약 90cm)에 두고\n레인을 따라 수평으로 향해주세요.',
-      icon: Icons.height,
+      icon: PhosphorIconsRegular.arrowsVertical,
     ),
     _GuideStep(
       emotion: 'cheer',
       title: '레인 전체가 보이면 OK!',
       body: '화면에 레인 끝(핀 구역)이\n모두 보이면 준비 완료입니다!',
-      icon: Icons.check_circle_outline,
+      icon: PhosphorIconsRegular.checkCircle,
     ),
   ];
 

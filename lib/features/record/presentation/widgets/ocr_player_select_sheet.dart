@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
@@ -35,7 +36,7 @@ class _OcrPlayerSelectSheet extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(Icons.people_outline, color: AppColors.neonOrange, size: 22),
+                Icon(PhosphorIconsRegular.usersThree, color: AppColors.neonOrange, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -44,7 +45,7 @@ class _OcrPlayerSelectSheet extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: AppColors.textSecondary),
+                  icon: Icon(PhosphorIconsRegular.x, color: AppColors.textSecondary),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -138,7 +139,7 @@ class _PlayerTile extends StatelessWidget {
           ],
         ],
       ),
-      trailing: Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
+      trailing: Icon(PhosphorIconsRegular.caretRight, color: AppColors.textHint, size: 20),
       onTap: () => Navigator.pop(context, player),
     );
   }

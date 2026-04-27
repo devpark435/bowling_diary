@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/presentation/providers/analysis_provider.dart';
@@ -23,7 +24,7 @@ class AnalysisTabPage extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.videocam_outlined,
+                  Icon(PhosphorIconsRegular.videoCamera,
                       size: 72, color: AppColors.textHint),
                   const SizedBox(height: 16),
                   Text('아직 측정 기록이 없어요',
@@ -48,7 +49,7 @@ class AnalysisTabPage extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.neonOrange,
         onPressed: () => context.push('/analysis/guide'),
-        child: const Icon(Icons.videocam, color: Colors.black),
+        child: const Icon(PhosphorIconsFill.videoCamera, color: Colors.black),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 
@@ -16,13 +17,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   final _pages = [
     _OnboardingData(
-      icon: Icons.sports_baseball,
+      icon: PhosphorIconsFill.bowlingBall,
       iconColor: AppColors.neonOrange,
       title: '프레임별로 기록해요',
       description: '실제 스코어시트처럼\n10프레임을 하나하나 입력하고\n자동으로 점수를 계산해드려요',
     ),
     _OnboardingData(
-      icon: Icons.bar_chart,
+      icon: PhosphorIconsFill.chartBar,
       iconColor: AppColors.mint,
       title: '성장을 눈으로 확인해요',
       description: '평균 점수 추이, 스트라이크율,\n볼별 비교까지\n내 볼링 실력을 분석해요',
