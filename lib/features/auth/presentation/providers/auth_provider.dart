@@ -37,9 +37,7 @@ class AuthStateError extends AuthState {
 
 final authNotifierProvider =
     StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final notifier = AuthNotifier();
-  ref.onDispose(() => notifier.dispose());
-  return notifier;
+  return AuthNotifier();
 });
 
 final currentUserProvider = Provider<UserEntity?>((ref) {
@@ -66,9 +64,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> _init() async {
+    if (!mounted) return;
     state = AuthStateLoading();
     final session = _supabase.auth.currentSession;
     if (session == null) {
+      if (!mounted) return;
       state = AuthStateUnauthenticated();
       return;
     }
@@ -83,6 +83,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .eq('id', userId)
           .maybeSingle();
 
+      if (!mounted) return;
       if (data == null) {
         state = AuthStateNeedsProfile(userId);
       } else {
@@ -94,6 +95,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
       state = AuthStateNeedsProfile(userId);
     }
   }
@@ -271,9 +273,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void _handleAuthStateChange(AuthChangeEvent event, Session? session) {
+    if (!mounted) return;
     if (event == AuthChangeEvent.signedIn && session != null) {
       _loadUserProfile(session.user.id);
     } else if (event == AuthChangeEvent.signedOut) {
+      if (!mounted) return;
       state = AuthStateUnauthenticated();
     }
   }
