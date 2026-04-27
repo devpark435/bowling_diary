@@ -36,7 +36,6 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
       begin: const Offset(0, 0.12),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
-
     _initVideo();
   }
 
@@ -81,15 +80,54 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
     final r = widget.result;
     final hasSpeed = r.speedKmh > 0;
     final hasRpm = r.rpmEstimated != null;
-    final dateStr =
-        DateFormat('yyyy년 MM월 dd일 HH:mm').format(r.recordedAt);
+    final dateStr = DateFormat('yyyy.MM.dd  HH:mm').format(r.recordedAt);
 
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: const BackButton(color: Colors.white),
+        title: Text(
+          dateStr,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: Colors.white60,
+            fontSize: 13,
+          ),
+        ),
+        actions: [
+          if (_videoAvailable)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.slow_motion_video,
+                        color: AppColors.neonOrange, size: 13),
+                    const SizedBox(width: 4),
+                    Text('0.25×',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.white60, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 영상 or 어두운 배경
+          // 영상 or 빈 배경
           if (_videoAvailable && _controller != null)
             GestureDetector(
               onTap: _togglePlay,
@@ -106,40 +144,17 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
             Container(
               color: AppColors.darkBg,
               child: Center(
-                child: Icon(
-                  Icons.videocam_off_outlined,
-                  color: AppColors.textHint,
-                  size: 48,
-                ),
+                child: Icon(Icons.videocam_off_outlined,
+                    color: AppColors.textHint, size: 48),
               ),
             ),
-
-          // 상단 그라데이션
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 130,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.75),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
 
           // 하단 그라데이션
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            height: 360,
+            height: 380,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -151,46 +166,6 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                     Colors.transparent,
                   ],
                 ),
-              ),
-            ),
-          ),
-
-          // 상단바
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new,
-                        color: Colors.white, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const Spacer(),
-                  if (_videoAvailable)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.18)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.slow_motion_video,
-                              color: AppColors.neonOrange, size: 13),
-                          const SizedBox(width: 4),
-                          Text('0.25×',
-                              style: AppTextStyles.bodySmall
-                                  .copyWith(color: Colors.white60, fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                ],
               ),
             ),
           ),
@@ -218,7 +193,7 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
               ),
             ),
 
-          // 하단 통계 패널
+          // 하단 수치 패널
           Positioned(
             bottom: 0,
             left: 0,
@@ -230,20 +205,10 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                 child: SlideTransition(
                   position: _slideAnim,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 날짜
-                        Text(
-                          dateStr,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: Colors.white38,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
                         // 구속
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -266,14 +231,24 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                               Padding(
                                 padding: const EdgeInsets.only(
                                     bottom: 8, left: 6),
-                                child: Text(
-                                  'km/h',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: AppColors.neonOrange
-                                        .withValues(alpha: 0.7),
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text('km/h',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: AppColors.neonOrange
+                                              .withValues(alpha: 0.75),
+                                          fontWeight: FontWeight.w500,
+                                        )),
+                                    Text('구속',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white38,
+                                          letterSpacing: 1.2,
+                                        )),
+                                  ],
                                 ),
                               ),
                           ],
@@ -284,32 +259,65 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                           height: 20,
                         ),
 
-                        // RPM + fps
+                        // RPM
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            _InfoChip(
-                              label: 'RPM',
-                              value: hasRpm
-                                  ? '${r.rpmEstimated}'
-                                  : '—',
-                              sub: hasRpm ? '추정값' : null,
-                            ),
-                            const SizedBox(width: 12),
-                            _InfoChip(
-                              label: 'FPS',
-                              value: '${r.fpsUsed}',
-                            ),
-                            if (r.linkedSessionId != null) ...[
-                              const SizedBox(width: 12),
-                              _InfoChip(
-                                label: '세션',
-                                value: '연결됨',
-                                accent: true,
+                            Text(
+                              hasRpm ? '${r.rpmEstimated}' : '—',
+                              style: TextStyle(
+                                fontSize: 44,
+                                fontWeight: FontWeight.w800,
+                                color: hasRpm
+                                    ? Colors.white
+                                    : AppColors.textHint,
+                                height: 1.0,
+                                letterSpacing: -1,
                               ),
-                            ],
+                            ),
+                            if (hasRpm)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                    bottom: 6, left: 6),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('rpm',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white60,
+                                          fontWeight: FontWeight.w500,
+                                        )),
+                                    const Text('RPM 추정값',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white30,
+                                          letterSpacing: 0.5,
+                                        )),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
-                        const SizedBox(height: 24),
+
+                        if (r.linkedSessionId != null) ...[
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Icon(Icons.link_rounded,
+                                  color: AppColors.neonOrange, size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                '세션에 연결됨',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.neonOrange
+                                      .withValues(alpha: 0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -317,60 +325,6 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? sub;
-  final bool accent;
-
-  const _InfoChip({
-    required this.label,
-    required this.value,
-    this.sub,
-    this.accent = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: accent
-              ? AppColors.neonOrange.withValues(alpha: 0.4)
-              : Colors.white.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-                fontSize: 10, color: Colors.white38, letterSpacing: 1),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: accent ? AppColors.neonOrange : Colors.white,
-              height: 1.1,
-            ),
-          ),
-          if (sub != null)
-            Text(sub!,
-                style: const TextStyle(
-                    fontSize: 9, color: Colors.white30, letterSpacing: 0.3)),
         ],
       ),
     );
