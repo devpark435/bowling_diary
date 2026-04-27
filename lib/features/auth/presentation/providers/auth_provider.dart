@@ -37,9 +37,7 @@ class AuthStateError extends AuthState {
 
 final authNotifierProvider =
     StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final notifier = AuthNotifier();
-  ref.onDispose(() => notifier.dispose());
-  return notifier;
+  return AuthNotifier();
 });
 
 final currentUserProvider = Provider<UserEntity?>((ref) {
