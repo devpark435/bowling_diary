@@ -35,7 +35,7 @@ class ThemeSelectionPage extends ConsumerWidget {
             return GestureDetector(
               onTap: () async {
                 await ref.read(colorThemeProvider.notifier).setTheme(theme);
-                if (context.mounted) AppRestarter.of(context).restart();
+                if (context.mounted) await AppRestarter.of(context).restart();
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
