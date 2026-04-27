@@ -1,12 +1,12 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/camera_recording_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/camera_guide_overlay.dart';
 
 class AnalysisCameraPage extends StatefulWidget {
@@ -72,16 +72,12 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
 
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AnalysisResultPage(
-            analysisData: analysisData,
-            videoPath: video.path,
-            recordedAt: DateTime.now(),
-          ),
-        ),
-      );
+      if (!mounted) return;
+      context.pushReplacement('/analysis/result', extra: {
+        'analysisData': analysisData,
+        'videoPath': video.path,
+        'recordedAt': DateTime.now(),
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -105,16 +101,12 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
 
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AnalysisResultPage(
-            analysisData: analysisData,
-            videoPath: session.videoPath,
-            recordedAt: DateTime.now(),
-          ),
-        ),
-      );
+      if (!mounted) return;
+      context.pushReplacement('/analysis/result', extra: {
+        'analysisData': analysisData,
+        'videoPath': session.videoPath,
+        'recordedAt': DateTime.now(),
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
