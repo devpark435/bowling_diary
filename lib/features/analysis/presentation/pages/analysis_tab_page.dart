@@ -59,18 +59,20 @@ class AnalysisTabPage extends ConsumerWidget {
                 ),
                 confirmDismiss: (_) => showDialog<bool>(
                   context: context,
-                  builder: (_) => AlertDialog(
+                  builder: (dialogContext) => AlertDialog(
                     backgroundColor: AppColors.darkCard,
                     title: const Text('기록 삭제'),
                     content: const Text('이 분석 기록을 삭제할까요?'),
                     actions: [
                       TextButton(
-                        onPressed: () => Navigator.pop(context, false),
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(false),
                         child: Text('취소',
                             style: TextStyle(color: AppColors.textSecondary)),
                       ),
                       TextButton(
-                        onPressed: () => Navigator.pop(context, true),
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(true),
                         child: Text('삭제',
                             style: TextStyle(color: AppColors.error)),
                       ),
