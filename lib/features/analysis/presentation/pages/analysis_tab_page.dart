@@ -40,14 +40,58 @@ class AnalysisTabPage extends ConsumerWidget {
           return ListView.builder(
             padding: const EdgeInsets.only(top: 8, bottom: 80),
             itemCount: items.length,
-            itemBuilder: (_, i) => AnalysisHistoryCard(
-              result: items[i],
-              onTap: () => Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(
-                  builder: (_) => AnalysisDetailPage(result: items[i]),
+            itemBuilder: (_, i) {
+              final item = items[i];
+              return Dismissible(
+                key: ValueKey(item.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  margin: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 24),
+                  child: const Icon(Icons.delete_outline_rounded,
+                      color: Colors.white, size: 24),
                 ),
-              ),
-            ),
+                confirmDismiss: (_) => showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: AppColors.darkCard,
+                    title: const Text('기록 삭제'),
+                    content: const Text('이 분석 기록을 삭제할까요?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text('취소',
+                            style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text('삭제',
+                            style: TextStyle(color: AppColors.error)),
+                      ),
+                    ],
+                  ),
+                ),
+                onDismissed: (_) async {
+                  await ref.read(analysisRepositoryProvider).delete(item.id);
+                  ref.invalidate(analysisHistoryProvider);
+                },
+                child: AnalysisHistoryCard(
+                  result: item,
+                  onTap: () =>
+                      Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) => AnalysisDetailPage(result: item),
+                    ),
+                  ),
+                ),
+              );
+            },
           );
         },
         loading: () => const LoadingWidget(),

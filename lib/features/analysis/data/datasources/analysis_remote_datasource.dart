@@ -41,4 +41,8 @@ class AnalysisRemoteDataSource {
         .update({'linked_session_id': sessionId})
         .eq('id', analysisId);
   }
+
+  Future<void> delete(String id) async {
+    await _supabase.from('ball_analysis').delete().eq('id', id);
+  }
 }
