@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/providers/analysis_provider.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_history_card.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
@@ -47,9 +47,7 @@ class AnalysisTabPage extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.neonOrange,
-        onPressed: () => Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute(builder: (_) => const AnalysisGuidePage()),
-        ).then((_) => ref.invalidate(analysisHistoryProvider)),
+        onPressed: () => context.push('/analysis/guide'),
         child: const Icon(Icons.videocam, color: Colors.black),
       ),
     );

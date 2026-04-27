@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/shared/providers/theme_provider.dart';
 import 'package:bowling_diary/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bowling_diary/features/settings/presentation/pages/theme_selection_page.dart';
 
@@ -12,6 +13,7 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(colorThemeProvider);
     final user = ref.watch(currentUserProvider);
     final isAdmin = user?.isAdmin ?? false;
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/analysis_camera_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/bowling_pin_character.dart';
 
 class AnalysisGuidePage extends StatefulWidget {
@@ -96,11 +96,7 @@ class _AnalysisGuidePageState extends State<AnalysisGuidePage> {
                           curve: Curves.easeInOut,
                         );
                       } else {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const AnalysisCameraPage()),
-                        );
+                        context.pushReplacement('/analysis/camera');
                       }
                     },
                     child: Text(

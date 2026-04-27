@@ -14,6 +14,10 @@ import 'package:bowling_diary/features/balls/presentation/pages/balls_page.dart'
 import 'package:bowling_diary/features/settings/presentation/pages/settings_page.dart';
 import 'package:bowling_diary/features/admin/presentation/pages/catalog_manage_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_tab_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/analysis_camera_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
+import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -86,6 +90,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/catalog',
         builder: (context, state) => const CatalogManagePage(),
+      ),
+      // 분석 플로우 — 바텀 네비게이션 없음
+      GoRoute(
+        path: '/analysis/guide',
+        builder: (context, state) => const AnalysisGuidePage(),
+      ),
+      GoRoute(
+        path: '/analysis/camera',
+        builder: (context, state) => const AnalysisCameraPage(),
+      ),
+      GoRoute(
+        path: '/analysis/result',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          return AnalysisResultPage(
+            analysisData: extra['analysisData'] as AnalysisData,
+            videoPath: extra['videoPath'] as String,
+            recordedAt: extra['recordedAt'] as DateTime,
+          );
+        },
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
