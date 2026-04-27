@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:bowling_diary/app/app.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/app/theme/color_themes.dart';
@@ -11,7 +12,8 @@ class ThemeSelectionPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTheme = ref.watch(colorThemeProvider);
-    final currentBrightness = ref.watch(platformBrightnessProvider);
+    final currentBrightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
 
     return Scaffold(
       appBar: AppBar(title: const Text('테마')),
@@ -31,7 +33,10 @@ class ThemeSelectionPage extends ConsumerWidget {
             final activePalette = ColorThemes.palette(theme, currentBrightness);
 
             return GestureDetector(
-              onTap: () => ref.read(colorThemeProvider.notifier).setTheme(theme),
+              onTap: () async {
+                await ref.read(colorThemeProvider.notifier).setTheme(theme);
+                if (context.mounted) AppRestarter.of(context).restart();
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(bottom: 12),

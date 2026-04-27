@@ -13,7 +13,6 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(colorThemeProvider);
     final user = ref.watch(currentUserProvider);
     final isAdmin = user?.isAdmin ?? false;
 

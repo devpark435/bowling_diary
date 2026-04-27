@@ -1,41 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bowling_diary/app/router/app_router.dart';
+import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_theme.dart';
-import 'package:bowling_diary/shared/providers/theme_provider.dart';
 
-class BowlingDiaryApp extends ConsumerStatefulWidget {
-  const BowlingDiaryApp({super.key});
+/// ProviderScope를 포함한 앱 전체 재시작 위젯
+class AppRestarter extends StatefulWidget {
+  const AppRestarter({super.key});
+
+  static _AppRestarterState of(BuildContext context) =>
+      context.findAncestorStateOfType<_AppRestarterState>()!;
 
   @override
-  ConsumerState<BowlingDiaryApp> createState() => _BowlingDiaryAppState();
+  State<AppRestarter> createState() => _AppRestarterState();
 }
 
-class _BowlingDiaryAppState extends ConsumerState<BowlingDiaryApp>
-    with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
+class _AppRestarterState extends State<AppRestarter> {
+  Key _key = UniqueKey();
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangePlatformBrightness() {
-    final brightness =
-        WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    ref.read(platformBrightnessProvider.notifier).state = brightness;
-  }
+  /// 호출 시 ProviderScope 포함 전체 재빌드 → 테마 재로드
+  void restart() => setState(() => _key = UniqueKey());
 
   @override
   Widget build(BuildContext context) {
+    return ProviderScope(
+      key: _key,
+      child: const BowlingDiaryApp(),
+    );
+  }
+}
+
+class BowlingDiaryApp extends ConsumerWidget {
+  const BowlingDiaryApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    final palette = ref.watch(activePaletteProvider);
+    final palette = AppColors.palette;
     final themeData = AppTheme.fromPalette(palette);
     final themeMode = palette.brightness == Brightness.light
         ? ThemeMode.light

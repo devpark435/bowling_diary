@@ -19,9 +19,5 @@ void main() async {
 
   FlutterNativeSplash.remove();
 
-  runApp(
-    const ProviderScope(
-      child: BowlingDiaryApp(),
-    ),
-  );
+  runApp(const AppRestarter());
 }

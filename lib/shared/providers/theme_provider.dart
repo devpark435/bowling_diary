@@ -4,25 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/color_themes.dart';
 
-/// 사용자가 선택한 테마 스타일 (3종)
 final colorThemeProvider =
     StateNotifierProvider<ColorThemeNotifier, AppColorTheme>((ref) {
   return ColorThemeNotifier();
-});
-
-/// 디바이스 밝기 — app.dart의 WidgetsBindingObserver가 업데이트
-final platformBrightnessProvider =
-    StateProvider<Brightness>((ref) {
-  return WidgetsBinding.instance.platformDispatcher.platformBrightness;
-});
-
-/// 현재 활성 팔레트 (테마 + 밝기 조합)
-final activePaletteProvider = Provider<ColorPalette>((ref) {
-  final theme = ref.watch(colorThemeProvider);
-  final brightness = ref.watch(platformBrightnessProvider);
-  final palette = ColorThemes.palette(theme, brightness);
-  AppColors.setPalette(palette);
-  return palette;
 });
 
 class ColorThemeNotifier extends StateNotifier<AppColorTheme> {
@@ -35,11 +19,18 @@ class ColorThemeNotifier extends StateNotifier<AppColorTheme> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final idx = prefs.getInt(_key);
-    if (idx != null && idx >= 0 && idx < AppColorTheme.values.length) {
-      state = AppColorTheme.values[idx];
-    }
+    final theme = (idx != null && idx >= 0 && idx < AppColorTheme.values.length)
+        ? AppColorTheme.values[idx]
+        : AppColorTheme.blue;
+
+    // 앱 시작 시 디바이스 밝기 한 번 감지
+    final brightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    AppColors.setPalette(ColorThemes.palette(theme, brightness));
+    state = theme;
   }
 
+  /// 테마 저장 후 앱을 재시작해야 실제로 적용됨
   Future<void> setTheme(AppColorTheme theme) async {
     state = theme;
     final prefs = await SharedPreferences.getInstance();
