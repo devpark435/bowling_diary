@@ -1,13 +1,10 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/camera_recording_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/analysis_trim_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/camera_guide_overlay.dart';
 
 class AnalysisCameraPage extends StatefulWidget {
@@ -19,13 +16,12 @@ class AnalysisCameraPage extends StatefulWidget {
 
 class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
   final _cameraService = CameraRecordingService();
-  final _analysisService = VideoAnalysisService();
-  final _frameExtractor = VideoFrameExtractorService();
 
   CameraController? _controller;
   bool _isInitialized = false;
   bool _isRecording = false;
   bool _isAnalyzing = false;
+  String? _analyzingVideoPath;
   String? _error;
 
   @override
@@ -58,36 +54,6 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
     }
   }
 
-  Future<void> _pickFromGallery() async {
-    final video = await ImagePicker().pickVideo(source: ImageSource.gallery);
-    if (video == null || !mounted) return;
-
-    setState(() => _isAnalyzing = true);
-    try {
-      final result = await _frameExtractor.extract(video.path);
-      final analysisData = _analysisService.analyzeImages(
-        result.frames,
-        result.originalFps,
-      );
-
-      if (!mounted) return;
-      setState(() => _isAnalyzing = false);
-
-      if (!mounted) return;
-      context.pushReplacement('/analysis/result', extra: {
-        'analysisData': analysisData,
-        'videoPath': video.path,
-        'recordedAt': DateTime.now(),
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isAnalyzing = false;
-        _error = '갤러리 영상 분석 오류: $e';
-      });
-    }
-  }
-
   Future<void> _stopAndAnalyze() async {
     setState(() {
       _isRecording = false;
@@ -96,18 +62,18 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
 
     try {
       final session = await _cameraService.stopRecording();
-      final analysisData =
-          _analysisService.analyze(session.sampledFrames, session.fps);
-
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
 
-      if (!mounted) return;
-      context.pushReplacement('/analysis/result', extra: {
-        'analysisData': analysisData,
-        'videoPath': session.videoPath,
-        'recordedAt': DateTime.now(),
-      });
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AnalysisTrimPage(
+            videoPath: session.videoPath,
+            fps: session.fps,
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -139,16 +105,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
 
     if (_isAnalyzing) {
       return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.neonOrange),
-              const SizedBox(height: 24),
-              Text('영상 분석 중...', style: AppTextStyles.bodyLarge),
-            ],
-          ),
-        ),
+        body: AnalysisLoadingWidget(videoPath: _analyzingVideoPath),
       );
     }
 
@@ -190,28 +147,6 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
               style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
             ),
           ),
-          if (!_isRecording)
-            Positioned(
-              bottom: 68,
-              left: 40,
-              child: GestureDetector(
-                onTap: _pickFromGallery,
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black45,
-                    border: Border.all(color: Colors.white54, width: 1.5),
-                  ),
-                  child: const Icon(
-                    PhosphorIconsRegular.images,
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
