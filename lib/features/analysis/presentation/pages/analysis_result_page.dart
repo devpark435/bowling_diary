@@ -2,6 +2,7 @@ import 'dart:io' as dart_io;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
@@ -88,9 +89,11 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
     );
 
     await ref.read(analysisRepositoryProvider).save(entity);
+    ref.invalidate(analysisHistoryProvider);
+
     if (!mounted) return;
     setState(() => _isSaving = false);
-    Navigator.of(context).popUntil((r) => r.isFirst);
+    context.go('/analysis');
   }
 
   Future<void> _onSavePressed() async {
