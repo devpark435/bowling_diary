@@ -400,23 +400,15 @@ class _GameDetailCard extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('게임 ${index + 1}', style: AppTextStyles.labelLarge),
-                    if (ballName != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Row(
-                          children: [
-                            Icon(PhosphorIconsFill.bowlingBall, color: AppColors.textHint, size: 12),
-                            const SizedBox(width: 4),
-                            Text(ballName, style: AppTextStyles.bodySmall),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
+                child: ballName != null
+                    ? Row(
+                        children: [
+                          Icon(PhosphorIconsFill.bowlingBall, color: AppColors.textHint, size: 12),
+                          const SizedBox(width: 4),
+                          Text(ballName, style: AppTextStyles.bodySmall),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
               ),
               Text(
                 '${game.totalScore}',
