@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/app.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
@@ -86,7 +87,7 @@ class ThemeSelectionPage extends ConsumerWidget {
                       ),
                     ),
                     if (isSelected)
-                      Icon(Icons.check_rounded,
+                      Icon(PhosphorIconsBold.check,
                           color: activePalette.primary, size: 20),
                   ],
                 ),

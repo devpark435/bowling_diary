@@ -2,7 +2,7 @@ import 'dart:io' as dart_io;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
@@ -74,7 +74,6 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
   Future<void> _save({String? linkedSessionId}) async {
     final auth = ref.read(authNotifierProvider);
     if (auth is! AuthStateAuthenticated) return;
-    setState(() => _isSaving = true);
 
     final entity = AnalysisResultEntity(
       id: const Uuid().v4(),
@@ -92,33 +91,39 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
     ref.invalidate(analysisHistoryProvider);
 
     if (!mounted) return;
-    setState(() => _isSaving = false);
-    context.go('/analysis');
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   Future<void> _onSavePressed() async {
+    if (_isSaving) return;
     final auth = ref.read(authNotifierProvider);
     if (auth is! AuthStateAuthenticated) return;
 
-    final sessions =
-        await ref.read(sameDaySessionsProvider(widget.recordedAt).future);
-    if (!mounted) return;
+    setState(() => _isSaving = true);
 
-    if (sessions.isEmpty) {
-      await _save();
-      return;
+    try {
+      final sessions =
+          await ref.read(sameDaySessionsProvider(widget.recordedAt).future);
+      if (!mounted) return;
+
+      if (sessions.isEmpty) {
+        await _save();
+        return;
+      }
+
+      final picked = await showModalBottomSheet<String?>(
+        context: context,
+        backgroundColor: AppColors.darkCard,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => _SessionLinkSheet(sessions: sessions),
+      );
+      if (!mounted) return;
+      await _save(linkedSessionId: picked);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-
-    final picked = await showModalBottomSheet<String?>(
-      context: context,
-      backgroundColor: AppColors.darkCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _SessionLinkSheet(sessions: sessions),
-    );
-    if (!mounted) return;
-    await _save(linkedSessionId: picked);
   }
 
   @override
@@ -461,7 +466,7 @@ class _SessionLinkSheet extends StatelessWidget {
                       style: AppTextStyles.bodyMedium),
                   subtitle: Text('${s.date.month}/${s.date.day}',
                       style: AppTextStyles.bodySmall),
-                  trailing: Icon(Icons.link, color: AppColors.neonOrange),
+                  trailing: Icon(PhosphorIconsRegular.link, color: AppColors.neonOrange),
                   onTap: () => Navigator.pop(context, s.id),
                 )),
             ListTile(

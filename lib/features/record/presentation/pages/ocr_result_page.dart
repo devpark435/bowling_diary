@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
@@ -401,7 +402,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: AppColors.mint, size: 18),
+                Icon(PhosphorIconsRegular.info, color: AppColors.mint, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -429,7 +430,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.auto_fix_high_rounded,
+                Icon(PhosphorIconsRegular.sparkle,
                     color: AppColors.neonOrange, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
@@ -458,7 +459,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded,
+                Icon(PhosphorIconsRegular.warning,
                     color: AppColors.neonOrange, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
@@ -509,7 +510,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
             height: 50,
             child: ElevatedButton.icon(
               onPressed: _applyTotalOnly,
-              icon: const Icon(Icons.speed_rounded, size: 20),
+              icon: const Icon(PhosphorIconsRegular.gauge, size: 20),
               label: Text(
                 '총점만 저장 ($_estimatedTotal점)',
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -523,7 +524,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
           child: _recognizedCount > 0
               ? ElevatedButton.icon(
                   onPressed: _applyFrameDetail,
-                  icon: const Icon(Icons.grid_on_rounded, size: 20),
+                  icon: const Icon(PhosphorIconsRegular.gridFour, size: 20),
                   label: Text(
                     _recognizedCount == 10
                         ? '프레임 상세 적용'
@@ -546,7 +547,7 @@ class _OcrResultPageState extends State<OcrResultPage> {
           height: 44,
           child: OutlinedButton.icon(
             onPressed: () => Navigator.pop(context, null),
-            icon: Icon(Icons.camera_alt_outlined,
+            icon: Icon(PhosphorIconsRegular.camera,
                 size: 18, color: AppColors.textSecondary),
             label: Text(
               '다시 촬영하기',

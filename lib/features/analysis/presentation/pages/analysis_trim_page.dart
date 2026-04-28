@@ -71,11 +71,13 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
 
   void _onRangeChanged(RangeValues values) {
     if (values.end - values.start < 0.5) return;
+    final endChanged = values.end != _endSec;
     setState(() {
       _startSec = values.start;
       _endSec = values.end;
     });
-    _controller?.seekTo(Duration(milliseconds: (_startSec * 1000).round()));
+    final seekSec = endChanged ? _endSec : _startSec;
+    _controller?.seekTo(Duration(milliseconds: (seekSec * 1000).round()));
     _controller?.pause();
   }
 

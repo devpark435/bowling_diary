@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/shared/providers/theme_provider.dart';
@@ -32,7 +33,7 @@ class SettingsPage extends ConsumerWidget {
                     _SectionLabel('관리자'),
                     const SizedBox(height: 8),
                     _MenuItem(
-                      icon: Icons.sports_baseball_outlined,
+                      icon: PhosphorIconsRegular.bowlingBall,
                       label: '카탈로그 관리',
                       onTap: () => context.push('/admin/catalog'),
                       accent: true,
@@ -45,12 +46,12 @@ class SettingsPage extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _MenuGroup(items: [
                     _MenuItem(
-                      icon: Icons.sports_baseball_outlined,
+                      icon: PhosphorIconsRegular.bowlingBall,
                       label: '내 볼',
                       onTap: () => context.push('/balls'),
                     ),
                     _MenuItem(
-                      icon: Icons.edit_outlined,
+                      icon: PhosphorIconsRegular.pencilSimple,
                       label: '프로필 수정',
                       onTap: () => context.push('/profile-setup'),
                       isLast: true,
@@ -63,7 +64,7 @@ class SettingsPage extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _MenuGroup(items: [
                     _MenuItem(
-                      icon: Icons.palette_outlined,
+                      icon: PhosphorIconsRegular.palette,
                       label: '테마',
                       onTap: () => Navigator.push(
                         context,
@@ -80,13 +81,13 @@ class SettingsPage extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _MenuGroup(items: [
                     _MenuItem(
-                      icon: Icons.logout_rounded,
+                      icon: PhosphorIconsRegular.signOut,
                       label: '로그아웃',
                       onTap: () =>
                           ref.read(authNotifierProvider.notifier).signOut(),
                     ),
                     _MenuItem(
-                      icon: Icons.delete_outline_rounded,
+                      icon: PhosphorIconsRegular.trash,
                       label: '회원 탈퇴',
                       onTap: () => _confirmDeleteAccount(context, ref),
                       destructive: true,
@@ -323,7 +324,7 @@ class _MenuItem extends StatelessWidget {
                 ),
                 const Spacer(),
                 if (!destructive)
-                  Icon(Icons.chevron_right_rounded,
+                  Icon(PhosphorIconsRegular.caretRight,
                       color: AppColors.textHint, size: 18),
               ],
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
@@ -29,7 +30,7 @@ class SessionDetailPage extends ConsumerWidget {
         title: const Text('기록 상세'),
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
+            icon: const Icon(PhosphorIconsRegular.dotsThree),
             color: AppColors.darkSurface,
             elevation: 8,
             shape: RoundedRectangleBorder(
@@ -59,7 +60,7 @@ class SessionDetailPage extends ConsumerWidget {
                         color: AppColors.mint.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.edit_outlined, size: 15, color: AppColors.mint),
+                      child: Icon(PhosphorIconsRegular.pencilSimple, size: 15, color: AppColors.mint),
                     ),
                     const SizedBox(width: 12),
                     Text('수정하기', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
@@ -79,7 +80,7 @@ class SessionDetailPage extends ConsumerWidget {
                         color: AppColors.error.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.delete_outline, size: 15, color: AppColors.error),
+                      child: Icon(PhosphorIconsRegular.trash, size: 15, color: AppColors.error),
                     ),
                     const SizedBox(width: 12),
                     Text('삭제하기', style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w500)),
@@ -163,13 +164,13 @@ class SessionDetailPage extends ConsumerWidget {
           children: [
             Text('세션 정보', style: AppTextStyles.headingSmall),
             const SizedBox(height: 14),
-            _InfoRow(icon: Icons.calendar_today, label: '날짜', value: dateStr),
+            _InfoRow(icon: PhosphorIconsRegular.calendarBlank, label: '날짜', value: dateStr),
             if (s.alleyName != null && s.alleyName!.isNotEmpty)
-              _InfoRow(icon: Icons.location_on, label: '볼링장', value: s.alleyName!, valueColor: AppColors.mint),
+              _InfoRow(icon: PhosphorIconsFill.mapPin, label: '볼링장', value: s.alleyName!, valueColor: AppColors.mint),
             if (s.laneNumber != null)
-              _InfoRow(icon: Icons.tag, label: '레인', value: '${s.laneNumber}번'),
+              _InfoRow(icon: PhosphorIconsRegular.hash, label: '레인', value: '${s.laneNumber}번'),
             if (s.oilPattern != null && s.oilPattern!.isNotEmpty)
-              _InfoRow(icon: Icons.water_drop_outlined, label: '오일 패턴', value: s.oilPattern!),
+              _InfoRow(icon: PhosphorIconsRegular.drop, label: '오일 패턴', value: s.oilPattern!),
           ],
         ),
       ),
@@ -204,7 +205,7 @@ class SessionDetailPage extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.edit_note, color: AppColors.textHint, size: 18),
+                Icon(PhosphorIconsRegular.notepad, color: AppColors.textHint, size: 18),
                 const SizedBox(width: 8),
                 Text('메모', style: AppTextStyles.headingSmall),
               ],
@@ -399,23 +400,15 @@ class _GameDetailCard extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('게임 ${index + 1}', style: AppTextStyles.labelLarge),
-                    if (ballName != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Row(
-                          children: [
-                            Icon(Icons.sports_baseball, color: AppColors.textHint, size: 12),
-                            const SizedBox(width: 4),
-                            Text(ballName, style: AppTextStyles.bodySmall),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
+                child: ballName != null
+                    ? Row(
+                        children: [
+                          Icon(PhosphorIconsFill.bowlingBall, color: AppColors.textHint, size: 12),
+                          const SizedBox(width: 4),
+                          Text(ballName, style: AppTextStyles.bodySmall),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
               ),
               Text(
                 '${game.totalScore}',

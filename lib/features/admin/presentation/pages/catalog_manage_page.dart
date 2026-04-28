@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/shared/widgets/loading_widget.dart';
@@ -46,10 +47,10 @@ class _CatalogManagePageState extends ConsumerState<CatalogManagePage> {
               style: TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: '볼 이름 또는 브랜드 검색',
-                prefixIcon: Icon(Icons.search, color: AppColors.textHint),
+                prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, color: AppColors.textHint),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.clear, color: AppColors.textHint, size: 20),
+                        icon: Icon(PhosphorIconsRegular.x, color: AppColors.textHint, size: 20),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -93,7 +94,7 @@ class _CatalogManagePageState extends ConsumerState<CatalogManagePage> {
       floatingActionButton: FloatingActionButton(
         heroTag: 'catalog_manage_fab',
         onPressed: () => _openForm(context),
-        child: const Icon(Icons.add),
+        child: const Icon(PhosphorIconsBold.plus),
       ),
     );
   }
@@ -180,10 +181,10 @@ class _CatalogAdminTile extends StatelessWidget {
                   child: Image.network(
                     ball.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(Icons.sports_baseball, color: AppColors.textHint, size: 22),
+                    errorBuilder: (_, __, ___) => Icon(PhosphorIconsFill.bowlingBall, color: AppColors.textHint, size: 22),
                   ),
                 )
-              : Icon(Icons.sports_baseball, color: AppColors.textHint, size: 22),
+              : Icon(PhosphorIconsFill.bowlingBall, color: AppColors.textHint, size: 22),
         ),
         title: Text(ball.name, style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
         subtitle: Text(
@@ -205,8 +206,8 @@ class _CatalogAdminTile extends StatelessWidget {
                 child: Text('이미지 없음', style: TextStyle(color: AppColors.error, fontSize: 10)),
               ),
             const SizedBox(width: 4),
-            IconButton(icon: Icon(Icons.edit, color: AppColors.mint, size: 20), onPressed: onEdit),
-            IconButton(icon: Icon(Icons.delete_outline, color: AppColors.error, size: 20), onPressed: onDelete),
+            IconButton(icon: Icon(PhosphorIconsRegular.pencilSimple, color: AppColors.mint, size: 20), onPressed: onEdit),
+            IconButton(icon: Icon(PhosphorIconsRegular.trash, color: AppColors.error, size: 20), onPressed: onDelete),
           ],
         ),
       ),
@@ -476,7 +477,7 @@ class _CatalogFormPageState extends ConsumerState<_CatalogFormPage> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.add_photo_alternate, size: 48, color: AppColors.textHint),
+        Icon(PhosphorIconsRegular.cameraPlus, size: 48, color: AppColors.textHint),
         const SizedBox(height: 8),
         Text('볼 이미지 추가', style: AppTextStyles.bodySmall),
         const SizedBox(height: 4),
