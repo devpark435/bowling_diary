@@ -304,7 +304,16 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                           highlight: false,
                           badge: '추정값',
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 12),
+                        Text(
+                          '* AI 측정으로 정확하지 않을 수 있습니다',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white30,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         // 저장 버튼
                         SizedBox(
                           width: double.infinity,

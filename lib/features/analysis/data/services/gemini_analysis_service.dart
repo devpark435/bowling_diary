@@ -173,10 +173,10 @@ release_sec ~ impact_sec 구간에서 볼링공 표면의 텍스처·로고·광
 ※ 참고: 일반 볼러 약 150~250 RPM, 상급자 약 300~450 RPM
 
 {
-  "release_sec": 1.2,
-  "impact_sec": 3.8,
-  "speed_kmh": 25.2,
-  "rpm_estimate": 280
+  "release_sec": null,
+  "impact_sec": null,
+  "speed_kmh": 0,
+  "rpm_estimate": null
 }''';
 
   AnalysisData _parseResponse(String body, int fps) {
