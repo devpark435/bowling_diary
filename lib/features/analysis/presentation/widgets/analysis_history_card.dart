@@ -6,46 +6,114 @@ import 'package:bowling_diary/features/analysis/domain/entities/analysis_result_
 
 class AnalysisHistoryCard extends StatelessWidget {
   final AnalysisResultEntity result;
+  final VoidCallback? onTap;
 
-  const AnalysisHistoryCard({super.key, required this.result});
+  const AnalysisHistoryCard({super.key, required this.result, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('MM.dd HH:mm').format(result.recordedAt);
-    final rpmText = result.rpmEstimated != null
-        ? '${result.rpmEstimated} RPM (추정)'
-        : 'RPM 측정 불가';
+    final date = DateFormat('MM.dd').format(result.recordedAt);
+    final time = DateFormat('HH:mm').format(result.recordedAt);
+    final hasSpeed = result.speedKmh > 0;
+    final hasRpm = result.rpmEstimated != null;
 
-    return Card(
-      color: AppColors.darkCard,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.darkCard,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(Icons.sports_baseball, color: AppColors.neonOrange, size: 32),
-            const SizedBox(width: 16),
+            // 날짜
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  date,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  time,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textHint,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            Container(
+              width: 1,
+              height: 40,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              color: AppColors.darkDivider,
+            ),
+            // 구속
             Expanded(
+              flex: 5,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(dateStr,
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textSecondary)),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${result.speedKmh.toStringAsFixed(1)} km/h',
-                    style: AppTextStyles.headingSmall
-                        .copyWith(color: AppColors.textPrimary),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        hasSpeed
+                            ? result.speedKmh.toStringAsFixed(1)
+                            : '—',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: hasSpeed
+                              ? AppColors.neonOrange
+                              : AppColors.textHint,
+                          height: 1.0,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      if (hasSpeed)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 3, left: 3),
+                          child: Text(
+                            'km/h',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.neonOrange.withValues(alpha: 0.7),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  Text(rpmText,
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textSecondary)),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasRpm ? '${result.rpmEstimated} RPM' : 'RPM 미측정',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
-            if (result.linkedSessionId != null)
-              Icon(Icons.link, color: AppColors.neonOrange, size: 18),
+            // 우측 아이콘
+            Column(
+              children: [
+                if (result.linkedSessionId != null)
+                  Icon(Icons.link_rounded,
+                      color: AppColors.textHint, size: 16),
+                const SizedBox(height: 4),
+                Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textHint, size: 18),
+              ],
+            ),
           ],
         ),
       ),

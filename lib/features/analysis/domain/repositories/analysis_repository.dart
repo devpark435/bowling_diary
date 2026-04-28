@@ -6,4 +6,5 @@ abstract class AnalysisRepository {
   Future<void> save(AnalysisResultEntity result);
   Future<List<SessionEntity>> getSameDaySessions(String userId, DateTime date);
   Future<void> linkToSession(String analysisId, String sessionId);
+  Future<void> delete(String id);
 }
