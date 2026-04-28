@@ -39,4 +39,7 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
   @override
   Future<void> linkToSession(String analysisId, String sessionId) =>
       _remote.linkToSession(analysisId, sessionId);
+
+  @override
+  Future<void> delete(String id) => _remote.delete(id);
 }

@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/shared/providers/theme_provider.dart';
@@ -30,7 +31,7 @@ class StatsPage extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.bar_chart, size: 64, color: AppColors.textHint),
+                        Icon(PhosphorIconsFill.chartBar, size: 64, color: AppColors.textHint),
                         const SizedBox(height: 16),
                         Text('아직 기록된 게임이 없어요', style: AppTextStyles.headingSmall.copyWith(color: AppColors.textSecondary)),
                         const SizedBox(height: 8),

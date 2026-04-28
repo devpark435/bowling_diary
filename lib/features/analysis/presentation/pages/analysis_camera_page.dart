@@ -1,10 +1,10 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:bowling_diary/app/theme/app_colors.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/camera_recording_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/analysis_trim_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/camera_guide_overlay.dart';
 
 class AnalysisCameraPage extends StatefulWidget {
@@ -16,12 +16,12 @@ class AnalysisCameraPage extends StatefulWidget {
 
 class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
   final _cameraService = CameraRecordingService();
-  final _analysisService = VideoAnalysisService();
 
   CameraController? _controller;
   bool _isInitialized = false;
   bool _isRecording = false;
   bool _isAnalyzing = false;
+  String? _analyzingVideoPath;
   String? _error;
 
   @override
@@ -62,19 +62,15 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
 
     try {
       final session = await _cameraService.stopRecording();
-      final analysisData =
-          _analysisService.analyze(session.sampledFrames, session.fps);
-
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
 
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => AnalysisResultPage(
-            analysisData: analysisData,
+          builder: (_) => AnalysisTrimPage(
             videoPath: session.videoPath,
-            recordedAt: DateTime.now(),
+            fps: session.fps,
           ),
         ),
       );
@@ -109,16 +105,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
 
     if (_isAnalyzing) {
       return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.neonOrange),
-              const SizedBox(height: 24),
-              Text('영상 분석 중...', style: AppTextStyles.bodyLarge),
-            ],
-          ),
-        ),
+        body: AnalysisLoadingWidget(videoPath: _analyzingVideoPath),
       );
     }
 
@@ -144,7 +131,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
                     border: Border.all(color: Colors.white, width: 4),
                   ),
                   child: Icon(
-                    _isRecording ? Icons.stop : Icons.fiber_manual_record,
+                    _isRecording ? PhosphorIconsFill.stop : PhosphorIconsFill.record,
                     color: _isRecording ? Colors.white : Colors.red,
                     size: 32,
                   ),
@@ -157,8 +144,7 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
             right: 40,
             child: Text(
               '${_cameraService.fps}fps',
-              style:
-                  AppTextStyles.bodySmall.copyWith(color: Colors.white70),
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
             ),
           ),
         ],

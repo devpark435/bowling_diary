@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/balls/domain/entities/ball_entity.dart';
@@ -28,7 +29,7 @@ class BallsPage extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.sports_baseball, size: 80, color: AppColors.textHint),
+                  Icon(PhosphorIconsFill.bowlingBall, size: 80, color: AppColors.textHint),
                   const SizedBox(height: 16),
                   Text('등록된 볼이 없어요', style: AppTextStyles.headingSmall.copyWith(color: AppColors.textSecondary)),
                   const SizedBox(height: 8),
@@ -52,7 +53,7 @@ class BallsPage extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         heroTag: 'balls_fab',
         onPressed: () => context.push('/ball/add'),
-        child: const Icon(Icons.add),
+        child: const Icon(PhosphorIconsBold.plus),
       ),
     );
   }
@@ -84,18 +85,18 @@ class _BallCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         placeholder: (_, __) => Container(
                           color: AppColors.darkDivider,
-                          child: Icon(Icons.sports_baseball, color: AppColors.textHint),
+                          child: Icon(PhosphorIconsFill.bowlingBall, color: AppColors.textHint),
                         ),
                         errorWidget: (_, __, ___) => Container(
                           color: AppColors.darkDivider,
-                          child: Icon(Icons.broken_image, color: AppColors.textHint),
+                          child: Icon(PhosphorIconsRegular.imageBroken, color: AppColors.textHint),
                         ),
                       )
                     : Container(
                         width: 72,
                         height: 72,
                         color: AppColors.darkDivider,
-                        child: Icon(Icons.sports_baseball, color: AppColors.textHint, size: 36),
+                        child: Icon(PhosphorIconsFill.bowlingBall, color: AppColors.textHint, size: 36),
                       ),
               ),
               const SizedBox(width: 16),
@@ -111,7 +112,7 @@ class _BallCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: AppColors.textHint),
+              Icon(PhosphorIconsRegular.caretRight, color: AppColors.textHint),
             ],
           ),
         ),

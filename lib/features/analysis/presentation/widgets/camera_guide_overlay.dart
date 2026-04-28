@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 
@@ -51,7 +52,7 @@ class CameraGuideOverlay extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.fiber_manual_record,
+                    const Icon(PhosphorIconsFill.record,
                         color: Colors.white, size: 14),
                     const SizedBox(width: 6),
                     Text('녹화 중',

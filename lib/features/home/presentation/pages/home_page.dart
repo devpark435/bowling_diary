@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/home/presentation/providers/home_provider.dart';
@@ -48,7 +49,7 @@ class HomePage extends ConsumerWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.sports_baseball,
+                          Icon(PhosphorIconsFill.bowlingBall,
                               size: 72, color: AppColors.textHint),
                           const SizedBox(height: 20),
                           Text('아직 기록된 게임이 없어요',
@@ -110,7 +111,7 @@ class HomePage extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         heroTag: 'home_fab',
         onPressed: () => context.push('/record'),
-        child: const Icon(Icons.add),
+        child: const Icon(PhosphorIconsBold.plus),
       ),
     );
   }
@@ -303,7 +304,7 @@ class _RecentGameCard extends StatelessWidget {
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.edit, size: 22),
+                  Icon(PhosphorIconsRegular.pencilSimple, size: 22),
                   SizedBox(height: 4),
                   Text('수정',
                       style:
@@ -322,7 +323,7 @@ class _RecentGameCard extends StatelessWidget {
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.delete_outline, size: 22),
+                  Icon(PhosphorIconsRegular.trash, size: 22),
                   SizedBox(height: 4),
                   Text('삭제',
                       style:
@@ -378,7 +379,7 @@ class _RecentGameCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.location_on,
+                        Icon(PhosphorIconsFill.mapPin,
                             color: AppColors.mint, size: 14),
                         const SizedBox(width: 4),
                         Text(s.alleyName!,

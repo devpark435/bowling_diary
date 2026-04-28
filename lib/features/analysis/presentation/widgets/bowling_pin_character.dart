@@ -10,83 +10,46 @@ class BowlingPinCharacter extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomPaint(
       size: const Size(100, 140),
-      painter: _PinPainter(emotion: emotion),
+      painter: _PinPainter(),
     );
   }
 }
 
 class _PinPainter extends CustomPainter {
-  final String emotion;
-  _PinPainter({required this.emotion});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.white;
     final orangePaint = Paint()..color = AppColors.neonOrange;
-    final blackPaint = Paint()..color = Colors.black87;
 
     final cx = size.width / 2;
 
+    final bodyRect = Rect.fromCenter(
+      center: Offset(cx, size.height * 0.65),
+      width: size.width * 0.72,
+      height: size.height * 0.62,
+    );
+
     // 몸통
-    canvas.drawOval(
-        Rect.fromCenter(
-            center: Offset(cx, size.height * 0.65),
-            width: size.width * 0.7,
-            height: size.height * 0.6),
-        paint);
-    // 목
-    canvas.drawRect(
-        Rect.fromCenter(
-            center: Offset(cx, size.height * 0.3),
-            width: size.width * 0.25,
-            height: size.height * 0.15),
-        paint);
-    // 머리
-    canvas.drawCircle(Offset(cx, size.height * 0.18), size.width * 0.22, paint);
+    canvas.drawOval(bodyRect, paint);
 
-    // 오렌지 줄무늬
+    // 오렌지 줄무늬 (몸통 안에만)
+    canvas.save();
+    final bodyPath = Path()..addOval(bodyRect);
+    canvas.clipPath(bodyPath);
     canvas.drawRect(
         Rect.fromCenter(
-            center: Offset(cx, size.height * 0.55),
-            width: size.width * 0.7,
-            height: size.height * 0.06),
+            center: Offset(cx, size.height * 0.54),
+            width: size.width * 0.72,
+            height: size.height * 0.055),
         orangePaint);
+    canvas.restore();
 
-    // 눈
-    final eyeY = size.height * 0.16;
-    canvas.drawCircle(Offset(cx - 7, eyeY), 3.5, blackPaint);
-    canvas.drawCircle(Offset(cx + 7, eyeY), 3.5, blackPaint);
-
-    // 감정별 입 모양
-    final mouthPaint = Paint()
-      ..color = blackPaint.color
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-
-    final mouthY = size.height * 0.22;
-    if (emotion == 'happy' || emotion == 'cheer') {
-      final path = Path()
-        ..moveTo(cx - 7, mouthY)
-        ..quadraticBezierTo(cx, mouthY + 8, cx + 7, mouthY);
-      canvas.drawPath(path, mouthPaint);
-    } else {
-      canvas.drawLine(
-          Offset(cx - 6, mouthY + 2), Offset(cx + 6, mouthY + 2), mouthPaint);
-    }
-
-    // cheer: 팔 올리기
-    if (emotion == 'cheer') {
-      final armPaint = Paint()
-        ..color = blackPaint.color
-        ..strokeWidth = 4
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(Offset(cx - size.width * 0.35, size.height * 0.5),
-          Offset(cx - size.width * 0.5, size.height * 0.3), armPaint);
-      canvas.drawLine(Offset(cx + size.width * 0.35, size.height * 0.5),
-          Offset(cx + size.width * 0.5, size.height * 0.3), armPaint);
-    }
+    // 머리 (목 없이 몸통과 오버랩)
+    canvas.drawCircle(
+        Offset(cx, size.height * 0.22), size.width * 0.24, paint);
   }
 
   @override
-  bool shouldRepaint(_PinPainter old) => old.emotion != emotion;
+  bool shouldRepaint(_PinPainter old) => false;
 }

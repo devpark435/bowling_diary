@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/record/data/services/kakao_place_service.dart';
@@ -105,10 +106,10 @@ class _AlleySearchSheetState extends State<_AlleySearchSheet> {
                 style: TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: '볼링장 이름을 검색하세요',
-                  prefixIcon: Icon(Icons.search, color: AppColors.textHint, size: 20),
+                  prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, color: AppColors.textHint, size: 20),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear, color: AppColors.textHint, size: 18),
+                          icon: Icon(PhosphorIconsRegular.x, color: AppColors.textHint, size: 18),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _results = []);
@@ -152,7 +153,7 @@ class _AlleySearchSheetState extends State<_AlleySearchSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.location_on_outlined, color: AppColors.textHint, size: 48),
+            Icon(PhosphorIconsRegular.mapPin, color: AppColors.textHint, size: 48),
             const SizedBox(height: 12),
             Text('볼링장 이름을 검색해보세요', style: AppTextStyles.bodyMedium),
           ],
@@ -166,13 +167,13 @@ class _AlleySearchSheetState extends State<_AlleySearchSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off, color: AppColors.textHint, size: 48),
+            Icon(PhosphorIconsRegular.magnifyingGlassMinus, color: AppColors.textHint, size: 48),
             const SizedBox(height: 12),
             Text('검색 결과가 없습니다', style: AppTextStyles.bodyMedium),
             const SizedBox(height: 16),
             TextButton.icon(
               onPressed: () => Navigator.pop(context, query),
-              icon: Icon(Icons.edit, size: 16, color: AppColors.neonOrange),
+              icon: Icon(PhosphorIconsRegular.pencilSimple, size: 16, color: AppColors.neonOrange),
               label: Text(
                 '"$query" 직접 입력',
                 style: TextStyle(
@@ -223,7 +224,7 @@ class _PlaceTile extends StatelessWidget {
                 color: AppColors.neonOrange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.location_on, color: AppColors.neonOrange, size: 20),
+              child: Icon(PhosphorIconsFill.mapPin, color: AppColors.neonOrange, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -257,7 +258,7 @@ class _PlaceTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: AppColors.textHint, size: 20),
+            Icon(PhosphorIconsRegular.caretRight, color: AppColors.textHint, size: 20),
           ],
         ),
       ),
