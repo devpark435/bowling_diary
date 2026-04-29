@@ -30,7 +30,7 @@ class VideoFrameExtractorService {
     try {
       final outputPattern = '${framesDir.path}/frame_%04d.jpg';
       final session = await FFmpegKit.execute(
-        '-i "$videoPath" -vf fps=$_sampleFps -q:v 2 "$outputPattern"',
+        '-i "$videoPath" -vf "fps=$_sampleFps,scale=480:-1" -q:v 5 "$outputPattern"',
       );
       final returnCode = await session.getReturnCode();
 

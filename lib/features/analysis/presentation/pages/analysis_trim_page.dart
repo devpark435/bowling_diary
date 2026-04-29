@@ -108,21 +108,37 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
 
       if (mounted) setState(() => _trimmedPath = trimmedPath);
 
-      // 2. Gemini 분석 (실패 시 로컬 fallback)
-      AnalysisData analysisData;
+      // 2. 프레임 추출 (로컬 + Gemini 공용)
+      final extracted = await _frameExtractor.extract(trimmedPath);
+
+      // 3. 로컬 분석 → 구속
+      final localData = _fallbackService.analyzeImages(
+        extracted.frames, extracted.originalFps,
+      );
+      debugPrint('[Trim] 로컬 구속: ${localData.speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h');
+
+      // 4. Gemini → RPM (실패해도 로컬 RPM으로 대체)
+      int? rpm = localData.rpmEstimated;
       try {
-        analysisData = await _geminiService.analyzeVideo(trimmedPath, widget.fps);
+        final geminiRpm = await _geminiService.analyzeRpm(extracted.frames);
+        if (geminiRpm != null) {
+          rpm = geminiRpm;
+          debugPrint('[Trim] Gemini RPM 채택: $rpm');
+        } else {
+          debugPrint('[Trim] Gemini RPM null → 로컬 RPM 사용: $rpm');
+        }
       } on GeminiQuotaExceededException {
-        debugPrint('[Trim] Gemini 할당량 초과 → 로컬 fallback');
-        final extracted = await _frameExtractor.extract(trimmedPath);
-        analysisData = _fallbackService.analyzeImages(
-            extracted.frames, extracted.originalFps);
-      } on GeminiApiException catch (e) {
-        debugPrint('[Trim] Gemini 오류 → fallback: $e');
-        final extracted = await _frameExtractor.extract(trimmedPath);
-        analysisData = _fallbackService.analyzeImages(
-            extracted.frames, extracted.originalFps);
+        debugPrint('[Trim] Gemini 할당량 초과 → 로컬 RPM 사용');
+      } catch (e) {
+        debugPrint('[Trim] Gemini RPM 오류 → 로컬 RPM 사용: $e');
       }
+
+      final analysisData = AnalysisData(
+        speedKmh: localData.speedKmh,
+        rpmEstimated: rpm,
+        framesAnalyzed: localData.framesAnalyzed,
+        fpsUsed: localData.fpsUsed,
+      );
 
       if (!mounted) return;
       await Navigator.pushReplacement(
