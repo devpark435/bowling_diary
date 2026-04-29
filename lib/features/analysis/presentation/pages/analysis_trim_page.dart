@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/gemini_analysis_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
@@ -29,6 +30,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   final _geminiService = GeminiAnalysisService();
   final _fallbackService = VideoAnalysisService();
   final _frameExtractor = VideoFrameExtractorService();
+  final _ballDetector = BallDetectionService();
 
   VideoPlayerController? _controller;
   double _startSec = 0;
@@ -108,36 +110,53 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
 
       if (mounted) setState(() => _trimmedPath = trimmedPath);
 
-      // 2. 프레임 추출 (로컬 + Gemini 공용)
+      // 2. 프레임 추출 (YOLO + Gemini 공용)
       final extracted = await _frameExtractor.extract(trimmedPath);
 
-      // 3. 로컬 분석 → 구속
+      // 3. YOLO person 감지 → 원본 fps로 별도 추출 후 릴리즈 프레임 특정
+      int releaseFrame = 0;
+      try {
+        await _ballDetector.init();
+        final personFrames = await _frameExtractor.extractForPersonDetection(trimmedPath);
+        final personRelease = _ballDetector.findReleaseFrame(personFrames.frames);
+        // person 추출은 원본 fps, frame diff 추출은 10fps → 비율 변환
+        final ratio = 10.0 / personFrames.originalFps;
+        releaseFrame = (personRelease * ratio).round().clamp(0, extracted.frames.length - 1);
+        debugPrint('[Trim] person 릴리즈=$personRelease (${personFrames.originalFps}fps) → 10fps 기준=$releaseFrame');
+      } catch (e) {
+        debugPrint('[Trim] YOLO person 감지 오류: $e');
+      } finally {
+        _ballDetector.dispose();
+      }
+
+      // 4. frame diff (릴리즈 프레임부터 시작)
       final localData = _fallbackService.analyzeImages(
         extracted.frames, extracted.originalFps,
+        releaseFrame: releaseFrame,
       );
-      debugPrint('[Trim] 로컬 구속: ${localData.speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h');
+      final speedKmh = localData.speedKmh;
+      debugPrint('[Trim] 구속: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h (릴리즈=$releaseFrame)');
 
       // 4. Gemini → RPM (실패해도 로컬 RPM으로 대체)
-      int? rpm = localData.rpmEstimated;
+      int? rpm;
       try {
-        final geminiRpm = await _geminiService.analyzeRpm(extracted.frames);
-        if (geminiRpm != null) {
-          rpm = geminiRpm;
+        rpm = await _geminiService.analyzeRpm(extracted.frames);
+        if (rpm != null) {
           debugPrint('[Trim] Gemini RPM 채택: $rpm');
         } else {
-          debugPrint('[Trim] Gemini RPM null → 로컬 RPM 사용: $rpm');
+          debugPrint('[Trim] Gemini RPM null');
         }
       } on GeminiQuotaExceededException {
-        debugPrint('[Trim] Gemini 할당량 초과 → 로컬 RPM 사용');
+        debugPrint('[Trim] Gemini 할당량 초과');
       } catch (e) {
-        debugPrint('[Trim] Gemini RPM 오류 → 로컬 RPM 사용: $e');
+        debugPrint('[Trim] Gemini RPM 오류: $e');
       }
 
       final analysisData = AnalysisData(
-        speedKmh: localData.speedKmh,
+        speedKmh: speedKmh,
         rpmEstimated: rpm,
-        framesAnalyzed: localData.framesAnalyzed,
-        fpsUsed: localData.fpsUsed,
+        framesAnalyzed: extracted.frames.length,
+        fpsUsed: extracted.originalFps,
       );
 
       if (!mounted) return;

@@ -81,12 +81,14 @@ class VideoAnalysisService {
   }
 
   /// 갤러리 영상 프레임(img.Image) 분석 — sampleFps는 추출 시 사용한 fps
+  /// releaseFrame: YOLO person 감지로 특정한 릴리즈 프레임 (0이면 자동 감지)
   AnalysisData analyzeImages(
     List<img.Image> frames,
     int originalFps, {
     int sampleFps = 10,
+    int releaseFrame = 0,
   }) {
-    debugPrint('[Analysis] 갤러리 분석 시작: ${frames.length}개 프레임, 원본 ${originalFps}fps, 샘플 ${sampleFps}fps');
+    debugPrint('[Analysis] 갤러리 분석 시작: ${frames.length}개 프레임, 원본 ${originalFps}fps, 샘플 ${sampleFps}fps, 릴리즈=$releaseFrame');
 
     if (frames.length < 5) {
       return AnalysisData(framesAnalyzed: frames.length, fpsUsed: originalFps);
@@ -105,14 +107,18 @@ class VideoAnalysisService {
       prevGray = gray;
     }
 
-    final detected = positions.asMap().entries.where((e) => e.value != null).toList();
+    // releaseFrame 이후 감지된 것만 사용
+    final detected = positions.asMap().entries
+        .where((e) => e.value != null && e.key >= releaseFrame)
+        .toList();
 
     if (detected.length < 3) {
       debugPrint('[Analysis] 볼 감지 실패 → 속도 0 반환');
       return AnalysisData(framesAnalyzed: frames.length, fpsUsed: originalFps);
     }
 
-    final releaseIdx = detected.first.key;
+    // releaseFrame을 릴리즈 기준점으로 고정 (YOLO가 준 경우)
+    final releaseIdx = releaseFrame > 0 ? releaseFrame : detected.first.key;
     final impactIdx = detected.last.key;
     final sampleInterval = (originalFps / sampleFps).round().clamp(1, 999);
     final actualFrameCount = (impactIdx - releaseIdx) * sampleInterval;

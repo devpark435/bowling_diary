@@ -59,6 +59,44 @@ class VideoFrameExtractorService {
     }
   }
 
+  /// YOLO person 감지 전용 — 원본 fps로 추출 (320px, 최대 120프레임)
+  Future<FrameExtractionResult> extractForPersonDetection(String videoPath) async {
+    final originalFps = await _getVideoFps(videoPath);
+
+    final tempDir = await getTemporaryDirectory();
+    final framesDir = Directory(
+      '${tempDir.path}/person_frames_${DateTime.now().millisecondsSinceEpoch}',
+    );
+    await framesDir.create();
+
+    try {
+      final outputPattern = '${framesDir.path}/frame_%04d.jpg';
+      // 원본 fps 유지, 최대 120프레임 (4초 × 30fps)
+      final session = await FFmpegKit.execute(
+        '-i "$videoPath" -vf "fps=$originalFps,scale=320:-1" -q:v 7 -frames:v 120 "$outputPattern"',
+      );
+      final returnCode = await session.getReturnCode();
+      if (returnCode == null || !returnCode.isValueSuccess()) {
+        throw Exception('person 프레임 추출 실패');
+      }
+
+      final frameFiles = framesDir.listSync()..sort((a, b) => a.path.compareTo(b.path));
+      final frames = <img.Image>[];
+      for (final file in frameFiles) {
+        if (file is File && file.path.endsWith('.jpg')) {
+          final bytes = await file.readAsBytes();
+          final image = img.decodeImage(bytes);
+          if (image != null) frames.add(image);
+        }
+      }
+
+      debugPrint('[FrameExtractor] person용 추출 완료: ${frames.length}개 프레임, ${originalFps}fps');
+      return FrameExtractionResult(frames: frames, originalFps: originalFps);
+    } finally {
+      await framesDir.delete(recursive: true);
+    }
+  }
+
   Future<int> _getVideoFps(String videoPath) async {
     try {
       final session = await FFprobeKit.getMediaInformation(videoPath);

@@ -48,6 +48,7 @@ dependencies:
   ffmpeg_kit_flutter_new: ^4.1.0
   path_provider: ^2.1.5
   phosphor_flutter: ^2.1.0
+  tflite_flutter: ^0.12.1
 
 dev_dependencies:
   flutter_test:
@@ -90,3 +91,4 @@ flutter:
     - assets/icon/
     - assets/splash/
     - assets/videos/
+    - assets/models/
