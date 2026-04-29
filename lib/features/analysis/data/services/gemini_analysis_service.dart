@@ -152,31 +152,17 @@ class GeminiAnalysisService {
   }
 
   String _buildPrompt() => '''
-볼링 투구 영상입니다. JSON만 반환하세요.
+볼링 투구 분석 전문가로서 영상의 정확한 타임스탬프를 추출하세요. JSON으로만 응답하세요.
 
-[볼링 레인 규격 — USBC 공식]
-파울라인 ~ 헤드핀(1번 핀) 중심 = 정확히 60피트 = 18.288m
-레인 폭 = 41.5인치 = 1.054m
+1. "start_time": 공이 투구자의 손에서 떨어져 파울 라인을 통과하는 시점 (초 단위, 식별 불가 시 null)
+2. "end_time": 공이 1번 핀에 충돌하는 시점 (초 단위, 식별 불가 시 null)
+3. "rotation_count": 공이 start_time~end_time 동안 로고나 문양이 몇 바퀴 회전하는지 관찰 (추정 불가 시 null)
 
-[구속 계산 방법]
-1. release_sec: 볼링공이 파울라인을 넘어가는 순간의 영상 타임스탬프 (초)
-2. impact_sec: 볼링공이 헤드핀에 최초 접촉하는 순간의 영상 타임스탬프 (초)
-3. elapsed = impact_sec - release_sec
-4. speed_kmh = (18.288 / elapsed) × 3.6
-※ 볼 감지 불가 시 release_sec, impact_sec 모두 null, speed_kmh = 0
-※ 참고: 일반 볼러 약 19~25 km/h, 상급자 약 25~35 km/h
-
-[RPM 계산 방법]
-release_sec ~ impact_sec 구간에서 볼링공 표면의 텍스처·로고·광택 반사 패턴 변화를 분석해
-회전수를 추정하세요. elapsed 동안의 총 회전수 → RPM = (총 회전수 / elapsed) × 60
-추정 불가 시 null.
-※ 참고: 일반 볼러 약 150~250 RPM, 상급자 약 300~450 RPM
-
+반환 형식:
 {
-  "release_sec": null,
-  "impact_sec": null,
-  "speed_kmh": 0,
-  "rpm_estimate": null
+  "start_time": null,
+  "end_time": null,
+  "rotation_count": null
 }''';
 
   AnalysisData _parseResponse(String body, int fps) {
@@ -185,35 +171,55 @@ release_sec ~ impact_sec 구간에서 볼링공 표면의 텍스처·로고·광
       final text = json['candidates'][0]['content']['parts'][0]['text'] as String;
       final data = jsonDecode(text) as Map<String, dynamic>;
 
-      final releaseSec = (data['release_sec'] as num?)?.toDouble();
-      final impactSec = (data['impact_sec'] as num?)?.toDouble();
-      double speedKmh = (data['speed_kmh'] as num?)?.toDouble() ?? 0.0;
+      final startTime = (data['start_time'] as num?)?.toDouble();
+      final endTime = (data['end_time'] as num?)?.toDouble();
+      final rotationCount = (data['rotation_count'] as num?)?.toDouble();
 
-      // 타임스탬프가 있으면 우리가 직접 재계산 (더 정확)
-      if (releaseSec != null && impactSec != null) {
-        final elapsed = impactSec - releaseSec;
-        if (elapsed > 0.1) {
-          final calculated = (18.288 / elapsed) * 3.6;
-          // 볼링 현실 범위(15~45 km/h) 내면 채택
-          if (calculated >= 15 && calculated <= 45) {
-            speedKmh = calculated;
+      double? speedKmh;
+      int? rpm;
+
+      if (startTime != null && endTime != null) {
+        final elapsed = endTime - startTime;
+        debugPrint('[GeminiAnalysis] start=${startTime}s end=${endTime}s elapsed=${elapsed.toStringAsFixed(3)}s');
+
+        if (elapsed > 0) {
+          // 구속 계산
+          final rawSpeed = (18.288 / elapsed) * 3.6;
+          if (rawSpeed >= 15 && rawSpeed <= 50) {
+            speedKmh = double.parse(rawSpeed.toStringAsFixed(1));
+            debugPrint('[GeminiAnalysis] 구속: ${speedKmh}km/h');
+          } else {
+            debugPrint('[GeminiAnalysis] 구속 범위 초과(${rawSpeed.toStringAsFixed(1)}km/h) → 측정불가');
           }
+
+          // RPM 계산
+          if (rotationCount != null && rotationCount > 0) {
+            final rawRpm = (rotationCount / elapsed) * 60;
+            if (rawRpm >= 50 && rawRpm <= 500) {
+              rpm = rawRpm.round();
+              debugPrint('[GeminiAnalysis] RPM: $rpm (회전수=${rotationCount.toStringAsFixed(1)})');
+            } else {
+              debugPrint('[GeminiAnalysis] RPM 범위 초과(${rawRpm.toStringAsFixed(0)}) → 측정불가');
+            }
+          }
+        } else {
+          debugPrint('[GeminiAnalysis] elapsed 비정상(${elapsed.toStringAsFixed(3)}s) → 측정불가');
         }
-        debugPrint('[GeminiAnalysis] 릴리즈=${releaseSec}s 임팩트=${impactSec}s elapsed=${(impactSec - releaseSec).toStringAsFixed(2)}s');
+      } else {
+        debugPrint('[GeminiAnalysis] 타임스탬프 null → 측정불가');
       }
 
-      final rpm = data['rpm_estimate'] as int?;
-      debugPrint('[GeminiAnalysis] 결과: ${speedKmh.toStringAsFixed(1)}km/h, RPM=$rpm');
+      debugPrint('[GeminiAnalysis] 결과: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h, RPM=$rpm');
 
       return AnalysisData(
-        speedKmh: double.parse(speedKmh.toStringAsFixed(1)),
+        speedKmh: speedKmh,
         rpmEstimated: rpm,
         framesAnalyzed: 0,
         fpsUsed: fps,
       );
     } catch (e) {
       debugPrint('[GeminiAnalysis] 파싱 오류: $e\n$body');
-      return AnalysisData(speedKmh: 0, framesAnalyzed: 0, fpsUsed: fps);
+      return AnalysisData(framesAnalyzed: 0, fpsUsed: fps);
     }
   }
 }

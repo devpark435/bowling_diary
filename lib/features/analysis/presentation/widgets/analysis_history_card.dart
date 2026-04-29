@@ -15,7 +15,7 @@ class AnalysisHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final date = DateFormat('MM.dd').format(result.recordedAt);
     final time = DateFormat('HH:mm').format(result.recordedAt);
-    final hasSpeed = result.speedKmh > 0;
+    final hasSpeed = result.speedKmh != null;
     final hasRpm = result.rpmEstimated != null;
 
     return GestureDetector(
@@ -66,21 +66,17 @@ class AnalysisHistoryCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        hasSpeed
-                            ? result.speedKmh.toStringAsFixed(1)
-                            : '—',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          color: hasSpeed
-                              ? AppColors.neonOrange
-                              : AppColors.textHint,
-                          height: 1.0,
-                          letterSpacing: -0.5,
+                      if (hasSpeed) ...[
+                        Text(
+                          result.speedKmh!.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.neonOrange,
+                            height: 1.0,
+                            letterSpacing: -0.5,
+                          ),
                         ),
-                      ),
-                      if (hasSpeed)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 3, left: 3),
                           child: Text(
@@ -89,6 +85,16 @@ class AnalysisHistoryCard extends StatelessWidget {
                               color: AppColors.neonOrange.withValues(alpha: 0.7),
                               fontSize: 11,
                             ),
+                          ),
+                        ),
+                      ] else
+                        Text(
+                          '측정불가',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textHint,
+                            height: 1.0,
                           ),
                         ),
                     ],

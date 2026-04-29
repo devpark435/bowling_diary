@@ -2,7 +2,7 @@ class AnalysisResultEntity {
   final String id;
   final String userId;
   final DateTime recordedAt;
-  final double speedKmh;
+  final double? speedKmh;
   final int? rpmEstimated;
   final int fpsUsed;
   final String? videoLocalPath;
@@ -13,7 +13,7 @@ class AnalysisResultEntity {
     required this.id,
     required this.userId,
     required this.recordedAt,
-    required this.speedKmh,
+    this.speedKmh,
     this.rpmEstimated,
     required this.fpsUsed,
     this.videoLocalPath,

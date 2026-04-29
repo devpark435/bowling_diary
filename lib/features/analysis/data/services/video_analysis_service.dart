@@ -3,13 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
 class AnalysisData {
-  final double speedKmh;
+  final double? speedKmh;
   final int? rpmEstimated;
   final int framesAnalyzed;
   final int fpsUsed;
 
   const AnalysisData({
-    required this.speedKmh,
+    this.speedKmh,
     this.rpmEstimated,
     required this.framesAnalyzed,
     required this.fpsUsed,
@@ -24,7 +24,7 @@ class VideoAnalysisService {
 
     if (frames.length < 5) {
       debugPrint('[Analysis] 프레임 부족 → 기본값 반환');
-      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: fps);
+      return AnalysisData(framesAnalyzed: frames.length, fpsUsed: fps);
     }
 
     final positions = <_BallPosition?>[];
@@ -49,7 +49,7 @@ class VideoAnalysisService {
 
     if (detected.length < 3) {
       debugPrint('[Analysis] 볼 감지 실패 → 속도 0 반환');
-      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: fps);
+      return AnalysisData(framesAnalyzed: frames.length, fpsUsed: fps);
     }
 
     final releaseIdx = detected.first.key;
@@ -60,17 +60,20 @@ class VideoAnalysisService {
     final elapsedSec = actualFrameCount / fps;
 
     if (elapsedSec <= 0) {
-      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: fps);
+      return AnalysisData(framesAnalyzed: frames.length, fpsUsed: fps);
     }
 
-    final speedKmh = (_laneLength / elapsedSec) * 3.6;
-    debugPrint('[Analysis] 속도: ${speedKmh.toStringAsFixed(1)}km/h (${elapsedSec.toStringAsFixed(2)}초)');
+    final rawSpeed = (_laneLength / elapsedSec) * 3.6;
+    final speedKmh = (rawSpeed >= 15 && rawSpeed <= 50)
+        ? double.parse(rawSpeed.toStringAsFixed(1))
+        : null;
+    debugPrint('[Analysis] 속도: ${rawSpeed.toStringAsFixed(1)}km/h (${elapsedSec.toStringAsFixed(2)}초)${speedKmh == null ? ' → 범위 초과, 측정불가' : ''}');
 
     final rpm = _estimateRpm(detected.map((e) => e.value!).toList(), fps);
     debugPrint('[Analysis] RPM 추정: $rpm');
 
     return AnalysisData(
-      speedKmh: double.parse(speedKmh.toStringAsFixed(1)),
+      speedKmh: speedKmh,
       rpmEstimated: rpm,
       framesAnalyzed: frames.length,
       fpsUsed: fps,
@@ -86,7 +89,7 @@ class VideoAnalysisService {
     debugPrint('[Analysis] 갤러리 분석 시작: ${frames.length}개 프레임, 원본 ${originalFps}fps, 샘플 ${sampleFps}fps');
 
     if (frames.length < 5) {
-      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: originalFps);
+      return AnalysisData(framesAnalyzed: frames.length, fpsUsed: originalFps);
     }
 
     final positions = <_BallPosition?>[];
@@ -106,7 +109,7 @@ class VideoAnalysisService {
 
     if (detected.length < 3) {
       debugPrint('[Analysis] 볼 감지 실패 → 속도 0 반환');
-      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: originalFps);
+      return AnalysisData(framesAnalyzed: frames.length, fpsUsed: originalFps);
     }
 
     final releaseIdx = detected.first.key;
@@ -116,11 +119,14 @@ class VideoAnalysisService {
     final elapsedSec = actualFrameCount / originalFps;
 
     if (elapsedSec <= 0) {
-      return AnalysisData(speedKmh: 0, framesAnalyzed: frames.length, fpsUsed: originalFps);
+      return AnalysisData(framesAnalyzed: frames.length, fpsUsed: originalFps);
     }
 
-    final speedKmh = (_laneLength / elapsedSec) * 3.6;
-    debugPrint('[Analysis] 속도: ${speedKmh.toStringAsFixed(1)}km/h');
+    final rawSpeed = (_laneLength / elapsedSec) * 3.6;
+    final speedKmh = (rawSpeed >= 15 && rawSpeed <= 50)
+        ? double.parse(rawSpeed.toStringAsFixed(1))
+        : null;
+    debugPrint('[Analysis] 속도: ${rawSpeed.toStringAsFixed(1)}km/h${speedKmh == null ? ' → 범위 초과, 측정불가' : ''}');
 
     final rpm = _estimateRpm(
       detected.map((e) => e.value!).toList(),
@@ -130,7 +136,7 @@ class VideoAnalysisService {
     debugPrint('[Analysis] RPM 추정: $rpm');
 
     return AnalysisData(
-      speedKmh: double.parse(speedKmh.toStringAsFixed(1)),
+      speedKmh: speedKmh,
       rpmEstimated: rpm,
       framesAnalyzed: frames.length,
       fpsUsed: originalFps,

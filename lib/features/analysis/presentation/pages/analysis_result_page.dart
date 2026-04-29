@@ -282,9 +282,7 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                         // 구속
                         _StatRow(
                           label: '구속',
-                          value: data.speedKmh > 0
-                              ? data.speedKmh.toStringAsFixed(1)
-                              : '—',
+                          value: data.speedKmh?.toStringAsFixed(1),
                           unit: 'km/h',
                           highlight: true,
                         ),
@@ -297,9 +295,7 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                         // RPM
                         _StatRow(
                           label: 'RPM',
-                          value: data.rpmEstimated != null
-                              ? data.rpmEstimated.toString()
-                              : '—',
+                          value: data.rpmEstimated?.toString(),
                           unit: 'rpm',
                           highlight: false,
                           badge: '추정값',
@@ -358,7 +354,7 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
 
 class _StatRow extends StatelessWidget {
   final String label;
-  final String value;
+  final String? value; // null = 측정불가
   final String unit;
   final bool highlight;
   final String? badge;
@@ -373,48 +369,77 @@ class _StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final measured = value != null;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // 숫자
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: highlight ? 52 : 44,
-            fontWeight: FontWeight.w800,
-            color: highlight ? AppColors.neonOrange : Colors.white,
-            height: 1.0,
-            letterSpacing: -1,
+        if (measured) ...[
+          Text(
+            value!,
+            style: TextStyle(
+              fontSize: highlight ? 52 : 44,
+              fontWeight: FontWeight.w800,
+              color: highlight ? AppColors.neonOrange : Colors.white,
+              height: 1.0,
+              letterSpacing: -1,
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
-        // 단위 + 라벨
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                unit,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: highlight
-                      ? AppColors.neonOrange.withValues(alpha: 0.8)
-                      : Colors.white60,
+          const SizedBox(width: 6),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  unit,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: highlight
+                        ? AppColors.neonOrange.withValues(alpha: 0.8)
+                        : Colors.white60,
+                  ),
                 ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white38,
-                  letterSpacing: 1.2,
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white38,
+                    letterSpacing: 1.2,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ] else ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '측정불가',
+                  style: TextStyle(
+                    fontSize: highlight ? 28 : 24,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white24,
+                    height: 1.0,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white24,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (badge != null) ...[
           const Spacer(),
           Container(
