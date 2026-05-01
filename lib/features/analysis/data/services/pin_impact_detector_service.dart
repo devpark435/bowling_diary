@@ -1,5 +1,3 @@
-import 'dart:math' show min;
-
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
