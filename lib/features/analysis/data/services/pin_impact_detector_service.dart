@@ -4,11 +4,12 @@ import 'package:image/image.dart' as img;
 class PinImpactDetectorService {
   static const _pinZoneRatio = 0.20;
   static const _changeThreshold = 0.15;
-  static const _pixelDiffThreshold = 30;
+  static const double _pixelDiffThreshold = 30.0;
 
   int? findImpactFrame(List<img.Image> frames, int releaseFrame) {
     if (frames.length < 2) return null;
 
+    // releaseFrame이 기준 프레임 — 다음 프레임부터 비교 시작
     img.Image? prevZone;
 
     for (int i = releaseFrame; i < frames.length; i++) {
