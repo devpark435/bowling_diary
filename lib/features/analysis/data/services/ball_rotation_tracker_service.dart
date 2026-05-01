@@ -130,8 +130,8 @@ class BallRotationTrackerService {
     final prevAngle = atan2(prev.cy, prev.cx);
     final currAngle = atan2(curr.cy, curr.cx);
     var delta = currAngle - prevAngle;
-    while (delta > pi) delta -= 2 * pi;
-    while (delta < -pi) delta += 2 * pi;
+    while (delta > pi) { delta -= 2 * pi; }
+    while (delta < -pi) { delta += 2 * pi; }
     return delta;
   }
 }
