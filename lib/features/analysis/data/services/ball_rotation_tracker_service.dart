@@ -21,8 +21,9 @@ class BallRotationTrackerService {
   ) {
     if (frames.isEmpty || detections.isEmpty) return null;
 
+    // angleDeltas 최대 = limit - 1 이므로 최소 _minSuccessFrames 개 delta 확보에 limit+1 필요
     final limit = min(_maxFrames, frames.length - releaseFrame);
-    if (limit < _minSuccessFrames) return null;
+    if (limit < _minSuccessFrames + 1) return null;
 
     final angleDeltas = <double>[];
     _HoleGroup? prevHoles;
