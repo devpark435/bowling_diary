@@ -14,7 +14,7 @@ class ReleaseDetectorService {
         consecutive++;
         start ??= i;
         if (consecutive >= _minConsecutive) {
-          debugPrint('[ReleaseDetector] 릴리즈 프레임: $start (연속 ${_minConsecutive}프레임)');
+          debugPrint('[ReleaseDetector] 릴리즈 프레임: $start (연속 $_minConsecutive프레임)');
           return start;
         }
       } else {
