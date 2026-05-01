@@ -187,7 +187,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         speedKmh: speedKmh,
         rpmEstimated: rpm,
         framesAnalyzed: extracted.frames.length,
-        fpsUsed: extracted.originalFps,
+        fpsUsed: extracted.sampleFps,
       );
 
       if (!mounted) return;
