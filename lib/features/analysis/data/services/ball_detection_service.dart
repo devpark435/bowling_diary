@@ -116,7 +116,7 @@ class BallTracker {
     if (elapsed <= 0) return null;
     final rawSpeed = (_laneLength / elapsed) * 3.6;
 
-    if (rawSpeed < 15 || rawSpeed > 50) {
+    if (rawSpeed < 10 || rawSpeed > 50) {
       debugPrint('[BallTracker] 속도 범위 초과(${rawSpeed.toStringAsFixed(1)}km/h) → 측정불가');
       return null;
     }

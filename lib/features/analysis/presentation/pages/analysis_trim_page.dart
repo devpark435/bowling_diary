@@ -143,7 +143,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         const laneLength = 18.29;
         final elapsedSec = (impactFrame - releaseFrame) / extracted.sampleFps.toDouble();
         final raw = (laneLength / elapsedSec) * 3.6;
-        if (raw >= 15 && raw <= 50) {
+        if (raw >= 10 && raw <= 50) {
           speedKmh = double.parse(raw.toStringAsFixed(1));
           debugPrint('[Trim] 이벤트 기반 구속: ${speedKmh}km/h');
         } else {

@@ -64,7 +64,7 @@ class VideoAnalysisService {
     }
 
     final rawSpeed = (_laneLength / elapsedSec) * 3.6;
-    final speedKmh = (rawSpeed >= 15 && rawSpeed <= 50)
+    final speedKmh = (rawSpeed >= 10 && rawSpeed <= 50)
         ? double.parse(rawSpeed.toStringAsFixed(1))
         : null;
     debugPrint('[Analysis] 속도: ${rawSpeed.toStringAsFixed(1)}km/h (${elapsedSec.toStringAsFixed(2)}초)${speedKmh == null ? ' → 범위 초과, 측정불가' : ''}');
@@ -128,7 +128,7 @@ class VideoAnalysisService {
     }
 
     final rawSpeed = (_laneLength / elapsedSec) * 3.6;
-    final speedKmh = (rawSpeed >= 15 && rawSpeed <= 50)
+    final speedKmh = (rawSpeed >= 10 && rawSpeed <= 50)
         ? double.parse(rawSpeed.toStringAsFixed(1))
         : null;
     debugPrint('[Analysis] 속도: ${rawSpeed.toStringAsFixed(1)}km/h${speedKmh == null ? ' → 범위 초과, 측정불가' : ''}');
