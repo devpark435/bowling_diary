@@ -136,7 +136,7 @@ JSON만 반환하세요.
       if (startFrame != null && endFrame != null && distance != null) {
         final elapsed = (endFrame - startFrame) * frameIntervalSec;
         final minElapsed = distance / (50.0 / 3.6);
-        final maxElapsed = distance / (15.0 / 3.6);
+        final maxElapsed = distance / (10.0 / 3.6);
 
         debugPrint('[GeminiAnalysis] 프레임 $startFrame→$endFrame, elapsed=${elapsed.toStringAsFixed(2)}s, distance=${distance}m');
 
