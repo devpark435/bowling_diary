@@ -137,50 +137,50 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
       final impactFrame = _pinImpactDetector.findImpactFrame(extracted.frames, releaseFrame);
       debugPrint('[Trim] 핀 충돌 프레임: $impactFrame');
 
-      // 6. 구속 계산 (이벤트 기반)
+      // 6. Gemini 통합 분석 (속도 + RPM) — 1차
       double? speedKmh;
-      if (impactFrame != null && impactFrame > releaseFrame) {
-        const laneLength = 18.29;
-        final elapsedSec = (impactFrame - releaseFrame) / extracted.sampleFps.toDouble();
-        final raw = (laneLength / elapsedSec) * 3.6;
-        if (raw >= 10 && raw <= 50) {
-          speedKmh = double.parse(raw.toStringAsFixed(1));
-          debugPrint('[Trim] 이벤트 기반 구속: ${speedKmh}km/h');
-        } else {
-          debugPrint('[Trim] 이벤트 기반 구속 범위 초과(${raw.toStringAsFixed(1)}km/h) → YOLO 폴백');
-        }
+      int? rpm;
+
+      try {
+        final geminiResult = await _geminiService.analyzeUnified(
+          frames: extracted.frames,
+          ballDetections: ballDetections,
+          releaseFrame: releaseFrame,
+          sampleFps: extracted.sampleFps,
+        );
+        speedKmh = geminiResult.speedKmh;
+        rpm = geminiResult.rpmEstimated;
+        debugPrint('[Trim] Gemini 통합 결과: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h, RPM=$rpm');
+      } on GeminiQuotaExceededException {
+        debugPrint('[Trim] Gemini 할당량 초과 → 로컬 폴백');
+      } catch (e) {
+        debugPrint('[Trim] Gemini 오류: $e → 로컬 폴백');
       }
 
-      // 구속 폴백: YOLO first/last 방식
+      // 속도 폴백: 이벤트 기반 → YOLO
       if (speedKmh == null) {
-        speedKmh = BallTracker.calcSpeedKmh(ballDetections, extracted.sampleFps.toDouble());
+        if (impactFrame != null && impactFrame > releaseFrame) {
+          const laneLength = 18.29;
+          final elapsedSec = (impactFrame - releaseFrame) / extracted.sampleFps.toDouble();
+          final raw = (laneLength / elapsedSec) * 3.6;
+          if (raw >= 10 && raw <= 50) {
+            speedKmh = double.parse(raw.toStringAsFixed(1));
+            debugPrint('[Trim] 이벤트 기반 구속 폴백: ${speedKmh}km/h');
+          }
+        }
+        speedKmh ??= BallTracker.calcSpeedKmh(ballDetections, extracted.sampleFps.toDouble());
         debugPrint('[Trim] YOLO 폴백 구속: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h');
       }
 
-      // 7. RPM: 지공 홀 추적
-      int? rpm = _rotationTracker.trackRpm(
-        extracted.frames,
-        ballDetections,
-        releaseFrame,
-        extracted.sampleFps,
-      );
-      debugPrint('[Trim] 지공 홀 RPM: $rpm');
-
-      // RPM 폴백: Gemini
+      // RPM 폴백: 지공 홀 추적
       if (rpm == null) {
-        try {
-          final geminiRpm = await _geminiService.analyzeRpm(extracted.frames);
-          if (geminiRpm != null) {
-            rpm = geminiRpm;
-            debugPrint('[Trim] Gemini RPM 채택: $rpm');
-          } else {
-            debugPrint('[Trim] Gemini RPM null');
-          }
-        } on GeminiQuotaExceededException {
-          debugPrint('[Trim] Gemini 할당량 초과');
-        } catch (e) {
-          debugPrint('[Trim] Gemini RPM 오류: $e');
-        }
+        rpm = _rotationTracker.trackRpm(
+          extracted.frames,
+          ballDetections,
+          releaseFrame,
+          extracted.sampleFps,
+        );
+        debugPrint('[Trim] 로컬 RPM 폴백: $rpm');
       }
 
       final analysisData = AnalysisData(
