@@ -2,34 +2,51 @@ import 'package:bowling_diary/features/analysis/data/services/ball_detection_ser
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _d = BallDetection(cx: 0.5, cy: 0.5, bw: 0.1, bh: 0.1, confidence: 0.9);
+BallDetection _det(double cx, double cy) => BallDetection(
+      cx: cx, cy: cy, bw: 0.05, bh: 0.05, confidence: 0.9);
 
 void main() {
   late ReleaseDetectorService sut;
 
   setUp(() => sut = ReleaseDetectorService());
 
-  test('감지 없으면 null 반환', () {
-    expect(sut.findReleaseFrame([null, null, null]), isNull);
+  test('볼이 정지 상태면 null 반환', () {
+    final detections = List.generate(20, (_) => _det(0.5, 0.5));
+    expect(sut.findReleaseFrame(detections), isNull);
   });
 
-  test('연속 3프레임 미만이면 null', () {
-    expect(sut.findReleaseFrame([_d, _d, null, _d, null]), isNull);
+  test('초반 정지 후 빠른 이동 시 올바른 프레임 반환', () {
+    final detections = <BallDetection?>[
+      ...List.generate(5, (_) => _det(0.5, 0.5)),
+      _det(0.52, 0.52), // disp ≈ 0.028 > 0.015
+      _det(0.54, 0.54),
+      _det(0.56, 0.56),
+      _det(0.58, 0.58),
+    ];
+    final result = sut.findReleaseFrame(detections);
+    expect(result, isNotNull);
+    expect(result, lessThan(8));
+    expect(result, greaterThanOrEqualTo(4));
   });
 
-  test('연속 3프레임 시작 인덱스 반환', () {
-    // frames: null, null, ball, ball, ball, ball
-    final detections = [null, null, _d, _d, _d, _d];
-    expect(sut.findReleaseFrame(detections), equals(2));
+  test('감지 없는 구간 후 이동하면 null 아님', () {
+    final detections = <BallDetection?>[
+      ...List.generate(5, (_) => null),
+      _det(0.5, 0.5),
+      _det(0.52, 0.52),
+      _det(0.54, 0.54),
+      _det(0.56, 0.56),
+    ];
+    expect(sut.findReleaseFrame(detections), isNotNull);
   });
 
-  test('중간 끊김 후 연속 3프레임이면 그 첫 인덱스 반환', () {
-    // frames: ball, null, ball, ball, ball
-    final detections = [_d, null, _d, _d, _d];
-    expect(sut.findReleaseFrame(detections), equals(2));
-  });
-
-  test('리스트 시작부터 연속이면 0 반환', () {
-    expect(sut.findReleaseFrame([_d, _d, _d]), equals(0));
+  test('연속 이동이 3프레임 미만이면 null', () {
+    final detections = <BallDetection?>[
+      _det(0.5, 0.5),
+      _det(0.52, 0.52), // moving
+      _det(0.5, 0.5),   // stopped → reset
+      _det(0.5, 0.5),
+    ];
+    expect(sut.findReleaseFrame(detections), isNull);
   });
 }
