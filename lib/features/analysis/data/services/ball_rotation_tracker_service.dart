@@ -6,7 +6,7 @@ import 'package:image/image.dart' as img;
 import 'ball_detection_service.dart';
 
 class BallRotationTrackerService {
-  static const _maxFrames = 15;
+  static const _maxFrames = 60;
   static const _minSuccessFrames = 5;
   static const double _holeDarknessThreshold = 80.0;
   static const _minHoleAreaRatio = 0.003;
