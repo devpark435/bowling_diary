@@ -243,7 +243,8 @@ JSON만 반환하세요.
     if (apiKey.isEmpty) return AnalysisData(framesAnalyzed: frames.length, fpsUsed: sampleFps);
     if (frames.isEmpty) return AnalysisData(framesAnalyzed: 0, fpsUsed: sampleFps);
 
-    const maxFullFrames = 30;
+    // 30→40장으로 증가: 핀 충돌 구간(후반부) 포함 확률 향상
+    const maxFullFrames = 40;
     final fullFrames = frames.length <= maxFullFrames
         ? frames
         : _subsample(frames, maxFullFrames);
@@ -351,9 +352,9 @@ JSON만 반환하세요.
 섹션 2는 릴리즈 이후 볼링공 근접 크롭 이미지${cropCount > 0 ? '($cropCount장, 30fps 연속)' : '(없음)'}입니다.
 
 [섹션 1 분석] 다음 프레임 번호를 찾으세요 (불명확하면 null):
-- foul_line_frame: 볼이 파울라인(레인 시작 경계선)을 통과하는 프레임 번호
-- arrows_frame: 볼이 레인의 삼각형 화살표 마크 7개 위를 통과하는 프레임 번호
-- headpin_frame: 볼이 헤드핀(1번 핀)에 처음 접촉하는 프레임 번호
+- foul_line_frame: 볼이 파울라인(레인 시작 경계선, foul line)을 완전히 통과하는 프레임
+- arrows_frame: 볼이 레인의 삼각형 화살표 마크 7개(arrows, 파울라인에서 약 4.5m 지점)를 통과하는 프레임
+- headpin_frame: 볼이 레인 끝 핀 배열에 처음 닿는 프레임 (headpin #1, the front pin). 핀이 움직이거나 쓰러지기 시작하는 첫 번째 프레임. 영상 후반부에 위치함
 
 [섹션 2 분석] 크롭 이미지에서 볼 표면(로고·텍스처·광택 반사 패턴) 변화를 추적하세요:
 - rotation_count: 첫 크롭~마지막 크롭 사이 볼의 총 회전수 (소수 가능, 예: 2.5회전)
