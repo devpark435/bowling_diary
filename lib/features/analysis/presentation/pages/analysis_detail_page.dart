@@ -78,7 +78,7 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
   @override
   Widget build(BuildContext context) {
     final r = widget.result;
-    final hasSpeed = r.speedKmh > 0;
+    final hasSpeed = r.speedKmh != null;
     final hasRpm = r.rpmEstimated != null;
     final dateStr = DateFormat('yyyy.MM.dd  HH:mm').format(r.recordedAt);
 
@@ -213,21 +213,17 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              hasSpeed
-                                  ? r.speedKmh.toStringAsFixed(1)
-                                  : '—',
-                              style: TextStyle(
-                                fontSize: 56,
-                                fontWeight: FontWeight.w800,
-                                color: hasSpeed
-                                    ? AppColors.neonOrange
-                                    : AppColors.textHint,
-                                height: 1.0,
-                                letterSpacing: -1.5,
+                            if (hasSpeed) ...[
+                              Text(
+                                r.speedKmh!.toStringAsFixed(1),
+                                style: TextStyle(
+                                  fontSize: 56,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.neonOrange,
+                                  height: 1.0,
+                                  letterSpacing: -1.5,
+                                ),
                               ),
-                            ),
-                            if (hasSpeed)
                               Padding(
                                 padding: const EdgeInsets.only(
                                     bottom: 8, left: 6),
@@ -242,10 +238,36 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                                               .withValues(alpha: 0.75),
                                           fontWeight: FontWeight.w500,
                                         )),
-                                    Text('구속',
-                                        style: const TextStyle(
+                                    const Text('구속',
+                                        style: TextStyle(
                                           fontSize: 10,
                                           color: Colors.white38,
+                                          letterSpacing: 1.2,
+                                        )),
+                                  ],
+                                ),
+                              ),
+                            ] else
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      '측정불가',
+                                      style: TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white24,
+                                        height: 1.0,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text('구속',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white24,
                                           letterSpacing: 1.2,
                                         )),
                                   ],
@@ -263,36 +285,58 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              hasRpm ? '${r.rpmEstimated}' : '—',
-                              style: TextStyle(
-                                fontSize: 44,
-                                fontWeight: FontWeight.w800,
-                                color: hasRpm
-                                    ? Colors.white
-                                    : AppColors.textHint,
-                                height: 1.0,
-                                letterSpacing: -1,
+                            if (hasRpm) ...[
+                              Text(
+                                '${r.rpmEstimated}',
+                                style: const TextStyle(
+                                  fontSize: 44,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  height: 1.0,
+                                  letterSpacing: -1,
+                                ),
                               ),
-                            ),
-                            if (hasRpm)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                    bottom: 6, left: 6),
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: 6, left: 6),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('rpm',
+                                    Text('rpm',
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.white60,
                                           fontWeight: FontWeight.w500,
                                         )),
-                                    const Text('RPM 추정값',
+                                    Text('RPM 추정값',
                                         style: TextStyle(
                                           fontSize: 10,
                                           color: Colors.white30,
+                                          letterSpacing: 0.5,
+                                        )),
+                                  ],
+                                ),
+                              ),
+                            ] else
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '측정불가',
+                                      style: TextStyle(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white24,
+                                        height: 1.0,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text('RPM',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white24,
                                           letterSpacing: 0.5,
                                         )),
                                   ],

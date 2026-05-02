@@ -20,6 +20,17 @@ class _AnalysisLoadingWidgetState extends State<AnalysisLoadingWidget>
   late final AnimationController _swayCtrl;
   late final Animation<double> _swayAnim;
 
+  int _stepIndex = 0;
+
+  static const _steps = [
+    ('영상 업로드 중...', 'AI 분석을 준비하고 있어요'),
+    ('구속 측정 중...', '파울라인~헤드핀 구간을 추적해요'),
+    ('회전수 측정 중...', '볼 표면 회전 패턴을 분석해요'),
+    ('결과 화면 만드는 중...', '거의 다 됐어요!'),
+  ];
+
+  static const _stepDurations = [8, 10, 10, 999];
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +42,16 @@ class _AnalysisLoadingWidgetState extends State<AnalysisLoadingWidget>
       CurvedAnimation(parent: _swayCtrl, curve: Curves.easeInOut),
     );
     if (widget.videoPath != null) _initVideo(widget.videoPath!);
+    _scheduleNextStep();
+  }
+
+  void _scheduleNextStep() {
+    if (_stepIndex >= _steps.length - 1) return;
+    Future.delayed(Duration(seconds: _stepDurations[_stepIndex]), () {
+      if (!mounted) return;
+      setState(() => _stepIndex++);
+      _scheduleNextStep();
+    });
   }
 
   Future<void> _initVideo(String path) async {
@@ -59,6 +80,8 @@ class _AnalysisLoadingWidgetState extends State<AnalysisLoadingWidget>
 
   @override
   Widget build(BuildContext context) {
+    final (title, subtitle) = _steps[_stepIndex];
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -87,14 +110,22 @@ class _AnalysisLoadingWidgetState extends State<AnalysisLoadingWidget>
                 ),
               ),
               const SizedBox(height: 28),
-              Text(
-                '영상 분석 중...',
-                style: AppTextStyles.bodyLarge.copyWith(color: Colors.white),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: Text(
+                  title,
+                  key: ValueKey(title),
+                  style: AppTextStyles.bodyLarge.copyWith(color: Colors.white),
+                ),
               ),
               const SizedBox(height: 8),
-              Text(
-                '볼 궤적을 추적하고 있어요',
-                style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: Text(
+                  subtitle,
+                  key: ValueKey(subtitle),
+                  style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
+                ),
               ),
             ],
           ),
