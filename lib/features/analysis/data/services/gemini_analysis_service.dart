@@ -307,6 +307,7 @@ JSON만 반환하세요.
     );
   }
 
+  /// [detections]는 [frames]와 동일한 길이여야 함 (프레임당 감지 결과 1개, 없으면 null)
   List<img.Image> _buildCropFrames(
     List<img.Image> frames,
     List<BallDetection?> detections,
@@ -413,6 +414,7 @@ JSON만 반환:
       }
 
       int? rpm;
+      // cropFrameCount > 1 필수: 프레임이 1개면 duration=0 → RPM 계산 불가
       if (rotationCount != null && rotationCount > 0 && cropFrameCount > 1) {
         final durationSec = (cropFrameCount - 1) * cropIntervalSec;
         final rawRpm = (rotationCount / durationSec) * 60;
