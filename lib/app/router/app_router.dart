@@ -228,6 +228,7 @@ class _CustomNavBar extends StatelessWidget {
                 label: '분석',
                 isActive: currentIndex == 2,
                 onTap: () => onTap(2),
+                showBeta: true,
               ),
               _NavItem(
                 icon: PhosphorIconsRegular.user,
@@ -250,6 +251,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+  final bool showBeta;
 
   const _NavItem({
     required this.icon,
@@ -257,6 +259,7 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.isActive,
     required this.onTap,
+    this.showBeta = false,
   });
 
   @override
@@ -280,10 +283,36 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isActive ? activeIcon : icon,
-                color: color,
-                size: 22,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isActive ? activeIcon : icon,
+                    color: color,
+                    size: 22,
+                  ),
+                  if (showBeta)
+                    Positioned(
+                      top: -5,
+                      right: -12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.neonOrange,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'BETA',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 4),
               Text(

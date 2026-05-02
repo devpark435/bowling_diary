@@ -64,13 +64,12 @@ class VideoAnalysisService {
     }
 
     final rawSpeed = (_laneLength / elapsedSec) * 3.6;
-    final speedKmh = (rawSpeed >= 15 && rawSpeed <= 50)
+    final speedKmh = (rawSpeed >= 10 && rawSpeed <= 50)
         ? double.parse(rawSpeed.toStringAsFixed(1))
         : null;
     debugPrint('[Analysis] 속도: ${rawSpeed.toStringAsFixed(1)}km/h (${elapsedSec.toStringAsFixed(2)}초)${speedKmh == null ? ' → 범위 초과, 측정불가' : ''}');
 
-    final rpm = _estimateRpm(detected.map((e) => e.value!).toList(), fps);
-    debugPrint('[Analysis] RPM 추정: $rpm');
+    const int? rpm = null;
 
     return AnalysisData(
       speedKmh: speedKmh,
@@ -81,12 +80,14 @@ class VideoAnalysisService {
   }
 
   /// 갤러리 영상 프레임(img.Image) 분석 — sampleFps는 추출 시 사용한 fps
+  /// releaseFrame: YOLO person 감지로 특정한 릴리즈 프레임 (0이면 자동 감지)
   AnalysisData analyzeImages(
     List<img.Image> frames,
     int originalFps, {
-    int sampleFps = 10,
+    int sampleFps = 30,
+    int releaseFrame = 0,
   }) {
-    debugPrint('[Analysis] 갤러리 분석 시작: ${frames.length}개 프레임, 원본 ${originalFps}fps, 샘플 ${sampleFps}fps');
+    debugPrint('[Analysis] 갤러리 분석 시작: ${frames.length}개 프레임, 원본 ${originalFps}fps, 샘플 ${sampleFps}fps, 릴리즈=$releaseFrame');
 
     if (frames.length < 5) {
       return AnalysisData(framesAnalyzed: frames.length, fpsUsed: originalFps);
@@ -105,14 +106,18 @@ class VideoAnalysisService {
       prevGray = gray;
     }
 
-    final detected = positions.asMap().entries.where((e) => e.value != null).toList();
+    // releaseFrame 이후 감지된 것만 사용
+    final detected = positions.asMap().entries
+        .where((e) => e.value != null && e.key >= releaseFrame)
+        .toList();
 
     if (detected.length < 3) {
       debugPrint('[Analysis] 볼 감지 실패 → 속도 0 반환');
       return AnalysisData(framesAnalyzed: frames.length, fpsUsed: originalFps);
     }
 
-    final releaseIdx = detected.first.key;
+    // releaseFrame을 릴리즈 기준점으로 고정 (YOLO가 준 경우)
+    final releaseIdx = releaseFrame > 0 ? releaseFrame : detected.first.key;
     final impactIdx = detected.last.key;
     final sampleInterval = (originalFps / sampleFps).round().clamp(1, 999);
     final actualFrameCount = (impactIdx - releaseIdx) * sampleInterval;
@@ -123,17 +128,12 @@ class VideoAnalysisService {
     }
 
     final rawSpeed = (_laneLength / elapsedSec) * 3.6;
-    final speedKmh = (rawSpeed >= 15 && rawSpeed <= 50)
+    final speedKmh = (rawSpeed >= 10 && rawSpeed <= 50)
         ? double.parse(rawSpeed.toStringAsFixed(1))
         : null;
     debugPrint('[Analysis] 속도: ${rawSpeed.toStringAsFixed(1)}km/h${speedKmh == null ? ' → 범위 초과, 측정불가' : ''}');
 
-    final rpm = _estimateRpm(
-      detected.map((e) => e.value!).toList(),
-      originalFps,
-      sampleInterval: sampleInterval,
-    );
-    debugPrint('[Analysis] RPM 추정: $rpm');
+    const int? rpm = null;
 
     return AnalysisData(
       speedKmh: speedKmh,
@@ -188,33 +188,6 @@ class VideoAnalysisService {
     return _BallPosition(sumX / count, sumY / count);
   }
 
-  /// 볼의 X 좌표 진동 주기로 RPM 추정
-  int? _estimateRpm(
-    List<_BallPosition> positions,
-    int fps, {
-    int sampleInterval = 10,
-  }) {
-    if (positions.length < 4) return null;
-
-    int directionChanges = 0;
-    double prevDx = 0;
-
-    for (int i = 1; i < positions.length; i++) {
-      final dx = positions[i].x - positions[i - 1].x;
-      if (prevDx != 0 && dx * prevDx < 0) directionChanges++;
-      if (dx.abs() > 1) prevDx = dx;
-    }
-
-    final effectiveFps = fps / sampleInterval;
-    final durationSec = positions.length / effectiveFps;
-    if (durationSec <= 0) return null;
-
-    final rotationsPerSec = directionChanges / 2.0 / durationSec;
-    final rpm = (rotationsPerSec * 60).round();
-
-    if (rpm < 100 || rpm > 500) return null;
-    return rpm;
-  }
 }
 
 class _BallPosition {

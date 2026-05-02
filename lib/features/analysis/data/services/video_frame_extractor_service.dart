@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'package:flutter/foundation.dart';
@@ -8,15 +9,18 @@ import 'package:path_provider/path_provider.dart';
 class FrameExtractionResult {
   final List<img.Image> frames;
   final int originalFps;
+  final int sampleFps;
 
   const FrameExtractionResult({
     required this.frames,
     required this.originalFps,
+    required this.sampleFps,
   });
 }
 
 class VideoFrameExtractorService {
-  static const _sampleFps = 10;
+  static const _sampleFps = 30;
+  static const _maxFrames = 150; // 최대 5초 × 30fps
 
   Future<FrameExtractionResult> extract(String videoPath) async {
     final originalFps = await _getVideoFps(videoPath);
@@ -30,7 +34,7 @@ class VideoFrameExtractorService {
     try {
       final outputPattern = '${framesDir.path}/frame_%04d.jpg';
       final session = await FFmpegKit.execute(
-        '-i "$videoPath" -vf fps=$_sampleFps -q:v 2 "$outputPattern"',
+        '-i "$videoPath" -vf "fps=$_sampleFps,scale=480:-1" -q:v 5 -frames:v $_maxFrames "$outputPattern"',
       );
       final returnCode = await session.getReturnCode();
 
@@ -52,8 +56,12 @@ class VideoFrameExtractorService {
         }
       }
 
-      debugPrint('[FrameExtractor] 추출 완료: ${frames.length}개 프레임, 원본 ${originalFps}fps');
-      return FrameExtractionResult(frames: frames, originalFps: originalFps);
+      debugPrint('[FrameExtractor] 추출 완료: ${frames.length}개 프레임, 원본 ${originalFps}fps, 샘플 ${_sampleFps}fps');
+      return FrameExtractionResult(
+        frames: frames,
+        originalFps: originalFps,
+        sampleFps: _sampleFps,
+      );
     } finally {
       await framesDir.delete(recursive: true);
     }
@@ -66,7 +74,7 @@ class VideoFrameExtractorService {
       if (streams != null) {
         for (final stream in streams) {
           if (stream.getType() == 'video') {
-            final fpsStr = stream.getAverageFrameRate(); // "60/1" 형태
+            final fpsStr = stream.getAverageFrameRate();
             if (fpsStr != null) {
               final parts = fpsStr.split('/');
               if (parts.length == 2) {
