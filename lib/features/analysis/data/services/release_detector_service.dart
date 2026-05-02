@@ -30,7 +30,7 @@ class ReleaseDetectorService {
           debugPrint('[ReleaseDetector] 릴리즈 프레임: $start (연속 $_minConsecutive프레임)');
           return start;
         }
-      } else if (prev != null) {
+      } else {
         consecutive = 0;
         start = null;
       }

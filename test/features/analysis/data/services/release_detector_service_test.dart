@@ -23,10 +23,8 @@ void main() {
       _det(0.56, 0.56),
       _det(0.58, 0.58),
     ];
-    final result = sut.findReleaseFrame(detections);
-    expect(result, isNotNull);
-    expect(result, lessThan(8));
-    expect(result, greaterThanOrEqualTo(4));
+    // 이동 시작 직전 프레임(index 4)이 반환되어야 함
+    expect(sut.findReleaseFrame(detections), equals(4));
   });
 
   test('감지 없는 구간 후 이동하면 null 아님', () {
