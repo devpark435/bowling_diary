@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
@@ -151,6 +153,9 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         speedKmh = geminiResult.data.speedKmh;
         rpm = geminiResult.data.rpmEstimated;
         debugPrint('[Trim] Gemini 통합 결과: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h, RPM=$rpm');
+        if (kDebugMode && geminiResult.landmarkFrames != null && mounted) {
+          _showLandmarkDebug(geminiResult);
+        }
       } on GeminiQuotaExceededException {
         debugPrint('[Trim] Gemini 할당량 초과 → 로컬 폴백');
       } catch (e) {
@@ -214,6 +219,55 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
     final m = (seconds ~/ 60).toString().padLeft(2, '0');
     final s = (seconds % 60).toStringAsFixed(1).padLeft(4, '0');
     return '$m:$s';
+  }
+
+  void _showLandmarkDebug(GeminiAnalysisResult result) {
+    final landmarks = result.landmarkFrames!;
+    final frames = result.sampledFrames ?? [];
+    const labels = {'foul_line': '파울라인', 'arrows': '화살표', 'headpin': '헤드핀'};
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('[DEBUG] Gemini 랜드마크'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: labels.entries.map((e) {
+              final frameIdx = landmarks[e.key];
+              if (frameIdx == null || frameIdx >= frames.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('${e.value}: null',
+                      style: const TextStyle(color: Colors.red)),
+                );
+              }
+              final jpgBytes =
+                  Uint8List.fromList(img.encodeJpg(frames[frameIdx]));
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${e.value} (프레임 $frameIdx)',
+                        style:
+                            const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Image.memory(jpgBytes, height: 120, fit: BoxFit.contain),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
