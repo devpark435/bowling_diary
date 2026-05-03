@@ -11,6 +11,7 @@ class PinImpactDetectorService {
 
   int? findImpactFrame(List<img.Image> frames, int releaseFrame) {
     if (frames.length < 2) return null;
+    if (releaseFrame >= frames.length) return null;
 
     final searchStart = releaseFrame + _minTravelFrames;
     if (searchStart >= frames.length) return null;
