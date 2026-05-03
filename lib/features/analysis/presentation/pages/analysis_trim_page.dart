@@ -154,7 +154,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         rpm = geminiResult.data.rpmEstimated;
         debugPrint('[Trim] Gemini 통합 결과: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h, RPM=$rpm');
         if (kDebugMode && geminiResult.landmarkFrames != null && mounted) {
-          _showLandmarkDebug(geminiResult);
+          await _showLandmarkDebug(geminiResult);
         }
       } on GeminiQuotaExceededException {
         debugPrint('[Trim] Gemini 할당량 초과 → 로컬 폴백');
@@ -221,7 +221,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
     return '$m:$s';
   }
 
-  void _showLandmarkDebug(GeminiAnalysisResult result) {
+  Future<void> _showLandmarkDebug(GeminiAnalysisResult result) async {
     final landmarks = result.landmarkFrames!;
     final frames = result.sampledFrames ?? [];
     const labels = {'foul_line': '파울라인', 'arrows': '화살표', 'headpin': '헤드핀'};
