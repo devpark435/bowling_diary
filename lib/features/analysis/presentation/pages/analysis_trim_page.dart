@@ -148,8 +148,8 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
           releaseFrame: releaseFrame,
           sampleFps: extracted.sampleFps,
         );
-        speedKmh = geminiResult.speedKmh;
-        rpm = geminiResult.rpmEstimated;
+        speedKmh = geminiResult.data.speedKmh;
+        rpm = geminiResult.data.rpmEstimated;
         debugPrint('[Trim] Gemini 통합 결과: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h, RPM=$rpm');
       } on GeminiQuotaExceededException {
         debugPrint('[Trim] Gemini 할당량 초과 → 로컬 폴백');
