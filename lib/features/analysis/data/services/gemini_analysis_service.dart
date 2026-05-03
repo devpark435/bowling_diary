@@ -11,17 +11,6 @@ List<String> _encodeFrames(List<img.Image> frames) {
   return frames.map((f) => base64Encode(img.encodeJpg(f, quality: 65))).toList();
 }
 
-class GeminiAnalysisResult {
-  final AnalysisData data;
-  final Map<String, int?>? landmarkFrames;
-  final List<img.Image>? sampledFrames;
-
-  const GeminiAnalysisResult({
-    required this.data,
-    this.landmarkFrames,
-    this.sampledFrames,
-  });
-}
 
 class GeminiAnalysisService {
   static const _baseUrl = 'https://generativelanguage.googleapis.com';
@@ -245,15 +234,15 @@ JSON만 반환하세요.
   }
 
   /// 속도(전체 프레임 랜드마크) + RPM(크롭 볼 이미지) 통합 단일 API 호출
-  Future<GeminiAnalysisResult> analyzeUnified({
+  Future<AnalysisData> analyzeUnified({
     required List<img.Image> frames,
     required List<BallDetection?> ballDetections,
     required int releaseFrame,
     required int sampleFps,
   }) async {
     final apiKey = AppConfig.geminiApiKey;
-    if (apiKey.isEmpty) return GeminiAnalysisResult(data: AnalysisData(framesAnalyzed: frames.length, fpsUsed: sampleFps));
-    if (frames.isEmpty) return GeminiAnalysisResult(data: AnalysisData(framesAnalyzed: 0, fpsUsed: sampleFps));
+    if (apiKey.isEmpty) return AnalysisData(framesAnalyzed: frames.length, fpsUsed: sampleFps);
+    if (frames.isEmpty) return AnalysisData(framesAnalyzed: 0, fpsUsed: sampleFps);
 
     // 30→40장으로 증가: 핀 충돌 구간(후반부) 포함 확률 향상
     const maxFullFrames = 40;
@@ -317,7 +306,6 @@ JSON만 반환하세요.
     return _parseUnifiedResponse(
       res.body, sampleFps, frames.length,
       fullIntervalSec, cropFrames.length, cropIntervalSec,
-      sampledFrames: kDebugMode ? fullFrames : null,
     );
   }
 
@@ -380,15 +368,14 @@ JSON만 반환:
   "rotation_count": null
 }''';
 
-  GeminiAnalysisResult _parseUnifiedResponse(
+  AnalysisData _parseUnifiedResponse(
     String body,
     int sampleFps,
     int totalFrames,
     double fullIntervalSec,
     int cropFrameCount,
-    double cropIntervalSec, {
-    List<img.Image>? sampledFrames,
-  }) {
+    double cropIntervalSec,
+  ) {
     try {
       final json = jsonDecode(body);
       final text = json['candidates'][0]['content']['parts'][0]['text'] as String;
@@ -443,16 +430,10 @@ JSON만 반환:
       }
 
       debugPrint('[GeminiAnalysis] 결과: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h, RPM=$rpm');
-      return GeminiAnalysisResult(
-        data: AnalysisData(speedKmh: speedKmh, rpmEstimated: rpm, framesAnalyzed: totalFrames, fpsUsed: sampleFps),
-        landmarkFrames: kDebugMode ? {'foul_line': foulLineFrame, 'arrows': arrowsFrame, 'headpin': headpinFrame} : null,
-        sampledFrames: sampledFrames,
-      );
+      return AnalysisData(speedKmh: speedKmh, rpmEstimated: rpm, framesAnalyzed: totalFrames, fpsUsed: sampleFps);
     } catch (e) {
       debugPrint('[GeminiAnalysis] 파싱 오류: $e\n$body');
-      return GeminiAnalysisResult(
-        data: AnalysisData(framesAnalyzed: totalFrames, fpsUsed: sampleFps),
-      );
+      return AnalysisData(framesAnalyzed: totalFrames, fpsUsed: sampleFps);
     }
   }
 }
