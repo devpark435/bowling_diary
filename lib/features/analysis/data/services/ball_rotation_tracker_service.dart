@@ -67,7 +67,7 @@ class BallRotationTrackerService {
     debugPrint('[BallRotation] totalAngle=${totalAngle.toStringAsFixed(2)}rad, '
         'frames=${angleDeltas.length}, RPM=$rpm');
 
-    if (rpm < 100 || rpm > 500) return null;
+    if (rpm < 50 || rpm > 600) return null;
     return rpm;
   }
 
