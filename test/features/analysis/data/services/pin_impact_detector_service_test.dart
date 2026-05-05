@@ -2,8 +2,7 @@ import 'package:bowling_diary/features/analysis/data/services/pin_impact_detecto
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
-img.Image _blackFrame(int w, int h) => img.Image(width: w, height: h)
-  ..clear(img.ColorRgb8(0, 0, 0));
+img.Image _blackFrame(int w, int h) => img.Image(width: w, height: h);
 
 img.Image _whiteFrame(int w, int h) => img.Image(width: w, height: h)
   ..clear(img.ColorRgb8(255, 255, 255));

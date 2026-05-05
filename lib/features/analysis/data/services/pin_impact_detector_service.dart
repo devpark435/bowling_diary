@@ -19,7 +19,7 @@ class PinImpactDetectorService {
     // 릴리즈 프레임을 기준으로 prevZone 초기화 (릴리즈 이후 변화를 무시하기 위해)
     final seedFrame = frames[releaseFrame];
     final seedH = (seedFrame.height * _pinZoneRatio).round().clamp(1, seedFrame.height);
-    img.Image? prevZone = img.grayscale(
+    img.Image prevZone = img.grayscale(
       img.copyCrop(seedFrame, x: 0, y: 0, width: seedFrame.width, height: seedH),
     );
 
@@ -29,7 +29,7 @@ class PinImpactDetectorService {
       final zone = img.copyCrop(frame, x: 0, y: 0, width: frame.width, height: zoneH);
       final grayZone = img.grayscale(zone);
 
-      final ratio = _changeRatio(prevZone!, grayZone);
+      final ratio = _changeRatio(prevZone, grayZone);
       if (ratio >= _changeThreshold) {
         debugPrint('[PinImpact] 핀 충돌 프레임: $i (변화율: ${(ratio * 100).toStringAsFixed(1)}%)');
         return i;
