@@ -11,6 +11,7 @@ List<String> _encodeFrames(List<img.Image> frames) {
   return frames.map((f) => base64Encode(img.encodeJpg(f, quality: 65))).toList();
 }
 
+
 class GeminiAnalysisService {
   static const _baseUrl = 'https://generativelanguage.googleapis.com';
   static const _sampleFps = 10.0;
@@ -391,10 +392,11 @@ JSON만 반환:
       int? startFrame, endFrame;
       double? distance;
 
-      if (foulLineFrame != null && headpinFrame != null && headpinFrame > foulLineFrame) {
-        startFrame = foulLineFrame; endFrame = headpinFrame; distance = 18.29;
-      } else if (foulLineFrame != null && arrowsFrame != null && arrowsFrame > foulLineFrame) {
+      // 우선순위: 파울라인↔화살표(4.57m, 안정적) > 파울라인↔헤드핀(18.29m) > 화살표↔헤드핀(13.72m)
+      if (foulLineFrame != null && arrowsFrame != null && arrowsFrame > foulLineFrame) {
         startFrame = foulLineFrame; endFrame = arrowsFrame; distance = 4.57;
+      } else if (foulLineFrame != null && headpinFrame != null && headpinFrame > foulLineFrame) {
+        startFrame = foulLineFrame; endFrame = headpinFrame; distance = 18.29;
       } else if (arrowsFrame != null && headpinFrame != null && headpinFrame > arrowsFrame) {
         startFrame = arrowsFrame; endFrame = headpinFrame; distance = 13.72;
       }
