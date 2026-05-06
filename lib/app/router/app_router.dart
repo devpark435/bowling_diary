@@ -14,7 +14,7 @@ import 'package:bowling_diary/features/balls/presentation/pages/ball_form_page.d
 import 'package:bowling_diary/features/balls/presentation/pages/balls_page.dart';
 import 'package:bowling_diary/features/settings/presentation/pages/settings_page.dart';
 import 'package:bowling_diary/features/admin/presentation/pages/catalog_manage_page.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/analysis_tab_page.dart';
+// import 'package:bowling_diary/features/analysis/presentation/pages/analysis_tab_page.dart'; // 임시 비활성화
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_camera_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
@@ -139,14 +139,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/analysis',
-                builder: (context, state) => const AnalysisTabPage(),
-              ),
-            ],
-          ),
+          // 분석 탭 임시 비활성화 (앱스토어 이슈)
+          // StatefulShellBranch(
+          //   routes: [
+          //     GoRoute(
+          //       path: '/analysis',
+          //       builder: (context, state) => const AnalysisTabPage(),
+          //     ),
+          //   ],
+          // ),
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -222,20 +223,21 @@ class _CustomNavBar extends StatelessWidget {
                 isActive: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
-              _NavItem(
-                icon: PhosphorIconsRegular.videoCamera,
-                activeIcon: PhosphorIconsFill.videoCamera,
-                label: '분석',
-                isActive: currentIndex == 2,
-                onTap: () => onTap(2),
-                showBeta: true,
-              ),
+              // 분석 탭 임시 비활성화 (앱스토어 이슈)
+              // _NavItem(
+              //   icon: PhosphorIconsRegular.videoCamera,
+              //   activeIcon: PhosphorIconsFill.videoCamera,
+              //   label: '분석',
+              //   isActive: currentIndex == 2,
+              //   onTap: () => onTap(2),
+              //   showBeta: true,
+              // ),
               _NavItem(
                 icon: PhosphorIconsRegular.user,
                 activeIcon: PhosphorIconsFill.user,
                 label: '마이페이지',
-                isActive: currentIndex == 3,
-                onTap: () => onTap(3),
+                isActive: currentIndex == 2,
+                onTap: () => onTap(2),
               ),
             ],
           ),
