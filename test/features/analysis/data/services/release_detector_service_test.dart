@@ -1,5 +1,6 @@
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 BallDetection _det(double cx, double cy) => BallDetection(
@@ -10,41 +11,77 @@ void main() {
 
   setUp(() => sut = ReleaseDetectorService());
 
-  test('볼이 정지 상태면 null 반환', () {
+  test('볼이 정지 상태면 notFound', () {
     final detections = List.generate(20, (_) => _det(0.5, 0.5));
-    expect(sut.findReleaseFrame(detections), isNull);
+    expect(sut.findRelease(detections).isFound, isFalse);
   });
 
-  test('초반 정지 후 빠른 이동 시 올바른 프레임 반환', () {
+  test('정지 후 가속 시 가속 시작 프레임 반환', () {
     final detections = <BallDetection?>[
       ...List.generate(5, (_) => _det(0.5, 0.5)),
-      _det(0.52, 0.52), // disp ≈ 0.028 > 0.015
-      _det(0.54, 0.54),
-      _det(0.56, 0.56),
-      _det(0.58, 0.58),
+      _det(0.505, 0.5),
+      _det(0.520, 0.5),
+      _det(0.545, 0.5),
+      _det(0.580, 0.5),
+      _det(0.625, 0.5),
+      _det(0.680, 0.5),
     ];
-    // 이동 시작 직전 프레임(index 4)이 반환되어야 함
-    expect(sut.findReleaseFrame(detections), equals(4));
+    final result = sut.findRelease(detections);
+    expect(result.isFound, isTrue);
+    expect(result.frame, greaterThanOrEqualTo(7));
+    expect(result.frame, lessThanOrEqualTo(9));
   });
 
-  test('감지 없는 구간 후 이동하면 null 아님', () {
+  test('null 끼인 시퀀스에서 null 이후 가속 감지', () {
     final detections = <BallDetection?>[
       ...List.generate(5, (_) => null),
-      _det(0.5, 0.5),
-      _det(0.52, 0.52),
-      _det(0.54, 0.54),
-      _det(0.56, 0.56),
+      _det(0.500, 0.5),
+      _det(0.530, 0.5),
+      _det(0.565, 0.5),
+      _det(0.605, 0.5),
+      _det(0.650, 0.5),
     ];
-    expect(sut.findReleaseFrame(detections), isNotNull);
+    expect(sut.findRelease(detections).isFound, isTrue);
   });
 
-  test('연속 이동이 3프레임 미만이면 null', () {
+  test('팔스윙 후 정지 시 release 아님 (절대 속도 미만)', () {
     final detections = <BallDetection?>[
-      _det(0.5, 0.5),
-      _det(0.52, 0.52), // moving
-      _det(0.5, 0.5),   // stopped → reset
-      _det(0.5, 0.5),
+      _det(0.50, 0.5),
+      _det(0.52, 0.5),
+      _det(0.54, 0.5),
+      _det(0.56, 0.5),
+      _det(0.58, 0.5),
+      _det(0.58, 0.5),
+      _det(0.58, 0.5),
     ];
-    expect(sut.findReleaseFrame(detections), isNull);
+    expect(sut.findRelease(detections).isFound, isFalse);
+  });
+
+  test('confidence는 0.6 이상', () {
+    final detections = <BallDetection?>[
+      ...List.generate(5, (_) => _det(0.5, 0.5)),
+      _det(0.530, 0.5),
+      _det(0.565, 0.5),
+      _det(0.605, 0.5),
+      _det(0.650, 0.5),
+      _det(0.700, 0.5),
+    ];
+    final result = sut.findRelease(detections);
+    expect(result.isFound, isTrue);
+    expect(result.confidence, greaterThanOrEqualTo(0.6));
+  });
+
+  test('동일 입력 5회 실행 시 동일 결과 (결정성)', () {
+    final detections = <BallDetection?>[
+      ...List.generate(5, (_) => _det(0.5, 0.5)),
+      _det(0.530, 0.5),
+      _det(0.565, 0.5),
+      _det(0.605, 0.5),
+      _det(0.650, 0.5),
+    ];
+    final results = List.generate(5, (_) => sut.findRelease(detections));
+    expect(results.every((r) =>
+        r.frame == results.first.frame && r.confidence == results.first.confidence),
+        isTrue);
   });
 }
