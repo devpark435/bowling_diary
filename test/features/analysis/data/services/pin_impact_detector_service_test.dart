@@ -75,6 +75,14 @@ void main() {
     expect(sut.findImpact(frames, detections, 20).isFound, isFalse);
   });
 
+  test('완전 정적 프레임 시퀀스에서는 noise floor가 false positive 방지', () {
+    final frames = List.generate(50, (_) => _blackFrame(100, 100));
+    final detections =
+        List<BallDetection?>.generate(50, (_) => _det(0.5, 0.3));
+    final result = sut.findImpact(frames, detections, 0);
+    expect(result.isFound, isFalse);
+  });
+
   test('동일 입력 5회 실행 시 동일 결과 (결정성)', () {
     final frames = <img.Image>[
       ...List.generate(25, (_) => _blackFrame(100, 100)),

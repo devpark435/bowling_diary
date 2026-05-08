@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -8,8 +9,10 @@ import 'package:bowling_diary/features/analysis/domain/entities/impact_result.da
 
 class PinImpactDetectorService {
   static const double _pixelDiffThreshold = 30.0;
+  // 50 km/h 기준 18.29m 이동 = 1.3s = 39프레임 → 안전 절반(20프레임)을 release 직후 무시
   static const _minTravelFrames = 20;
   static const double _roiWidthRatio = 0.25;
+  static const double _minThreshold = 0.05;
 
   ImpactResult findImpact(
     List<img.Image> frames,
@@ -42,8 +45,10 @@ class PinImpactDetectorService {
     final variance =
         ratios.map((r) => (r - mean) * (r - mean)).reduce((a, b) => a + b) /
             ratios.length;
-    final stddev = variance > 0 ? _sqrt(variance) : 0.0;
-    final dynamicThreshold = mean + 3 * stddev;
+    final stddev = variance > 0 ? math.sqrt(variance) : 0.0;
+    final dynamicThreshold = mean + 3 * stddev < _minThreshold
+        ? _minThreshold
+        : mean + 3 * stddev;
 
     debugPrint(
         '[PinImpact] roi=$roi, μ=${mean.toStringAsFixed(3)}, σ=${stddev.toStringAsFixed(3)}, threshold=${dynamicThreshold.toStringAsFixed(3)}');
@@ -132,12 +137,4 @@ class PinImpactDetectorService {
     return changed / total;
   }
 
-  double _sqrt(double v) {
-    if (v <= 0) return 0;
-    var x = v;
-    for (int i = 0; i < 16; i++) {
-      x = (x + v / x) / 2;
-    }
-    return x;
-  }
 }
