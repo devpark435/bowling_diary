@@ -1,58 +1,143 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
-class PinImpactDetectorService {
-  static const _pinZoneRatio = 0.20;
-  static const _changeThreshold = 0.15;
-  static const double _pixelDiffThreshold = 30.0;
-  // 릴리즈 직후 볼 스윙 이벤트를 오탐하지 않도록 최소 탐색 시작 프레임
-  // 50 km/h 기준 18.29m 이동 = 1.3s = 39프레임 → 여유분 포함 20프레임
-  static const _minTravelFrames = 20;
+import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/impact_result.dart';
 
-  int? findImpactFrame(List<img.Image> frames, int releaseFrame) {
-    if (frames.length < 2) return null;
-    if (releaseFrame >= frames.length) return null;
+class PinImpactDetectorService {
+  static const double _pixelDiffThreshold = 30.0;
+  static const _minTravelFrames = 20;
+  static const double _roiWidthRatio = 0.25;
+
+  ImpactResult findImpact(
+    List<img.Image> frames,
+    List<BallDetection?> detections,
+    int releaseFrame,
+  ) {
+    if (frames.length < 2) return ImpactResult.notFound;
+    if (releaseFrame >= frames.length) return ImpactResult.notFound;
 
     final searchStart = releaseFrame + _minTravelFrames;
-    if (searchStart >= frames.length) return null;
+    if (searchStart >= frames.length) return ImpactResult.notFound;
 
-    // 릴리즈 프레임을 기준으로 prevZone 초기화 (릴리즈 이후 변화를 무시하기 위해)
-    final seedFrame = frames[releaseFrame];
-    final seedH = (seedFrame.height * _pinZoneRatio).round().clamp(1, seedFrame.height);
-    img.Image prevZone = img.grayscale(
-      img.copyCrop(seedFrame, x: 0, y: 0, width: seedFrame.width, height: seedH),
-    );
+    final roi = _resolveRoi(frames, detections, releaseFrame);
 
-    for (int i = searchStart; i < frames.length; i++) {
-      final frame = frames[i];
-      final zoneH = (frame.height * _pinZoneRatio).round().clamp(1, frame.height);
-      final zone = img.copyCrop(frame, x: 0, y: 0, width: frame.width, height: zoneH);
-      final grayZone = img.grayscale(zone);
+    final ratios = <double>[];
+    img.Image? prevZone;
 
-      final ratio = _changeRatio(prevZone, grayZone);
-      if (ratio >= _changeThreshold) {
-        debugPrint('[PinImpact] 핀 충돌 프레임: $i (변화율: ${(ratio * 100).toStringAsFixed(1)}%)');
-        return i;
+    for (int i = releaseFrame; i < frames.length; i++) {
+      final zone = _crop(frames[i], roi);
+      final gray = img.grayscale(zone);
+      if (prevZone != null) {
+        ratios.add(_changeRatio(prevZone, gray));
       }
-      prevZone = grayZone;
+      prevZone = gray;
     }
-    debugPrint('[PinImpact] 핀 충돌 미감지');
-    return null;
+
+    if (ratios.isEmpty) return ImpactResult.notFound;
+
+    final mean = ratios.reduce((a, b) => a + b) / ratios.length;
+    final variance =
+        ratios.map((r) => (r - mean) * (r - mean)).reduce((a, b) => a + b) /
+            ratios.length;
+    final stddev = variance > 0 ? _sqrt(variance) : 0.0;
+    final dynamicThreshold = mean + 3 * stddev;
+
+    debugPrint(
+        '[PinImpact] roi=$roi, μ=${mean.toStringAsFixed(3)}, σ=${stddev.toStringAsFixed(3)}, threshold=${dynamicThreshold.toStringAsFixed(3)}');
+
+    for (int i = 0; i < ratios.length; i++) {
+      final frameIdx = releaseFrame + 1 + i;
+      if (frameIdx <= searchStart) continue;
+      if (ratios[i] >= dynamicThreshold) {
+        debugPrint(
+            '[PinImpact] impact=$frameIdx, ratio=${(ratios[i] * 100).toStringAsFixed(1)}%');
+        return ImpactResult(
+          frame: frameIdx,
+          roi: roi,
+          confidence: ratios[i].clamp(0.0, 1.0),
+        );
+      }
+    }
+
+    debugPrint('[PinImpact] impact 미감지');
+    return ImpactResult.notFound;
+  }
+
+  Rect _resolveRoi(
+    List<img.Image> frames,
+    List<BallDetection?> detections,
+    int releaseFrame,
+  ) {
+    final fw = frames.first.width.toDouble();
+    final fh = frames.first.height.toDouble();
+
+    // YOLO 마지막 유효 detection 위치 + 직전 방향벡터 → ROI
+    final searchEnd = frames.length;
+    BallDetection? last;
+    BallDetection? second;
+    for (int i = searchEnd - 1; i >= releaseFrame; i--) {
+      final d = i < detections.length ? detections[i] : null;
+      if (d == null) continue;
+      if (last == null) {
+        last = d;
+        continue;
+      }
+      second = d;
+      break;
+    }
+
+    if (last != null) {
+      final dx = second != null ? last.cx - second.cx : 0.0;
+      final dy = second != null ? last.cy - second.cy : 0.0;
+      final extX = last.cx + dx * 5;
+      final extY = last.cy + dy * 5;
+      final roiW = fw * _roiWidthRatio;
+      final roiH = fh * _roiWidthRatio;
+      final left = (extX * fw - roiW / 2).clamp(0.0, fw - 1);
+      final top = (extY * fh - roiH / 2).clamp(0.0, fh - 1);
+      final width = roiW.clamp(1.0, fw - left);
+      final height = roiH.clamp(1.0, fh - top);
+      return Rect.fromLTWH(left, top, width, height);
+    }
+
+    // fallback: 화면 상단 20% (현행 동작)
+    return Rect.fromLTWH(0, 0, fw, fh * 0.2);
+  }
+
+  img.Image _crop(img.Image src, Rect roi) {
+    final x = roi.left.round().clamp(0, src.width - 1);
+    final y = roi.top.round().clamp(0, src.height - 1);
+    final w = roi.width.round().clamp(1, src.width - x);
+    final h = roi.height.round().clamp(1, src.height - y);
+    return img.copyCrop(src, x: x, y: y, width: w, height: h);
   }
 
   double _changeRatio(img.Image prev, img.Image curr) {
-    final total = curr.width * curr.height;
+    final w = curr.width < prev.width ? curr.width : prev.width;
+    final h = curr.height < prev.height ? curr.height : prev.height;
+    final total = w * h;
     if (total == 0) return 0;
     int changed = 0;
-
-    for (int y = 0; y < curr.height; y++) {
-      for (int x = 0; x < curr.width; x++) {
-        final diff = (img.getLuminance(curr.getPixel(x, y)) -
-                img.getLuminance(prev.getPixel(x, y)))
-            .abs();
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        final diff =
+            (img.getLuminance(curr.getPixel(x, y)) - img.getLuminance(prev.getPixel(x, y)))
+                .abs();
         if (diff > _pixelDiffThreshold) changed++;
       }
     }
     return changed / total;
+  }
+
+  double _sqrt(double v) {
+    if (v <= 0) return 0;
+    var x = v;
+    for (int i = 0; i < 16; i++) {
+      x = (x + v / x) / 2;
+    }
+    return x;
   }
 }
