@@ -51,12 +51,16 @@ dependencies:
   tflite_flutter: ^0.12.1
   opencv_dart: ^2.2.1+4
 
-# OpenCV 모듈 선택: 핀 추적(Lucas-Kanade)을 위해 video 모듈 추가
-# core/imgproc/imgcodecs는 기본 포함, video는 명시적으로 추가
+# OpenCV 모듈 선택: include_modules는 whitelist 동작.
+# 명시한 것만 빌드되므로 default(imgproc/imgcodecs)도 명시.
+# video: Lucas-Kanade optical flow (calcOpticalFlowPyrLK)
+# imgproc: goodFeaturesToTrack, cvtColor 등 기본 영상 처리
 hooks:
   user_defines:
     dartcv4:
       include_modules:
+        - imgproc
+        - imgcodecs
         - video
 
 dev_dependencies:
