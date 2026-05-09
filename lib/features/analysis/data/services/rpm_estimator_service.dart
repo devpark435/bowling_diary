@@ -18,14 +18,19 @@ class RpmEstimatorService {
   static const double _qualityLevel = 0.01;
   static const double _minDistance = 5.0;
   static const int _maxAnalyzeFrames = 30;
-  static const int _minTrackedFrames = 5;
+  static const int _minTrackedFrames = 3;
   static const int _minFeatures = 6;
   static const int _minRpm = 100;
   static const int _maxRpm = 600;
-  // LK 추적 실패로 간주할 한 프레임 내 변위 한계 (픽셀)
-  static const double _maxFeatureDisplacement = 30.0;
+  // LK 한 프레임 내 변위 한계 (픽셀). ROI 128 기준 50% 까지 허용.
+  // 볼이 카메라로 빠르게 다가오는 시점에 텍스처 확대로 큰 변위 발생.
+  static const double _maxFeatureDisplacement = 64.0;
   // 각도 변화 안정성 컷오프: 표준편차/|평균| 비율
   static const double _maxAngleCoefVariation = 1.5;
+  // LK 윈도우 크기 (기본 21 → 31로 확대 → 큰 변위에 강건)
+  static const (int, int) _lkWinSize = (31, 31);
+  // LK 피라미드 레벨 (기본 3 → 4로 증가 → 빠른 움직임 추적 강화)
+  static const int _lkMaxLevel = 4;
 
   RpmResult estimate({
     required List<img.Image> frames,
@@ -74,6 +79,8 @@ class RpmEstimatorService {
       for (int i = 1; i < crops.length; i++) {
         final result = cv.calcOpticalFlowPyrLK(
           crops[i - 1], crops[i], prevPts, cv.VecPoint2f(),
+          winSize: _lkWinSize,
+          maxLevel: _lkMaxLevel,
         );
         final nextPts = result.$1;
         final status = result.$2;

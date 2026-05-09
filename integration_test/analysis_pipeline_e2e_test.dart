@@ -45,6 +45,12 @@ void main() {
 
       final data = await pipeline.run(path, 30);
 
+      // ignore: avoid_print
+      print('[E2E] frames=${data.framesAnalyzed}, fps=${data.fpsUsed}, '
+          'speed=${data.speedKmh}, rpm=${data.rpmEstimated}, '
+          'speedFail=${data.speedFailure}, rpmFail=${data.rpmFailure}, '
+          'speedConf=${data.speedConfidence}, rpmConf=${data.rpmConfidence}');
+
       expect(data.framesAnalyzed, greaterThan(0),
           reason: '프레임 추출 실패');
       expect(data.fpsUsed, greaterThan(0));
@@ -55,6 +61,48 @@ void main() {
       }
       if (data.rpmEstimated != null) {
         expect(data.rpmEstimated, inInclusiveRange(100, 600));
+      }
+    }, timeout: const Timeout(Duration(minutes: 3)));
+
+    testWidgets('진단: detection 분포 + release 이후 통계', (tester) async {
+      final path = await _resolveVideoPath();
+
+      final extractor = VideoFrameExtractorService();
+      final detector = BallDetectionService();
+      final releaseDet = ReleaseDetectorService();
+
+      final extracted = await extractor.extract(path);
+      final frames = extracted.frames;
+      final w = frames.isNotEmpty ? frames.first.width : 0;
+      final h = frames.isNotEmpty ? frames.first.height : 0;
+
+      await detector.init();
+      final detections = frames.map(detector.detect).toList();
+      detector.dispose();
+
+      final release = releaseDet.findRelease(detections);
+      final afterRelease = detections.skip(release.frame).toList();
+      final detectedAfter =
+          afterRelease.whereType<BallDetection>().toList();
+      final firstAfter =
+          afterRelease.indexWhere((d) => d != null);
+      final lastAfter =
+          afterRelease.lastIndexWhere((d) => d != null);
+
+      // ignore: avoid_print
+      print('[DIAG] 영상=$w×$h, frames=${frames.length}, '
+          'release=${release.frame}(conf=${release.confidence}), '
+          'detection총=${detections.where((d) => d != null).length}/${detections.length}, '
+          'release후detection=${detectedAfter.length}/${afterRelease.length}, '
+          '첫감지=${firstAfter}, 마지막감지=${lastAfter}');
+
+      if (detectedAfter.isNotEmpty) {
+        final last = detectedAfter.last;
+        final first = detectedAfter.first;
+        // ignore: avoid_print
+        print('[DIAG] release첫감지=(cx=${first.cx.toStringAsFixed(3)}, cy=${first.cy.toStringAsFixed(3)}, bw=${first.bw.toStringAsFixed(3)}, bh=${first.bh.toStringAsFixed(3)}, conf=${first.confidence.toStringAsFixed(2)})');
+        // ignore: avoid_print
+        print('[DIAG] release마지막감지=(cx=${last.cx.toStringAsFixed(3)}, cy=${last.cy.toStringAsFixed(3)}, bw=${last.bw.toStringAsFixed(3)}, bh=${last.bh.toStringAsFixed(3)}, conf=${last.confidence.toStringAsFixed(2)})');
       }
     }, timeout: const Timeout(Duration(minutes: 3)));
 

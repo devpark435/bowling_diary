@@ -11,8 +11,10 @@ class PinImpactDetectorService {
   static const double _pixelDiffThreshold = 30.0;
   // 50 km/h 기준 18.29m 이동 = 1.3s = 39프레임 → 안전 절반(20프레임)을 release 직후 무시
   static const _minTravelFrames = 20;
-  static const double _roiWidthRatio = 0.25;
+  static const double _roiWidthRatio = 0.30;
   static const double _minThreshold = 0.05;
+  // 볼 bbox 크기가 release 후 1.5배 이상 커지면 카메라가 핀 뒤편 시나리오
+  static const double _cameraBehindPinsBboxGrowth = 1.5;
 
   ImpactResult findImpact(
     List<img.Image> frames,
@@ -79,12 +81,19 @@ class PinImpactDetectorService {
     final fw = frames.first.width.toDouble();
     final fh = frames.first.height.toDouble();
 
-    // YOLO 마지막 유효 detection 위치 + 직전 방향벡터 → ROI
-    final searchEnd = frames.length;
+    // release 직후 첫 detection + 마지막 detection 비교
+    BallDetection? firstAfter;
     BallDetection? last;
     BallDetection? second;
-    for (int i = searchEnd - 1; i >= releaseFrame; i--) {
-      final d = i < detections.length ? detections[i] : null;
+    for (int i = releaseFrame; i < detections.length; i++) {
+      final d = detections[i];
+      if (d != null) {
+        firstAfter = d;
+        break;
+      }
+    }
+    for (int i = detections.length - 1; i >= releaseFrame; i--) {
+      final d = detections[i];
       if (d == null) continue;
       if (last == null) {
         last = d;
@@ -94,22 +103,44 @@ class PinImpactDetectorService {
       break;
     }
 
-    if (last != null) {
-      final dx = second != null ? last.cx - second.cx : 0.0;
-      final dy = second != null ? last.cy - second.cy : 0.0;
-      final extX = last.cx + dx * 5;
-      final extY = last.cy + dy * 5;
-      final roiW = fw * _roiWidthRatio;
-      final roiH = fh * _roiWidthRatio;
-      final left = (extX * fw - roiW / 2).clamp(0.0, fw - 1);
-      final top = (extY * fh - roiH / 2).clamp(0.0, fh - 1);
-      final width = roiW.clamp(1.0, fw - left);
-      final height = roiH.clamp(1.0, fh - top);
-      return Rect.fromLTWH(left, top, width, height);
+    if (last == null) {
+      // fallback: 화면 상단 20%
+      return Rect.fromLTWH(0, 0, fw, fh * 0.2);
     }
 
-    // fallback: 화면 상단 20% (현행 동작)
-    return Rect.fromLTWH(0, 0, fw, fh * 0.2);
+    // 카메라 시점 자동 판정: bbox 크기 추세
+    final bboxGrowth = firstAfter != null && firstAfter.bw > 0
+        ? last.bw / firstAfter.bw
+        : 1.0;
+    final cameraBehindPins = bboxGrowth >= _cameraBehindPinsBboxGrowth;
+
+    final double cx;
+    final double cy;
+    if (cameraBehindPins) {
+      // 카메라가 핀 뒤편: 볼이 카메라로 옴. 임팩트는 last detection 근처
+      // (extrapolation 작게: 1배만)
+      final dx = second != null ? last.cx - second.cx : 0.0;
+      final dy = second != null ? last.cy - second.cy : 0.0;
+      cx = last.cx + dx * 1.0;
+      cy = last.cy + dy * 1.0;
+      debugPrint('[PinImpact] camera-behind-pins (bboxGrowth=${bboxGrowth.toStringAsFixed(2)}x)');
+    } else {
+      // 카메라가 던지는 사람 뒤편: 볼이 핀(멀리)으로 감. 외삽 5배
+      final dx = second != null ? last.cx - second.cx : 0.0;
+      final dy = second != null ? last.cy - second.cy : 0.0;
+      cx = last.cx + dx * 5;
+      cy = last.cy + dy * 5;
+      debugPrint('[PinImpact] camera-behind-thrower (bboxGrowth=${bboxGrowth.toStringAsFixed(2)}x)');
+    }
+
+    // ROI 크기: 마지막 bbox의 4배 또는 영상 폭 30% 중 큰 값
+    final dynamicW = math.max(fw * _roiWidthRatio, last.bw * fw * 4);
+    final dynamicH = math.max(fh * _roiWidthRatio, last.bh * fh * 4);
+    final left = (cx * fw - dynamicW / 2).clamp(0.0, fw - 1);
+    final top = (cy * fh - dynamicH / 2).clamp(0.0, fh - 1);
+    final width = dynamicW.clamp(1.0, fw - left);
+    final height = dynamicH.clamp(1.0, fh - top);
+    return Rect.fromLTWH(left, top, width, height);
   }
 
   img.Image _crop(img.Image src, Rect roi) {
