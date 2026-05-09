@@ -96,32 +96,3 @@ class BallDetectionService {
   }
 }
 
-class BallTracker {
-  static const _laneLength = 18.29;
-
-  static double? calcSpeedKmh(List<BallDetection?> detections, double fps) {
-    final detected = detections.asMap().entries.where((e) => e.value != null).toList();
-
-    if (detected.length < 3) {
-      debugPrint('[BallTracker] 볼 감지 부족: ${detected.length}프레임');
-      return null;
-    }
-
-    final releaseFrame = detected.first.key;
-    final impactFrame = detected.last.key;
-    final elapsed = (impactFrame - releaseFrame) / fps;
-
-    debugPrint('[BallTracker] 프레임 $releaseFrame→$impactFrame, elapsed=${elapsed.toStringAsFixed(2)}s');
-
-    if (elapsed <= 0) return null;
-    final rawSpeed = (_laneLength / elapsed) * 3.6;
-
-    if (rawSpeed < 10 || rawSpeed > 50) {
-      debugPrint('[BallTracker] 속도 범위 초과(${rawSpeed.toStringAsFixed(1)}km/h) → 측정불가');
-      return null;
-    }
-
-    debugPrint('[BallTracker] 구속: ${rawSpeed.toStringAsFixed(1)}km/h');
-    return double.parse(rawSpeed.toStringAsFixed(1));
-  }
-}

@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:bowling_diary/core/constants/app_config.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 
 List<String> _encodeFrames(List<img.Image> frames) {

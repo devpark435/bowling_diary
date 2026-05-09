@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_result_entity.dart';
 import 'package:bowling_diary/features/analysis/presentation/providers/analysis_provider.dart';
 import 'package:bowling_diary/features/auth/presentation/providers/auth_provider.dart';

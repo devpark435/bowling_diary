@@ -5,7 +5,7 @@ import 'package:bowling_diary/features/analysis/data/services/pin_impact_detecto
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/rpm_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 
 class AnalysisPipeline {
