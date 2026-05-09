@@ -90,6 +90,37 @@ void main() {
     expect(data.rpmFailure, isNull);
   });
 
+  test('동일 입력 → 동일 AnalysisData (결정성)', () async {
+    final frames = List.generate(30, (_) => img.Image(width: 10, height: 10));
+    final detections = List<BallDetection?>.generate(30, (_) => null);
+
+    AnalysisPipeline build() => AnalysisPipeline(
+          frameExtractor: _FakeFrameExtractor(FrameExtractionResult(
+              frames: frames, originalFps: 30, sampleFps: 30)),
+          ballDetector: _FakeBallDetector(detections),
+          releaseDetector:
+              _FakeRelease(const ReleaseResult(frame: 5, confidence: 1.0)),
+          impactDetector: _FakeImpact(ImpactResult(
+              frame: 25,
+              roi: const Rect.fromLTWH(0, 0, 10, 10),
+              confidence: 1.0)),
+          speedEstimator: SpeedEstimatorService(),
+          rpmEstimator: _FakeRpm(RpmResult.success(280, 0.85)),
+        );
+
+    final d1 = await build().run('dummy.mp4', 30);
+    final d2 = await build().run('dummy.mp4', 30);
+
+    expect(d1.speedKmh, equals(d2.speedKmh));
+    expect(d1.rpmEstimated, equals(d2.rpmEstimated));
+    expect(d1.speedConfidence, equals(d2.speedConfidence));
+    expect(d1.rpmConfidence, equals(d2.rpmConfidence));
+    expect(d1.framesAnalyzed, equals(d2.framesAnalyzed));
+    expect(d1.fpsUsed, equals(d2.fpsUsed));
+    expect(d1.speedFailure, equals(d2.speedFailure));
+    expect(d1.rpmFailure, equals(d2.rpmFailure));
+  });
+
   test('release 실패 시 speed/rpm 모두 null', () async {
     final frames = List.generate(30, (_) => img.Image(width: 10, height: 10));
     final pipeline = AnalysisPipeline(
