@@ -117,6 +117,15 @@ class PinImpactDetectorService {
         if (cellRatios[c] >= threshold) spikingCells.add(c);
       }
 
+      // 볼이 감지된 cell 제외 (볼 확대 움직임으로 인한 false positive 방지)
+      if (absoluteFrame < detections.length) {
+        final ballDet = detections[absoluteFrame];
+        if (ballDet != null) {
+          final ballCellSet = _ballCellIndices(ballDet);
+          spikingCells.removeWhere(ballCellSet.contains);
+        }
+      }
+
       if (spikingCells.length >= _minSpikingCells) {
         // spike cell들의 union ROI 계산 (원본 좌표로 변환)
         double minX = double.infinity,
@@ -160,5 +169,32 @@ class PinImpactDetectorService {
     debugPrint('[PinImpact] impact 미감지 (grid ${_gridCols}x$_gridRows, '
         'minCells=$_minSpikingCells)');
     return ImpactResult.notFound;
+  }
+
+  /// 볼 detection bbox가 점유하는 grid cell 인덱스 집합 반환 (정규화 좌표 기준).
+  Set<int> _ballCellIndices(BallDetection det) {
+    final cellFw = 1.0 / _gridCols;
+    final cellFh = 1.0 / _gridRows;
+    // bbox 패딩 1.2배
+    const pad = 1.2;
+    final bx = det.cx - det.bw * pad / 2;
+    final by = det.cy - det.bh * pad / 2;
+    final bx2 = det.cx + det.bw * pad / 2;
+    final by2 = det.cy + det.bh * pad / 2;
+
+    final result = <int>{};
+    for (int row = 0; row < _gridRows; row++) {
+      for (int col = 0; col < _gridCols; col++) {
+        final cx0 = col * cellFw;
+        final cy0 = row * cellFh;
+        final cx1 = cx0 + cellFw;
+        final cy1 = cy0 + cellFh;
+        // bbox와 cell이 겹치면 포함
+        if (bx < cx1 && bx2 > cx0 && by < cy1 && by2 > cy0) {
+          result.add(row * _gridCols + col);
+        }
+      }
+    }
+    return result;
   }
 }

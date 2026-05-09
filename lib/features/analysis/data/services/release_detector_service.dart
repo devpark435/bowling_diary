@@ -7,11 +7,12 @@ import 'package:bowling_diary/features/analysis/domain/entities/release_result.d
 
 class ReleaseDetectorService {
   static const _windowSize = 5;
-  static const _minConsecutive = 3;
-  // 어프로치 동작은 보통 0.01-0.03, 진짜 release는 0.05+. 이 영역 분리하기 위해
-  // peak의 50%를 임계값으로 동적 설정.
-  static const double _absSpeedFloor = 0.025;
-  static const double _peakRatio = 0.5;
+  // 2로 낮춰 detection dropout으로 인한 짧은 segment도 허용.
+  // shrink score(-1~+1) × 5 보정으로 backward motion 패널티.
+  static const _minConsecutive = 2;
+  static const double _absSpeedFloor = 0.015;
+  // peak의 35%를 threshold로. detection dropout 영상에서도 release 신호 탐지.
+  static const double _peakRatio = 0.35;
   // 카메라가 사용자 뒤편 시점이면 백스윙에서 bbox가 커짐.
   // bbox max/min ratio가 1.4 이상이면 백스윙 신호 활용 (백스윙 정점 이후만 release 후보).
   static const double _backswingDetectRatio = 1.4;
@@ -34,8 +35,14 @@ class ReleaseDetectorService {
     // 백스윙 정점 감지: bbox 면적 max 시점 + 그 이후만 release 후보로 제한.
     // 카메라가 측면이거나 변화 작으면 무시 (전체 영상 검색).
     final backswingPeakFrame = _findBackswingPeak(detections);
-    // searchStart는 최소 1 (velocities[i-1] 접근 위해)
-    final searchStart = (backswingPeakFrame ?? 1).clamp(1, velocities.length);
+    // 어프로치+셋업은 영상 초반에 있으므로 최소 영상 길이 25% 이후부터 검색.
+    // 이를 통해 셋업 중 bbox max(frame 0-21)가 searchStart로 잡히는 오판 방지.
+    // searchStart는 최소 1 (velocities[i-1] 접근 위해).
+    final minStart = (velocities.length * 0.25).round().clamp(1, velocities.length);
+    final rawStart = backswingPeakFrame ?? 1;
+    final searchStart = rawStart >= minStart
+        ? rawStart.clamp(1, velocities.length)
+        : minStart;
 
     // 모든 후보 segment 수집.
     final segments = <(int start, int len)>[];
