@@ -65,9 +65,9 @@ void main() {
     expect(speed.failure, equals(SpeedFailure.outOfRange));
   });
 
-  test('confidence < 0.5 → lowConfidence', () {
+  test('confidence < 0.3 → lowConfidence', () {
     final speed = sut.estimate(
-      release: const ReleaseResult(frame: 0, confidence: 0.4),
+      release: const ReleaseResult(frame: 0, confidence: 0.2),
       impact: impact(60, 1.0),
       sampleFps: 30,
     );

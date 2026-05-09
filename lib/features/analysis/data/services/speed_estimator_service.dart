@@ -8,7 +8,8 @@ class SpeedEstimatorService {
   static const double _laneLength = 18.29;
   static const double _minSpeed = 10.0;
   static const double _maxSpeed = 50.0;
-  static const double _minConfidence = 0.5;
+  // grid 기반 impact confidence가 낮아질 수 있어 0.3으로 완화
+  static const double _minConfidence = 0.3;
 
   SpeedResult estimate({
     required ReleaseResult release,

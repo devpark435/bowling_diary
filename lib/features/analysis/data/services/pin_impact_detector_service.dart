@@ -7,14 +7,26 @@ import 'package:image/image.dart' as img;
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/impact_result.dart';
 
+/// 영상 grid 변화율 기반 핀 임팩트 탐지.
+///
+/// ROI 위치 추정 없이 영상 전체를 8×8 grid로 나눠 각 cell의
+/// frame-to-frame 변화율 시계열을 분석한다.
+/// release 후 minTravelFrames를 기다렸다가, _minSpikingCells개 이상의
+/// cell이 동시에 baseline + 3σ 이상으로 spike하면 임팩트로 판정.
 class PinImpactDetectorService {
-  static const double _pixelDiffThreshold = 30.0;
-  // 50 km/h 기준 18.29m 이동 = 1.3s = 39프레임 → 안전 절반(20프레임)을 release 직후 무시
-  static const _minTravelFrames = 20;
-  static const double _roiWidthRatio = 0.30;
-  static const double _minThreshold = 0.05;
-  // 볼 bbox 크기가 release 후 1.5배 이상 커지면 카메라가 핀 뒤편 시나리오
-  static const double _cameraBehindPinsBboxGrowth = 1.5;
+  static const int _gridCols = 8;
+  static const int _gridRows = 8;
+  static const int _dsSize = 160; // 다운샘플 크기
+  static const double _pixelDiffThreshold = 20.0;
+  // 50 km/h 기준 이동 시간 ~1.3s = 39프레임 → 절반(20)을 release 직후 무시
+  static const int _minTravelFrames = 20;
+  // baseline 계산에 사용할 release 직후 프레임 수
+  static const int _baselineFrames = 20;
+  // 동시에 spike해야 하는 최소 cell 수 (임팩트 vs 단순 움직임 구분)
+  static const int _minSpikingCells = 3;
+  // cell threshold의 최소값 (정적 배경의 경우 baseline이 너무 낮을 수 있음)
+  static const double _minCellThreshold = 0.04;
+  static const double _spikeMultiplier = 3.0;
 
   ImpactResult findImpact(
     List<img.Image> frames,
@@ -27,145 +39,126 @@ class PinImpactDetectorService {
     final searchStart = releaseFrame + _minTravelFrames;
     if (searchStart >= frames.length) return ImpactResult.notFound;
 
-    final roi = _resolveRoi(frames, detections, releaseFrame);
+    final fw = frames.first.width.toDouble();
+    final fh = frames.first.height.toDouble();
 
-    final ratios = <double>[];
-    img.Image? prevZone;
-
+    // 1. release부터 다운샘플 그레이스케일 프레임 준비
+    final dsFrames = <img.Image>[];
+    final frameIndices = <int>[];
     for (int i = releaseFrame; i < frames.length; i++) {
-      final zone = _crop(frames[i], roi);
-      final gray = img.grayscale(zone);
-      if (prevZone != null) {
-        ratios.add(_changeRatio(prevZone, gray));
-      }
-      prevZone = gray;
+      final ds = img.copyResize(frames[i], width: _dsSize, height: _dsSize);
+      dsFrames.add(img.grayscale(ds));
+      frameIndices.add(i);
     }
 
-    if (ratios.isEmpty) return ImpactResult.notFound;
+    if (dsFrames.length < _baselineFrames + 2) return ImpactResult.notFound;
 
-    final mean = ratios.reduce((a, b) => a + b) / ratios.length;
-    final variance =
-        ratios.map((r) => (r - mean) * (r - mean)).reduce((a, b) => a + b) /
-            ratios.length;
-    final stddev = variance > 0 ? math.sqrt(variance) : 0.0;
-    final dynamicThreshold = mean + 3 * stddev < _minThreshold
-        ? _minThreshold
-        : mean + 3 * stddev;
+    final cellW = _dsSize ~/ _gridCols;
+    final cellH = _dsSize ~/ _gridRows;
+    final totalCells = _gridCols * _gridRows;
 
-    debugPrint(
-        '[PinImpact] roi=$roi, μ=${mean.toStringAsFixed(3)}, σ=${stddev.toStringAsFixed(3)}, threshold=${dynamicThreshold.toStringAsFixed(3)}');
+    // 2. 각 연속 프레임 쌍에서 cell별 변화율 계산
+    // gridRatios[frameIdx][cellIdx]
+    final gridRatios = <List<double>>[];
+    for (int fi = 1; fi < dsFrames.length; fi++) {
+      final prev = dsFrames[fi - 1];
+      final curr = dsFrames[fi];
+      final cellRatios = List<double>.filled(totalCells, 0.0);
+      for (int row = 0; row < _gridRows; row++) {
+        for (int col = 0; col < _gridCols; col++) {
+          final cellIdx = row * _gridCols + col;
+          final x0 = col * cellW;
+          final y0 = row * cellH;
+          int changed = 0;
+          int total = 0;
+          for (int py = y0; py < y0 + cellH && py < _dsSize; py++) {
+            for (int px = x0; px < x0 + cellW && px < _dsSize; px++) {
+              final diff = (img.getLuminance(curr.getPixel(px, py)) -
+                      img.getLuminance(prev.getPixel(px, py)))
+                  .abs();
+              if (diff > _pixelDiffThreshold) changed++;
+              total++;
+            }
+          }
+          cellRatios[cellIdx] = total > 0 ? changed / total : 0.0;
+        }
+      }
+      gridRatios.add(cellRatios);
+    }
 
-    for (int i = 0; i < ratios.length; i++) {
-      final frameIdx = releaseFrame + 1 + i;
-      if (frameIdx <= searchStart) continue;
-      if (ratios[i] >= dynamicThreshold) {
-        debugPrint(
-            '[PinImpact] impact=$frameIdx, ratio=${(ratios[i] * 100).toStringAsFixed(1)}%');
+    // 3. 첫 _baselineFrames 쌍으로 cell별 baseline (mean + 3σ) 계산
+    final baselineLen = math.min(_baselineFrames, gridRatios.length ~/ 2);
+    final means = List<double>.filled(totalCells, 0.0);
+    final stds = List<double>.filled(totalCells, 0.0);
+    for (int c = 0; c < totalCells; c++) {
+      final vals = gridRatios.take(baselineLen).map((r) => r[c]).toList();
+      final mean = vals.reduce((a, b) => a + b) / vals.length;
+      final variance = vals.map((v) => (v - mean) * (v - mean)).reduce(
+              (a, b) => a + b) /
+          vals.length;
+      means[c] = mean;
+      stds[c] = math.sqrt(variance);
+    }
+
+    // 4. release + minTravelFrames 이후 spike 탐지
+    // gridRatios[i]는 frame[releaseFrame + i + 1] 의 변화율 (i=0 → release+1 vs release)
+    final relativeSearchStart = searchStart - releaseFrame - 1;
+
+    for (int ri = math.max(0, relativeSearchStart);
+        ri < gridRatios.length;
+        ri++) {
+      final absoluteFrame = frameIndices[ri + 1]; // ri+1 because ratio is between fi-1 and fi
+      final cellRatios = gridRatios[ri];
+      final spikingCells = <int>[];
+
+      for (int c = 0; c < totalCells; c++) {
+        final threshold =
+            math.max(_minCellThreshold, means[c] + _spikeMultiplier * stds[c]);
+        if (cellRatios[c] >= threshold) spikingCells.add(c);
+      }
+
+      if (spikingCells.length >= _minSpikingCells) {
+        // spike cell들의 union ROI 계산 (원본 좌표로 변환)
+        double minX = double.infinity,
+            minY = double.infinity,
+            maxX = 0,
+            maxY = 0;
+        for (final c in spikingCells) {
+          final col = c % _gridCols;
+          final row = c ~/ _gridCols;
+          final x = col * cellW / _dsSize * fw;
+          final y = row * cellH / _dsSize * fh;
+          final w = cellW / _dsSize * fw;
+          final h = cellH / _dsSize * fh;
+          minX = math.min(minX, x);
+          minY = math.min(minY, y);
+          maxX = math.max(maxX, x + w);
+          maxY = math.max(maxY, y + h);
+        }
+        final roi = Rect.fromLTRB(minX, minY, maxX, maxY);
+        final maxRatio = spikingCells.map((c) => cellRatios[c]).reduce(
+            (a, b) => a > b ? a : b);
+
+        // confidence: cell 수 기여(50%) + maxRatio 기여(50%)
+        // cells=_minSpikingCells → 0.5, cells=10+ → ~1.0
+        final cellScore =
+            (spikingCells.length / _minSpikingCells * 0.5).clamp(0.0, 0.5);
+        final ratioScore = (maxRatio * 0.5).clamp(0.0, 0.5);
+        final confidence = (cellScore + ratioScore).clamp(0.0, 1.0);
+
+        debugPrint('[PinImpact] impact=$absoluteFrame, '
+            'cells=${spikingCells.length}, maxRatio=${(maxRatio * 100).toStringAsFixed(1)}%, '
+            'conf=${confidence.toStringAsFixed(2)}, roi=$roi');
         return ImpactResult(
-          frame: frameIdx,
+          frame: absoluteFrame,
           roi: roi,
-          confidence: ratios[i].clamp(0.0, 1.0),
+          confidence: confidence,
         );
       }
     }
 
-    debugPrint('[PinImpact] impact 미감지');
+    debugPrint('[PinImpact] impact 미감지 (grid ${_gridCols}x$_gridRows, '
+        'minCells=$_minSpikingCells)');
     return ImpactResult.notFound;
   }
-
-  Rect _resolveRoi(
-    List<img.Image> frames,
-    List<BallDetection?> detections,
-    int releaseFrame,
-  ) {
-    final fw = frames.first.width.toDouble();
-    final fh = frames.first.height.toDouble();
-
-    // release 직후 첫 detection + 마지막 detection 비교
-    BallDetection? firstAfter;
-    BallDetection? last;
-    BallDetection? second;
-    for (int i = releaseFrame; i < detections.length; i++) {
-      final d = detections[i];
-      if (d != null) {
-        firstAfter = d;
-        break;
-      }
-    }
-    for (int i = detections.length - 1; i >= releaseFrame; i--) {
-      final d = detections[i];
-      if (d == null) continue;
-      if (last == null) {
-        last = d;
-        continue;
-      }
-      second = d;
-      break;
-    }
-
-    if (last == null) {
-      // fallback: 화면 상단 20%
-      return Rect.fromLTWH(0, 0, fw, fh * 0.2);
-    }
-
-    // 카메라 시점 자동 판정: bbox 크기 추세
-    final bboxGrowth = firstAfter != null && firstAfter.bw > 0
-        ? last.bw / firstAfter.bw
-        : 1.0;
-    final cameraBehindPins = bboxGrowth >= _cameraBehindPinsBboxGrowth;
-
-    final double cx;
-    final double cy;
-    if (cameraBehindPins) {
-      // 카메라가 핀 뒤편: 볼이 카메라로 옴. 임팩트는 last detection 근처
-      // (extrapolation 작게: 1배만)
-      final dx = second != null ? last.cx - second.cx : 0.0;
-      final dy = second != null ? last.cy - second.cy : 0.0;
-      cx = last.cx + dx * 1.0;
-      cy = last.cy + dy * 1.0;
-      debugPrint('[PinImpact] camera-behind-pins (bboxGrowth=${bboxGrowth.toStringAsFixed(2)}x)');
-    } else {
-      // 카메라가 던지는 사람 뒤편: 볼이 핀(멀리)으로 감. 외삽 5배
-      final dx = second != null ? last.cx - second.cx : 0.0;
-      final dy = second != null ? last.cy - second.cy : 0.0;
-      cx = last.cx + dx * 5;
-      cy = last.cy + dy * 5;
-      debugPrint('[PinImpact] camera-behind-thrower (bboxGrowth=${bboxGrowth.toStringAsFixed(2)}x)');
-    }
-
-    // ROI 크기: 마지막 bbox의 4배 또는 영상 폭 30% 중 큰 값
-    final dynamicW = math.max(fw * _roiWidthRatio, last.bw * fw * 4);
-    final dynamicH = math.max(fh * _roiWidthRatio, last.bh * fh * 4);
-    final left = (cx * fw - dynamicW / 2).clamp(0.0, fw - 1);
-    final top = (cy * fh - dynamicH / 2).clamp(0.0, fh - 1);
-    final width = dynamicW.clamp(1.0, fw - left);
-    final height = dynamicH.clamp(1.0, fh - top);
-    return Rect.fromLTWH(left, top, width, height);
-  }
-
-  img.Image _crop(img.Image src, Rect roi) {
-    final x = roi.left.round().clamp(0, src.width - 1);
-    final y = roi.top.round().clamp(0, src.height - 1);
-    final w = roi.width.round().clamp(1, src.width - x);
-    final h = roi.height.round().clamp(1, src.height - y);
-    return img.copyCrop(src, x: x, y: y, width: w, height: h);
-  }
-
-  double _changeRatio(img.Image prev, img.Image curr) {
-    final w = curr.width < prev.width ? curr.width : prev.width;
-    final h = curr.height < prev.height ? curr.height : prev.height;
-    final total = w * h;
-    if (total == 0) return 0;
-    int changed = 0;
-    for (int y = 0; y < h; y++) {
-      for (int x = 0; x < w; x++) {
-        final diff =
-            (img.getLuminance(curr.getPixel(x, y)) - img.getLuminance(prev.getPixel(x, y)))
-                .abs();
-        if (diff > _pixelDiffThreshold) changed++;
-      }
-    }
-    return changed / total;
-  }
-
 }
