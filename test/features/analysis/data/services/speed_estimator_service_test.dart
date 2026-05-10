@@ -1,86 +1,101 @@
-import 'dart:ui';
-
+import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/impact_result.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
+import 'package:bowling_diary/features/analysis/domain/services/homography_solver.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+HomographyMatrix _testHomography() {
+  // 정규화 (nx, ny) → (nx*1.05, ny*18.29) m 매핑
+  return HomographySolver.solve4Point(
+    const [
+      FramePoint(nx: 0, ny: 0),
+      FramePoint(nx: 1, ny: 0),
+      FramePoint(nx: 1, ny: 1),
+      FramePoint(nx: 0, ny: 1),
+    ],
+    const [
+      LanePoint(xM: 0,    yM: 0),
+      LanePoint(xM: 1.05, yM: 0),
+      LanePoint(xM: 1.05, yM: 18.29),
+      LanePoint(xM: 0,    yM: 18.29),
+    ],
+  );
+}
+
 void main() {
-  late SpeedEstimatorService sut;
-  setUp(() => sut = SpeedEstimatorService());
+  final svc = SpeedEstimatorService();
+  final h = _testHomography();
 
-  ImpactResult impact(int frame, double conf) => ImpactResult(
-      frame: frame,
-      roi: const Rect.fromLTWH(0, 0, 100, 100),
-      confidence: conf);
+  group('SpeedEstimatorService', () {
+    test('등속 25km/h 시뮬: 측정 정확', () {
+      // 25km/h = 6.944 m/s. 30fps → 0.2315m/프레임.
+      // y_norm 변화량 (정사각 매핑): 0.2315 / 18.29 = 0.01266 / frame
+      final detections = <BallDetection?>[
+        for (var i = 0; i < 60; i++)
+          BallDetection(
+            cx: 0.5,
+            cy: 0.05 + i * 0.01266,
+            bw: 0.02,
+            bh: 0.02,
+            confidence: 0.9,
+          ),
+      ];
+      final r = svc.estimate(
+        release: const ReleaseResult(frame: 5, confidence: 0.8),
+        detections: detections,
+        homography: h,
+        sampleFps: 30,
+      );
+      expect(r.kmh, isNotNull);
+      expect(r.kmh!, closeTo(25.0, 0.5));
+    });
 
-  test('정상 입력 — 속도 32.9km/h 근접 계산', () {
-    final speed = sut.estimate(
-      release: const ReleaseResult(frame: 0, confidence: 1.0),
-      impact: impact(60, 1.0),
-      sampleFps: 30,
-    );
-    expect(speed.kmh, closeTo(32.9, 0.5));
-    expect(speed.failure, isNull);
-    expect(speed.confidence, equals(1.0));
-  });
+    test('release 없으면 실패', () {
+      final r = svc.estimate(
+        release: ReleaseResult.notFound,
+        detections: const [],
+        homography: h,
+        sampleFps: 30,
+      );
+      expect(r.failure, SpeedFailure.releaseNotFound);
+    });
 
-  test('release 미감지 시 releaseNotFound', () {
-    final speed = sut.estimate(
-      release: ReleaseResult.notFound,
-      impact: impact(60, 1.0),
-      sampleFps: 30,
-    );
-    expect(speed.kmh, isNull);
-    expect(speed.failure, equals(SpeedFailure.releaseNotFound));
-  });
+    test('비행 윈도우 detections null이면 lowConfidence', () {
+      // release+8 ~ release+24 모두 null
+      final detections = <BallDetection?>[
+        for (var i = 0; i < 30; i++) null,
+      ];
+      final r = svc.estimate(
+        release: const ReleaseResult(frame: 0, confidence: 0.8),
+        detections: detections,
+        homography: h,
+        sampleFps: 30,
+      );
+      expect(r.failure, SpeedFailure.lowConfidence);
+    });
 
-  test('impact 미감지 시 impactNotFound', () {
-    final speed = sut.estimate(
-      release: const ReleaseResult(frame: 0, confidence: 1.0),
-      impact: ImpactResult.notFound,
-      sampleFps: 30,
-    );
-    expect(speed.kmh, isNull);
-    expect(speed.failure, equals(SpeedFailure.impactNotFound));
-  });
-
-  test('범위 초과(과속) → outOfRange', () {
-    final speed = sut.estimate(
-      release: const ReleaseResult(frame: 0, confidence: 1.0),
-      impact: impact(10, 1.0),
-      sampleFps: 30,
-    );
-    expect(speed.kmh, isNull);
-    expect(speed.failure, equals(SpeedFailure.outOfRange));
-  });
-
-  test('범위 초과(느림) → outOfRange', () {
-    final speed = sut.estimate(
-      release: const ReleaseResult(frame: 0, confidence: 1.0),
-      impact: impact(600, 1.0),
-      sampleFps: 30,
-    );
-    expect(speed.failure, equals(SpeedFailure.outOfRange));
-  });
-
-  test('confidence < 0.3 → lowConfidence', () {
-    final speed = sut.estimate(
-      release: const ReleaseResult(frame: 0, confidence: 0.2),
-      impact: impact(60, 1.0),
-      sampleFps: 30,
-    );
-    expect(speed.kmh, isNull);
-    expect(speed.failure, equals(SpeedFailure.lowConfidence));
-  });
-
-  test('confidence는 release/impact 중 작은 값', () {
-    final speed = sut.estimate(
-      release: const ReleaseResult(frame: 0, confidence: 0.8),
-      impact: impact(60, 0.6),
-      sampleFps: 30,
-    );
-    expect(speed.confidence, equals(0.6));
+    test('비현실적으로 빠른 속도 outOfRange', () {
+      // 100km/h 시뮬 = 27.78 m/s. y_norm 변화량 0.0506/frame
+      final detections = <BallDetection?>[
+        for (var i = 0; i < 60; i++)
+          BallDetection(
+            cx: 0.5,
+            cy: 0.05 + i * 0.0506,
+            bw: 0.02,
+            bh: 0.02,
+            confidence: 0.9,
+          ),
+      ];
+      final r = svc.estimate(
+        release: const ReleaseResult(frame: 5, confidence: 0.8),
+        detections: detections,
+        homography: h,
+        sampleFps: 30,
+      );
+      expect(r.failure, SpeedFailure.outOfRange);
+    });
   });
 }
