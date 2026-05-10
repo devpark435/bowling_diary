@@ -1,4 +1,4 @@
-enum SpeedFailure { releaseNotFound, impactNotFound, outOfRange, lowConfidence }
+enum SpeedFailure { releaseNotFound, outOfRange, lowConfidence }
 
 class SpeedResult {
   final double? kmh;
