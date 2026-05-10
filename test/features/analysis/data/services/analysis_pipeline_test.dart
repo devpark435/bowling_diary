@@ -1,13 +1,10 @@
-import 'dart:ui';
-
 import 'package:bowling_diary/features/analysis/data/services/analysis_pipeline.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/rpm_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/impact_result.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/rpm_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
@@ -41,15 +38,16 @@ class _FakeRelease implements ReleaseDetectorService {
   ReleaseResult findRelease(List<BallDetection?> detections) => result;
 }
 
-class _FakeImpact implements PinImpactDetectorService {
-  final ImpactResult result;
-  _FakeImpact(this.result);
+class _FakeSpeed implements SpeedEstimatorService {
+  final SpeedResult result;
+  _FakeSpeed(this.result);
   @override
-  ImpactResult findImpact(
-    List<img.Image> frames,
-    List<BallDetection?> detections,
-    int releaseFrame,
-  ) =>
+  SpeedResult estimate({
+    required ReleaseResult release,
+    required List<BallDetection?> detections,
+    required HomographyMatrix homography,
+    required int sampleFps,
+  }) =>
       result;
 }
 
@@ -77,9 +75,8 @@ void main() {
       ballDetector: _FakeBallDetector(detections),
       releaseDetector:
           _FakeRelease(const ReleaseResult(frame: 0, confidence: 1.0)),
-      impactDetector: _FakeImpact(ImpactResult(
-          frame: 60, roi: const Rect.fromLTWH(0, 0, 10, 10), confidence: 1.0)),
-      speedEstimator: SpeedEstimatorService(),
+      homography: HomographyMatrix.identity(),
+      speedEstimator: _FakeSpeed(SpeedResult.success(20.0, 0.9)),
       rpmEstimator: _FakeRpm(RpmResult.success(280, 0.9)),
     );
 
@@ -100,11 +97,8 @@ void main() {
           ballDetector: _FakeBallDetector(detections),
           releaseDetector:
               _FakeRelease(const ReleaseResult(frame: 5, confidence: 1.0)),
-          impactDetector: _FakeImpact(ImpactResult(
-              frame: 25,
-              roi: const Rect.fromLTWH(0, 0, 10, 10),
-              confidence: 1.0)),
-          speedEstimator: SpeedEstimatorService(),
+          homography: HomographyMatrix.identity(),
+          speedEstimator: _FakeSpeed(SpeedResult.success(18.5, 0.85)),
           rpmEstimator: _FakeRpm(RpmResult.success(280, 0.85)),
         );
 
@@ -128,7 +122,7 @@ void main() {
           frames: frames, originalFps: 30, sampleFps: 30)),
       ballDetector: _FakeBallDetector(List.filled(30, null)),
       releaseDetector: _FakeRelease(ReleaseResult.notFound),
-      impactDetector: _FakeImpact(ImpactResult.notFound),
+      homography: HomographyMatrix.identity(),
       speedEstimator: SpeedEstimatorService(),
       rpmEstimator: _FakeRpm(RpmResult.failed(RpmFailure.featureDetectionFailed)),
     );

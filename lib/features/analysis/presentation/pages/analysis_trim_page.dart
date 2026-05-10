@@ -7,11 +7,11 @@ import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/data/services/analysis_pipeline.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/rpm_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
 
@@ -34,7 +34,9 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
     frameExtractor: VideoFrameExtractorService(),
     ballDetector: BallDetectionService(),
     releaseDetector: ReleaseDetectorService(),
-    impactDetector: PinImpactDetectorService(),
+    // TODO(Phase 1.2): CalibrationRepository.getDefault()으로부터 HomographyMatrix 로드.
+    // 현재는 identity matrix로 fallback (캘리브레이션 UI 미구현 상태).
+    homography: HomographyMatrix.identity(),
     speedEstimator: SpeedEstimatorService(),
     rpmEstimator: RpmEstimatorService(),
   );

@@ -3,18 +3,18 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/rpm_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 
 class AnalysisPipeline {
   final VideoFrameExtractorService frameExtractor;
   final BallDetectionService ballDetector;
   final ReleaseDetectorService releaseDetector;
-  final PinImpactDetectorService impactDetector;
+  final HomographyMatrix homography;
   final SpeedEstimatorService speedEstimator;
   final RpmEstimatorService rpmEstimator;
 
@@ -22,7 +22,7 @@ class AnalysisPipeline {
     required this.frameExtractor,
     required this.ballDetector,
     required this.releaseDetector,
-    required this.impactDetector,
+    required this.homography,
     required this.speedEstimator,
     required this.rpmEstimator,
   });
@@ -54,11 +54,10 @@ class AnalysisPipeline {
     if (release.isFound) {
       detections = _filterOutliers(detections, release.frame);
     }
-    final impact = impactDetector.findImpact(frames, detections, release.frame);
-
     final speed = speedEstimator.estimate(
       release: release,
-      impact: impact,
+      detections: detections,
+      homography: homography,
       sampleFps: extracted.sampleFps,
     );
 
