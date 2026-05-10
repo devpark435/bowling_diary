@@ -50,6 +50,7 @@ dependencies:
   phosphor_flutter: ^2.1.0
   tflite_flutter: ^0.12.1
   opencv_dart: ^2.2.1+4
+  equatable: ^2.0.8
 
 # OpenCV 모듈 선택: include_modules는 whitelist 동작.
 # 명시한 것만 빌드되므로 default(imgproc/imgcodecs)도 명시.
