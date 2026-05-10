@@ -16,10 +16,15 @@ void main() {
   });
 
   group('FramePoint', () {
-    test('정규화 픽셀 좌표 (0~1)', () {
+    test('정규화 좌표 (0~1)', () {
       const p = FramePoint(nx: 0.5, ny: 0.8);
       expect(p.nx, 0.5);
       expect(p.ny, 0.8);
+    });
+
+    test('동등성 비교', () {
+      expect(const FramePoint(nx: 0.5, ny: 0.8),
+          const FramePoint(nx: 0.5, ny: 0.8));
     });
   });
 }
