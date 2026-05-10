@@ -3,6 +3,8 @@ import 'dart:math' show sqrt;
 import 'package:flutter/foundation.dart';
 
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 
 class ReleaseDetectorService {
@@ -17,7 +19,10 @@ class ReleaseDetectorService {
   // bbox max/min ratio가 1.4 이상이면 백스윙 신호 활용 (백스윙 정점 이후만 release 후보).
   static const double _backswingDetectRatio = 1.4;
 
-  ReleaseResult findRelease(List<BallDetection?> detections) {
+  ReleaseResult findRelease(
+    List<BallDetection?> detections, {
+    HomographyMatrix? homography,
+  }) {
     final velocities = _smoothedVelocities(detections);
     if (velocities.length < _minConsecutive + 1) {
       debugPrint('[ReleaseDetector] 데이터 부족');
@@ -80,14 +85,20 @@ class ReleaseDetectorService {
 
     // 점수 기반 best segment 선택:
     // score = segment 길이 + 후속 bbox 감소 신호(release 직후 forward swing → 카메라 멀어짐)
+    //         + (homography 있을 때) lane forward score × 5
     int? bestStart;
     int bestLen = 0;
     double bestScore = double.negativeInfinity;
     for (final seg in segments) {
       final shrinkScore = _postReleaseBboxShrinkScore(detections, seg.$1);
-      final score = seg.$2.toDouble() + shrinkScore * 5;
+      final laneFwdScore = homography != null
+          ? _laneForwardScore(detections, homography, seg.$1)
+          : 0.0;
+      final score = seg.$2.toDouble() + shrinkScore * 5 + laneFwdScore * 5;
       debugPrint('[ReleaseDetector] candidate start=${seg.$1}, len=${seg.$2}, '
-          'shrink=${shrinkScore.toStringAsFixed(2)}, score=${score.toStringAsFixed(2)}');
+          'shrink=${shrinkScore.toStringAsFixed(2)}, '
+          'laneFwd=${laneFwdScore.toStringAsFixed(2)}, '
+          'score=${score.toStringAsFixed(2)}');
       if (score > bestScore) {
         bestScore = score;
         bestStart = seg.$1;
@@ -100,6 +111,39 @@ class ReleaseDetectorService {
         'peak=${peakV.toStringAsFixed(3)}, threshold=${threshold.toStringAsFixed(3)}, '
         'len=$bestLen, backswingPeak=$backswingPeakFrame');
     return ReleaseResult(frame: bestStart!, confidence: confidence);
+  }
+
+  /// release 후보 시작 프레임부터 최대 10개 valid detection의 lane Y 좌표가
+  /// 단조 증가하는 비율을 [-1, 1] 범위로 반환.
+  /// 양수 = lane 방향 전진(release 신호 강화), 음수 = 역방향(패널티).
+  /// valid detection 3개 미만이면 신호 없음으로 0.0 반환.
+  @visibleForTesting
+  double laneForwardScore(
+    List<BallDetection?> detections,
+    HomographyMatrix h,
+    int startFrame,
+  ) =>
+      _laneForwardScore(detections, h, startFrame);
+
+  double _laneForwardScore(
+    List<BallDetection?> detections,
+    HomographyMatrix h,
+    int startFrame,
+  ) {
+    final ys = <double>[];
+    for (var i = startFrame; i < startFrame + 10 && i < detections.length; i++) {
+      final d = detections[i];
+      if (d == null) continue;
+      ys.add(h.frameToLane(FramePoint(nx: d.cx, ny: d.cy)).yM);
+    }
+    if (ys.length < 3) return 0.0;
+    var inc = 0;
+    var total = 0;
+    for (var i = 1; i < ys.length; i++) {
+      if (ys[i] > ys[i - 1]) inc++;
+      total++;
+    }
+    return (inc / total) * 2 - 1;
   }
 
   /// release 직후 bbox 면적이 직전 대비 얼마나 감소했는지 [-1, 1] 범위로 반환.

@@ -35,7 +35,19 @@ class _FakeRelease implements ReleaseDetectorService {
   final ReleaseResult result;
   _FakeRelease(this.result);
   @override
-  ReleaseResult findRelease(List<BallDetection?> detections) => result;
+  ReleaseResult findRelease(
+    List<BallDetection?> detections, {
+    HomographyMatrix? homography,
+  }) =>
+      result;
+
+  @override
+  double laneForwardScore(
+    List<BallDetection?> detections,
+    HomographyMatrix h,
+    int startFrame,
+  ) =>
+      0.0;
 }
 
 class _FakeSpeed implements SpeedEstimatorService {

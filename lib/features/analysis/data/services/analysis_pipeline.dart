@@ -48,7 +48,7 @@ class AnalysisPipeline {
     // 짧은 gap(≤5프레임) 보간 → velocity 시계열 안정화
     detections = _interpolateDetections(detections);
 
-    final release = releaseDetector.findRelease(detections);
+    final release = releaseDetector.findRelease(detections, homography: homography);
 
     // release 이후 trajectory linearity 기반 outlier 제거
     if (release.isFound) {
