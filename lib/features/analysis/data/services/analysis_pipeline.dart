@@ -7,7 +7,9 @@ import 'package:bowling_diary/features/analysis/data/services/release_detector_s
 import 'package:bowling_diary/features/analysis/data/services/rpm_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
+import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 
 class AnalysisPipeline {
@@ -68,6 +70,76 @@ class AnalysisPipeline {
       sampleFps: extracted.sampleFps,
     );
 
+    // ── FSM 병렬 패스 (Phase 5.2): trajectory/break/aim 산출 ──────────────
+    final fsm = AnalysisStateMachine();
+    for (var i = 0; i < detections.length; i++) {
+      final d = detections[i];
+      final lanePos = d != null
+          ? homography.frameToLane(FramePoint(nx: d.cx, ny: d.cy))
+          : null;
+      fsm.onFrame(frameIdx: i, detection: d, lanePos: lanePos);
+    }
+
+    LanePoint? releasePosM;
+    List<LanePoint> trajectoryLane = const [];
+    double? aimAngleDeg;
+    LanePoint? breakPosM;
+
+    if (fsm.releaseFrame != null) {
+      final relIdx = fsm.releaseFrame!;
+      final relDet = relIdx < detections.length ? detections[relIdx] : null;
+      if (relDet != null) {
+        releasePosM =
+            homography.frameToLane(FramePoint(nx: relDet.cx, ny: relDet.cy));
+      }
+    }
+
+    trajectoryLane = fsm.trajectory.map((e) => e.lane).toList();
+
+    // aimAngleDeg: 릴리즈 직후 0.5m 구간의 레인 y축 기준 진행각
+    if (trajectoryLane.length >= 2) {
+      final first = trajectoryLane.first;
+      LanePoint? second;
+      for (final p in trajectoryLane) {
+        if (p.yM - first.yM >= 0.5) {
+          second = p;
+          break;
+        }
+      }
+      second ??= trajectoryLane.last;
+      final dx = second.xM - first.xM;
+      final dy = second.yM - first.yM;
+      if (dy.abs() > 1e-6) {
+        // 레인 y축 기준 각도. 오른쪽(+x) 방향이 양수.
+        aimAngleDeg = (math.atan2(dx, dy) * 180.0 / math.pi);
+      }
+    }
+
+    // breakPosM: 직선(first→last)에서 최대 수선 거리 지점 (곡률 > 5cm)
+    if (trajectoryLane.length >= 5) {
+      final start = trajectoryLane.first;
+      final end = trajectoryLane.last;
+      final vx = end.xM - start.xM;
+      final vy = end.yM - start.yM;
+      final segLen = math.sqrt(vx * vx + vy * vy);
+      if (segLen > 1.0) {
+        var maxDist = 0.0;
+        LanePoint? bestPoint;
+        for (final p in trajectoryLane) {
+          final num1 =
+              (vx * (start.yM - p.yM) - (start.xM - p.xM) * vy).abs();
+          final dist = num1 / segLen;
+          if (dist > maxDist) {
+            maxDist = dist;
+            bestPoint = p;
+          }
+        }
+        if (maxDist > 0.05 && bestPoint != null) {
+          breakPosM = bestPoint;
+        }
+      }
+    }
+
     return AnalysisData(
       speedKmh: speed.kmh,
       rpmEstimated: rpm.rpm,
@@ -77,6 +149,10 @@ class AnalysisPipeline {
       rpmFailure: rpm.failure,
       speedConfidence: speed.confidence,
       rpmConfidence: rpm.confidence,
+      releasePosM: releasePosM,
+      breakPosM: breakPosM,
+      aimAngleDeg: aimAngleDeg,
+      trajectoryLane: trajectoryLane,
     );
   }
 
