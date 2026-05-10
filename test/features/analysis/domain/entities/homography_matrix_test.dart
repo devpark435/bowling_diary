@@ -38,5 +38,18 @@ void main() {
               [0, 0, 0, 0, 0, 0, 0, 0, 0]),
           throwsArgumentError);
     });
+
+    test('비항등 행렬 라운드트립', () {
+      final h = HomographyMatrix.fromRowMajor([
+        1.2, 0.3, -0.5,
+        0.1, 0.9,  0.2,
+        0.004, 0.002, 1.0,
+      ]);
+      const frame = FramePoint(nx: 0.4, ny: 0.6);
+      final lane = h.frameToLane(frame);
+      final back = h.laneToFrame(lane);
+      expect(back.nx, closeTo(frame.nx, 1e-6));
+      expect(back.ny, closeTo(frame.ny, 1e-6));
+    });
   });
 }
