@@ -85,7 +85,10 @@ class SpeedEstimatorService {
 
     // 5. 중앙값 계산 → km/h 변환
     samples.sort();
-    final medianMs = samples[samples.length ~/ 2];
+    final mid = samples.length ~/ 2;
+    final medianMs = samples.length.isOdd
+        ? samples[mid]
+        : (samples[mid - 1] + samples[mid]) / 2.0;
     final kmh = medianMs * 3.6;
 
     // 6. 속도 범위 검증
