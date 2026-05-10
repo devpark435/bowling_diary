@@ -1,6 +1,6 @@
 import 'dart:math' show sqrt;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
@@ -112,18 +112,6 @@ class ReleaseDetectorService {
         'len=$bestLen, backswingPeak=$backswingPeakFrame');
     return ReleaseResult(frame: bestStart!, confidence: confidence);
   }
-
-  /// release 후보 시작 프레임부터 최대 10개 valid detection의 lane Y 좌표가
-  /// 단조 증가하는 비율을 [-1, 1] 범위로 반환.
-  /// 양수 = lane 방향 전진(release 신호 강화), 음수 = 역방향(패널티).
-  /// valid detection 3개 미만이면 신호 없음으로 0.0 반환.
-  @visibleForTesting
-  double laneForwardScore(
-    List<BallDetection?> detections,
-    HomographyMatrix h,
-    int startFrame,
-  ) =>
-      _laneForwardScore(detections, h, startFrame);
 
   double _laneForwardScore(
     List<BallDetection?> detections,

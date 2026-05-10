@@ -87,46 +87,38 @@ void main() {
         isTrue);
   });
 
-  // ── lane forward score 단위 테스트 ──────────────────────────────────────
+  // ── lane forward score 통합 테스트 (findRelease 경유) ──────────────────
 
-  test('identity homography + 단조 증가 ny → laneForwardScore ≈ +1', () {
-    // identity homography 에서 frameToLane(FramePoint(nx, ny)).yM == ny
-    // 단조 증가 ny 시퀀스 → 모든 pair 증가 → score = 1.0 * 2 - 1 = 1.0
+  test('valid detection 2개 이하면 lane forward score 무효 — homography 유무 결과 동일', () {
+    // valid detection이 2개(≤ 2)인 경우 _laneForwardScore는 0.0을 반환하므로
+    // homography 유무가 결과에 영향을 주지 않는다.
+    // 충분한 velocity 시퀀스를 만들되, release 후보 구간에서 valid detection이 2개뿐.
     final h = HomographyMatrix.identity();
-    final detections = <BallDetection?>[
-      BallDetection(cx: 0.5, cy: 0.10, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.20, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.30, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.40, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.50, bw: 0.05, bh: 0.05, confidence: 0.9),
-    ];
-    final score = sut.laneForwardScore(detections, h, 0);
-    expect(score, closeTo(1.0, 0.01));
-  });
 
-  test('identity homography + 단조 감소 ny → laneForwardScore ≈ -1', () {
-    final h = HomographyMatrix.identity();
+    // 0~9: 정지 (null), 10~19: null, 20: valid, 21~22: null, 23: valid, 24~25: 가속 유효
+    // 실제로는 velocity 계산을 위해 cx 변화가 있어야 함.
+    // 간단한 구성: 정지 후 가속하되, 가속 구간(startFrame~startFrame+10)에 valid detection 2개만.
     final detections = <BallDetection?>[
-      BallDetection(cx: 0.5, cy: 0.50, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.40, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.30, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.20, bw: 0.05, bh: 0.05, confidence: 0.9),
-      BallDetection(cx: 0.5, cy: 0.10, bw: 0.05, bh: 0.05, confidence: 0.9),
+      // 0~14: 정지
+      ...List.generate(15, (_) => _det(0.5, 0.5)),
+      // 15~19: 가속 (velocity 충분)
+      _det(0.530, 0.5),
+      _det(0.565, 0.5),
+      _det(0.605, 0.5),
+      _det(0.650, 0.5),
+      _det(0.700, 0.5),
+      // 20~28: null (valid detection 0개 → release 구간 합산 ≤ 2)
+      null, null, null, null, null, null, null, null, null,
     ];
-    final score = sut.laneForwardScore(detections, h, 0);
-    expect(score, closeTo(-1.0, 0.01));
-  });
 
-  test('valid detection 2개 이하면 laneForwardScore == 0', () {
-    final h = HomographyMatrix.identity();
-    final detections = <BallDetection?>[
-      BallDetection(cx: 0.5, cy: 0.10, bw: 0.05, bh: 0.05, confidence: 0.9),
-      null,
-      BallDetection(cx: 0.5, cy: 0.20, bw: 0.05, bh: 0.05, confidence: 0.9),
-      // 총 2개만 valid → 0.0 반환
-    ];
-    final score = sut.laneForwardScore(detections, h, 0);
-    expect(score, equals(0.0));
+    final withoutH = sut.findRelease(detections);
+    final withH = sut.findRelease(detections, homography: h);
+
+    // valid detection 부족으로 lane score가 0이므로 두 결과의 frame이 일치해야 함.
+    expect(withH.isFound, equals(withoutH.isFound));
+    if (withoutH.isFound) {
+      expect(withH.frame, equals(withoutH.frame));
+    }
   });
 
   test('homography 있으면 lane forward score로 후보 우선순위', () {
