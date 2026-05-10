@@ -110,4 +110,29 @@ void main() {
     final loaded = (await repo.listAll()).first;
     expect(loaded.homography.toRowMajorList(), h.toRowMajorList());
   });
+
+  test('초기 상태는 빈 목록', () async {
+    expect(await repo.listAll(), isEmpty);
+  });
+
+  test('손상된 JSON은 빈 목록으로 복구', () async {
+    SharedPreferences.setMockInitialValues({'calibration_profiles_v1': '{not a list}'});
+    final prefs = await SharedPreferences.getInstance();
+    final badRepo = CalibrationRepositoryImpl(prefs);
+    expect(await badRepo.listAll(), isEmpty);
+  });
+
+  test('알 수 없는 viewpoint는 디코딩 실패로 누락', () async {
+    SharedPreferences.setMockInitialValues({
+      'calibration_profiles_v1': '[{"id":"bad","name":"x","viewpoint":"unknown","homography":[1,0,0,0,1,0,0,0,1],"createdAt":"2026-01-01T00:00:00.000"}]',
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final badRepo = CalibrationRepositoryImpl(prefs);
+    expect(await badRepo.listAll(), isEmpty);
+  });
+
+  test('존재하지 않는 id를 기본값으로 설정하면 getDefault는 null', () async {
+    await repo.setDefault('ghost');
+    expect(await repo.getDefault(), isNull);
+  });
 }

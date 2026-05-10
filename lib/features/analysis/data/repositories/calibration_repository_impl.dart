@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bowling_diary/features/analysis/domain/entities/calibration_profile.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/repositories/calibration_repository.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 캘리브레이션 프로파일 저장소 구현체 (SharedPreferences 기반)
@@ -45,6 +46,7 @@ class CalibrationRepositoryImpl implements CalibrationRepository {
   CalibrationProfile _fromJson(Map<String, dynamic> json) {
     final viewpoint = CameraViewpoint.values.firstWhere(
       (e) => e.name == json['viewpoint'] as String,
+      orElse: () => throw FormatException('알 수 없는 viewpoint: ${json['viewpoint']}'),
     );
     final homographyValues =
         (json['homography'] as List<dynamic>).map((e) => (e as num).toDouble()).toList();
@@ -62,8 +64,13 @@ class CalibrationRepositoryImpl implements CalibrationRepository {
   List<Map<String, dynamic>> _readRawList() {
     final raw = _prefs.getString(_profilesKey);
     if (raw == null) return [];
-    final decoded = jsonDecode(raw) as List<dynamic>;
-    return decoded.cast<Map<String, dynamic>>();
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded.whereType<Map<String, dynamic>>().toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   /// 프로파일 목록을 JSON 문자열로 저장한다.
@@ -75,7 +82,15 @@ class CalibrationRepositoryImpl implements CalibrationRepository {
 
   @override
   Future<List<CalibrationProfile>> listAll() async {
-    return _readRawList().map(_fromJson).toList();
+    final result = <CalibrationProfile>[];
+    for (final json in _readRawList()) {
+      try {
+        result.add(_fromJson(json));
+      } catch (e) {
+        debugPrint('[CalibrationRepository] 프로파일 디코딩 실패 (id=${json['id']}): $e');
+      }
+    }
+    return result;
   }
 
   @override
