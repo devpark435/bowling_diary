@@ -44,7 +44,9 @@ class HomographySolver {
     for (var i = 0; i < 4; i++) {
       final xi = frame[i].nx;
       final yi = frame[i].ny;
+      // ignore: non_constant_identifier_names — 수학 관례: 대문자 = 레인(월드) 좌표
       final Xi = lane[i].xM;
+      // ignore: non_constant_identifier_names
       final Yi = lane[i].yM;
 
       // 첫 번째 행: X 방정식

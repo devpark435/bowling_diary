@@ -23,6 +23,9 @@ void main() {
         final out = h.frameToLane(framePts[i]);
         expect(out.xM, closeTo(lanePts[i].xM, 1e-3));
         expect(out.yM, closeTo(lanePts[i].yM, 1e-3));
+        final back = h.laneToFrame(out);
+        expect(back.nx, closeTo(framePts[i].nx, 1e-6));
+        expect(back.ny, closeTo(framePts[i].ny, 1e-6));
       }
     });
 
@@ -54,6 +57,22 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
+
+    test('공선 4점은 ArgumentError', () {
+      const f = [
+        FramePoint(nx: 0, ny: 0),
+        FramePoint(nx: 1, ny: 0),
+        FramePoint(nx: 2, ny: 0),
+        FramePoint(nx: 3, ny: 0),
+      ];
+      const l = [
+        LanePoint(xM: 0, yM: 0),
+        LanePoint(xM: 1, yM: 0),
+        LanePoint(xM: 2, yM: 0),
+        LanePoint(xM: 3, yM: 0),
+      ];
+      expect(() => HomographySolver.solve4Point(f, l), throwsArgumentError);
     });
   });
 }
