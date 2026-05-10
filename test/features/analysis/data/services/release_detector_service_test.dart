@@ -1,6 +1,5 @@
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:flutter_test/flutter_test.dart';
 
