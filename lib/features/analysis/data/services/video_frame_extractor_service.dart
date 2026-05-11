@@ -20,7 +20,9 @@ class FrameExtractionResult {
 
 class VideoFrameExtractorService {
   static const _sampleFps = 30;
-  static const _maxFrames = 150; // 최대 5초 × 30fps
+  // 어프로치(2-3초) + 백스윙(1-2초) + release + 핀 도달(2-3초) 모두 포함하려면
+  // 최소 8-10초 필요. 300프레임 = 10초.
+  static const _maxFrames = 300;
 
   Future<FrameExtractionResult> extract(String videoPath) async {
     final originalFps = await _getVideoFps(videoPath);

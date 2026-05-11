@@ -71,6 +71,11 @@ class SettingsPage extends ConsumerWidget {
                         MaterialPageRoute(
                             builder: (_) => const ThemeSelectionPage()),
                       ),
+                    ),
+                    _MenuItem(
+                      icon: PhosphorIconsRegular.crosshair,
+                      label: '분석 캘리브레이션',
+                      onTap: () => context.push('/analysis/calibrations'),
                       isLast: true,
                     ),
                   ]),

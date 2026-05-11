@@ -7,8 +7,9 @@ import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_result_entity.dart';
+import 'package:bowling_diary/features/analysis/presentation/widgets/trajectory_chart.dart';
 import 'package:bowling_diary/features/analysis/presentation/providers/analysis_provider.dart';
 import 'package:bowling_diary/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bowling_diary/features/record/domain/entities/session_entity.dart';
@@ -85,6 +86,10 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
       videoLocalPath: widget.videoPath,
       linkedSessionId: linkedSessionId,
       createdAt: DateTime.now(),
+      releasePosM: widget.analysisData.releasePosM,
+      breakPosM: widget.analysisData.breakPosM,
+      aimAngleDeg: widget.analysisData.aimAngleDeg,
+      trajectoryLane: widget.analysisData.trajectoryLane,
     );
 
     await ref.read(analysisRepositoryProvider).save(entity);
@@ -309,6 +314,25 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                             letterSpacing: 0.3,
                           ),
                         ),
+                        // 트래젝토리 차트 (데이터가 있을 때만 표시)
+                        if (data.trajectoryLane.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            '트래젝토리',
+                            style: AppTextStyles.headingSmall
+                                .copyWith(color: Colors.white),
+                          ),
+                          const SizedBox(height: 8),
+                          ConstrainedBox(
+                            constraints:
+                                const BoxConstraints(maxHeight: 280),
+                            child: TrajectoryChart(
+                              trajectory: data.trajectoryLane,
+                              releasePos: data.releasePosM,
+                              breakPos: data.breakPosM,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         // 저장 버튼
                         SizedBox(

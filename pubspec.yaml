@@ -49,9 +49,25 @@ dependencies:
   path_provider: ^2.1.5
   phosphor_flutter: ^2.1.0
   tflite_flutter: ^0.12.1
+  opencv_dart: ^2.2.1+4
+  equatable: ^2.0.8
+
+# OpenCV 모듈 선택: include_modules는 whitelist 동작.
+# 명시한 것만 빌드되므로 default(imgproc/imgcodecs)도 명시.
+# video: Lucas-Kanade optical flow (calcOpticalFlowPyrLK)
+# imgproc: goodFeaturesToTrack, cvtColor 등 기본 영상 처리
+hooks:
+  user_defines:
+    dartcv4:
+      include_modules:
+        - imgproc
+        - imgcodecs
+        - video
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   riverpod_generator: ^2.6.3

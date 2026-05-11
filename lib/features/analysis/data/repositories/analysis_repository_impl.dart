@@ -25,6 +25,10 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
         videoLocalPath: result.videoLocalPath,
         linkedSessionId: result.linkedSessionId,
         createdAt: result.createdAt,
+        releasePosM: result.releasePosM,
+        breakPosM: result.breakPosM,
+        aimAngleDeg: result.aimAngleDeg,
+        trajectoryLane: result.trajectoryLane,
       ));
 
   @override
