@@ -2,9 +2,11 @@ import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/features/analysis/data/repositories/calibration_repository_impl.dart';
 import 'package:bowling_diary/features/analysis/data/services/analysis_pipeline.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
@@ -30,16 +32,7 @@ class AnalysisTrimPage extends StatefulWidget {
 }
 
 class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
-  final _pipeline = AnalysisPipeline(
-    frameExtractor: VideoFrameExtractorService(),
-    ballDetector: BallDetectionService(),
-    releaseDetector: ReleaseDetectorService(),
-    // TODO(Phase 1.2): CalibrationRepository.getDefault()으로부터 HomographyMatrix 로드.
-    // 현재는 identity matrix로 fallback (캘리브레이션 UI 미구현 상태).
-    homography: HomographyMatrix.identity(),
-    speedEstimator: SpeedEstimatorService(),
-    rpmEstimator: RpmEstimatorService(),
-  );
+  HomographyMatrix _homography = HomographyMatrix.identity();
 
   VideoPlayerController? _controller;
   double _startSec = 0;
@@ -52,6 +45,18 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   void initState() {
     super.initState();
     _initVideo();
+    _loadDefaultHomography();
+  }
+
+  Future<void> _loadDefaultHomography() async {
+    final prefs = await SharedPreferences.getInstance();
+    final profile = await CalibrationRepositoryImpl(prefs).getDefault();
+    if (profile != null) {
+      debugPrint('[AnalysisTrim] 기본 캘리브레이션 프로파일 사용: ${profile.name}');
+      if (mounted) setState(() => _homography = profile.homography);
+    } else {
+      debugPrint('[AnalysisTrim] 기본 캘리브레이션 없음 — identity matrix fallback');
+    }
   }
 
   Future<void> _initVideo() async {
@@ -118,7 +123,15 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
 
       if (mounted) setState(() => _trimmedPath = trimmedPath);
 
-      final analysisData = await _pipeline.run(trimmedPath, widget.fps);
+      final pipeline = AnalysisPipeline(
+        frameExtractor: VideoFrameExtractorService(),
+        ballDetector: BallDetectionService(),
+        releaseDetector: ReleaseDetectorService(),
+        homography: _homography,
+        speedEstimator: SpeedEstimatorService(),
+        rpmEstimator: RpmEstimatorService(),
+      );
+      final analysisData = await pipeline.run(trimmedPath, widget.fps);
 
       debugPrint(
           '[Trim] 결과 speed=${analysisData.speedKmh}km/h(conf=${analysisData.speedConfidence}, fail=${analysisData.speedFailure}), '
