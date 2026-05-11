@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -27,23 +29,73 @@ class BallDetectionService {
 
   Interpreter? _interpreter;
   int _frameCount = 0;
+  final Stopwatch _detectStopwatch = Stopwatch();
+  double _totalDetectMs = 0;
+
+  /// iOS Metal delegate 생성
+  GpuDelegate _gpuDelegateIOS() {
+    return GpuDelegate(
+      options: GpuDelegateOptions(
+        allowPrecisionLoss: true,
+        // TFLGpuDelegateWaitTypePassive = 0 (bindings 비공개 상수)
+        waitType: 0,
+      ),
+    );
+  }
+
+  /// Android GPU delegate V2 생성
+  GpuDelegateV2 _gpuDelegateAndroid() {
+    return GpuDelegateV2(
+      options: GpuDelegateOptionsV2(
+        isPrecisionLossAllowed: true,
+        // TFLITE_GPU_INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER = 0
+        inferencePreference: 0,
+        // TFLITE_GPU_INFERENCE_PRIORITY_MIN_LATENCY = 2
+        inferencePriority1: 2,
+        // TFLITE_GPU_INFERENCE_PRIORITY_AUTO = 0
+        inferencePriority2: 0,
+        inferencePriority3: 0,
+      ),
+    );
+  }
 
   Future<void> init() async {
-    final options = InterpreterOptions()..threads = 2;
-    _interpreter = await Interpreter.fromAsset(_modelPath, options: options);
+    final stopwatch = Stopwatch()..start();
+    try {
+      final options = InterpreterOptions();
+      if (Platform.isIOS) {
+        options.addDelegate(_gpuDelegateIOS());
+      } else if (Platform.isAndroid) {
+        options.addDelegate(_gpuDelegateAndroid());
+      } else {
+        options.threads = 2;
+      }
+      _interpreter = await Interpreter.fromAsset(_modelPath, options: options);
+      debugPrint('[BallDetection] GPU delegate 로드 (${stopwatch.elapsedMilliseconds}ms)');
+    } catch (e) {
+      debugPrint('[BallDetection] GPU 실패, CPU fallback: $e');
+      final options = InterpreterOptions()..threads = 2;
+      _interpreter = await Interpreter.fromAsset(_modelPath, options: options);
+      debugPrint('[BallDetection] CPU 로드 (${stopwatch.elapsedMilliseconds}ms)');
+    }
     final inShape = _interpreter!.getInputTensor(0).shape;
     final outShape = _interpreter!.getOutputTensor(0).shape;
-    debugPrint('[BallDetection] 모델 로드 | 입력: $inShape | 출력: $outShape');
+    debugPrint('[BallDetection] 입력: $inShape | 출력: $outShape');
   }
 
   void dispose() {
     _interpreter?.close();
     _interpreter = null;
     _frameCount = 0;
+    _totalDetectMs = 0;
+    _detectStopwatch.reset();
   }
 
   BallDetection? detect(img.Image frame) {
     if (_interpreter == null) return null;
+
+    _detectStopwatch.reset();
+    _detectStopwatch.start();
 
     final resized = img.copyResize(frame, width: _inputSize, height: _inputSize);
     final input = _toFloat32Input(resized);
@@ -55,6 +107,14 @@ class BallDetectionService {
 
     _interpreter!.run(input, output);
     _frameCount++;
+
+    _detectStopwatch.stop();
+    if (_frameCount <= 10) {
+      _totalDetectMs += _detectStopwatch.elapsedMicroseconds / 1000.0;
+      if (_frameCount == 10) {
+        debugPrint('[BallDetection] 평균 추론: ${(_totalDetectMs / 10).toStringAsFixed(1)}ms/frame');
+      }
+    }
 
     return _parseBest(output[0], verbose: _frameCount == 1);
   }
