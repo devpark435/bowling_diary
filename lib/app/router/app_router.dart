@@ -19,6 +19,7 @@ import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guid
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_camera_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/calibration_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/calibration_list_page.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -119,6 +120,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map<String, dynamic>;
           return CalibrationPage(referenceImagePath: extra['imagePath'] as String);
         },
+      ),
+      GoRoute(
+        path: '/analysis/calibrations',
+        builder: (context, state) => const CalibrationListPage(),
       ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) {
