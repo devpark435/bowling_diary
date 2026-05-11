@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
@@ -121,13 +122,33 @@ class _AnalysisTabPageState extends ConsumerState<AnalysisTabPage> {
         loading: () => const LoadingWidget(),
         error: (e, _) => Center(child: Text('불러오기 실패: $e')),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.neonOrange,
-        onPressed: () => Navigator.of(context, rootNavigator: true)
-            .push(MaterialPageRoute(
-                builder: (_) => const AnalysisSelectionPage()))
-            .then((_) => ref.invalidate(analysisHistoryProvider)),
-        child: const Icon(PhosphorIconsBold.plus, color: Colors.black),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 라이브 분석 버튼
+          FloatingActionButton.small(
+            heroTag: 'live_analysis',
+            backgroundColor: AppColors.darkCard,
+            onPressed: () => context.push('/analysis/live'),
+            tooltip: '라이브 분석',
+            child: Icon(
+              PhosphorIconsRegular.broadcast,
+              color: AppColors.neonOrange,
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 새 분석 기록 버튼
+          FloatingActionButton(
+            heroTag: 'new_analysis',
+            backgroundColor: AppColors.neonOrange,
+            onPressed: () => Navigator.of(context, rootNavigator: true)
+                .push(MaterialPageRoute(
+                    builder: (_) => const AnalysisSelectionPage()))
+                .then((_) => ref.invalidate(analysisHistoryProvider)),
+            child: const Icon(PhosphorIconsBold.plus, color: Colors.black),
+          ),
+        ],
       ),
     );
   }

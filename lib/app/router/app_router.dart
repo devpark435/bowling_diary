@@ -21,6 +21,7 @@ import 'package:bowling_diary/features/analysis/presentation/pages/analysis_resu
 import 'package:bowling_diary/features/analysis/presentation/pages/calibration_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/calibration_list_page.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/live_analysis_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -124,6 +125,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/analysis/calibrations',
         builder: (context, state) => const CalibrationListPage(),
+      ),
+      GoRoute(
+        path: '/analysis/live',
+        builder: (context, state) => const LiveAnalysisPage(),
       ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) {
