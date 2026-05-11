@@ -86,6 +86,10 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
       videoLocalPath: widget.videoPath,
       linkedSessionId: linkedSessionId,
       createdAt: DateTime.now(),
+      releasePosM: widget.analysisData.releasePosM,
+      breakPosM: widget.analysisData.breakPosM,
+      aimAngleDeg: widget.analysisData.aimAngleDeg,
+      trajectoryLane: widget.analysisData.trajectoryLane,
     );
 
     await ref.read(analysisRepositoryProvider).save(entity);

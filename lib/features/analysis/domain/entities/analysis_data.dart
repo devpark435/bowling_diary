@@ -2,9 +2,6 @@ import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/rpm_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 
-// TODO(Phase 6.1 DB persistence): AnalysisResultEntity 및 analysis_result_model.dart,
-// Supabase 마이그레이션도 동일 필드를 추가해야 함. 사용자 승인 후 별도 작업으로 진행.
-
 class AnalysisData {
   final double? speedKmh;
   final int? rpmEstimated;
