@@ -86,9 +86,9 @@ class AnalysisPipeline {
       fsm.onFrame(frameIdx: i, detection: d, lanePos: lanePos);
     }
 
-    if (fsm.impactFrame == null || !release.isFound) {
+    if (!release.isFound || fsm.impactFrame == null) {
       return AnalysisData(
-        speedFailure: SpeedFailure.impactNotFound,
+        speedFailure: !release.isFound ? SpeedFailure.releaseNotFound : SpeedFailure.impactNotFound,
         driftStatus: driftResult.status,
         framesAnalyzed: frames.length,
         fpsUsed: extracted.sampleFps,
