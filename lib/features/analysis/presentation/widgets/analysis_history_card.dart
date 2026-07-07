@@ -16,7 +16,6 @@ class AnalysisHistoryCard extends StatelessWidget {
     final date = DateFormat('MM.dd').format(result.recordedAt);
     final time = DateFormat('HH:mm').format(result.recordedAt);
     final hasSpeed = result.speedKmh != null;
-    final hasRpm = result.rpmEstimated != null;
 
     return GestureDetector(
       onTap: onTap,
@@ -98,14 +97,6 @@ class AnalysisHistoryCard extends StatelessWidget {
                           ),
                         ),
                     ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    hasRpm ? '${result.rpmEstimated} RPM' : 'RPM 미측정',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
                   ),
                 ],
               ),

@@ -71,6 +71,36 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
     }
   }
 
+  Future<void> _showCalibrationRequiredDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.darkCard,
+        title: Text(
+          '레인 캘리브레이션이 필요해요',
+          style: AppTextStyles.headingSmall.copyWith(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '첫 분석 전에 레인 위치를 한 번만 알려주면 돼요.\n레인이 잘 보이는 사진으로 4개 지점을 탭합니다.',
+          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('취소', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('캘리브레이션 하기', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.neonOrange, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _openCalibration();
+    }
+  }
+
   Future<void> _initVideo() async {
     final ctrl = VideoPlayerController.file(File(widget.videoPath));
     await ctrl.initialize();
@@ -122,9 +152,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   Future<void> _startAnalysis() async {
     final profile = _calibrationProfile;
     if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('캘리브레이션 프로파일이 없습니다. 먼저 캘리브레이션을 완료해 주세요')),
-      );
+      await _showCalibrationRequiredDialog();
       return;
     }
 
@@ -157,9 +185,12 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         ),
       ));
     } catch (e) {
+      debugPrint('분석 실패: $e');
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('분석 실패: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('분석 중 문제가 발생했어요. 다시 시도해 주세요')),
+      );
     }
   }
 

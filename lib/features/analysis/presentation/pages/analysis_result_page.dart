@@ -2,6 +2,7 @@ import 'dart:io' as dart_io;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
@@ -295,6 +296,27 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                               textAlign: TextAlign.center,
                             ),
                           ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.neonOrange,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () => context.go('/analysis/camera'),
+                              child: Text(
+                                '다시 촬영하기',
+                                style: AppTextStyles.bodyLarge.copyWith(
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                         ],
                         // 구속
                         _StatRow(
@@ -313,10 +335,34 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // 저장 버튼
+                        // 저장 버튼 (측정 실패 시 다시 촬영하기가 primary이므로 secondary로)
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton(
+                          child: data.speedKmh == null
+                              ? OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.neonOrange,
+                                    side: BorderSide(color: AppColors.neonOrange),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  onPressed: _isSaving ? null : _onSavePressed,
+                                  child: _isSaving
+                                      ? SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppColors.neonOrange))
+                                      : Text(
+                                          '저장하기',
+                                          style: AppTextStyles.bodyLarge.copyWith(
+                                              fontWeight: FontWeight.w700),
+                                        ),
+                                )
+                              : ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.neonOrange,
                               foregroundColor: Colors.black,

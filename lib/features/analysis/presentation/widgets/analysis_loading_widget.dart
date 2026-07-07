@@ -25,11 +25,10 @@ class _AnalysisLoadingWidgetState extends State<AnalysisLoadingWidget>
   static const _steps = [
     ('영상 업로드 중...', 'AI 분석을 준비하고 있어요'),
     ('구속 측정 중...', '파울라인~헤드핀 구간을 추적해요'),
-    ('회전수 측정 중...', '볼 표면 회전 패턴을 분석해요'),
     ('결과 화면 만드는 중...', '거의 다 됐어요!'),
   ];
 
-  static const _stepDurations = [8, 10, 10, 999];
+  static const _stepDurations = [8, 14, 999];
 
   @override
   void initState() {

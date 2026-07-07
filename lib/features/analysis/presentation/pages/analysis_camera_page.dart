@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -24,6 +26,9 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
   String? _analyzingVideoPath;
   String? _error;
 
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
+
   @override
   void initState() {
     super.initState();
@@ -39,8 +44,9 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
         _isInitialized = true;
       });
     } catch (e) {
+      debugPrint('카메라 초기화 실패: $e');
       if (!mounted) return;
-      setState(() => _error = '카메라 초기화 실패: $e');
+      setState(() => _error = '카메라를 열 수 없어요. 앱 권한을 확인해 주세요');
     }
   }
 
@@ -50,11 +56,20 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
     } else {
       await _cameraService.startRecording();
       if (!mounted) return;
-      setState(() => _isRecording = true);
+      setState(() {
+        _isRecording = true;
+        _recordingSeconds = 0;
+      });
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() => _recordingSeconds++);
+      });
     }
   }
 
   Future<void> _stopAndAnalyze() async {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
     setState(() {
       _isRecording = false;
       _isAnalyzing = true;
@@ -75,31 +90,65 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
         ),
       );
     } catch (e) {
+      debugPrint('분석 중 오류: $e');
       if (!mounted) return;
       setState(() {
         _isAnalyzing = false;
-        _error = '분석 중 오류: $e';
+        _error = '녹화 처리 중 문제가 발생했어요. 다시 시도해 주세요';
       });
     }
   }
 
+  String _formatElapsed(int seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
   @override
   void dispose() {
+    _recordingTimer?.cancel();
     _cameraService.dispose();
     super.dispose();
+  }
+
+  Widget _buildCloseButton() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.black.withValues(alpha: 0.4),
+            shape: const CircleBorder(),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
       return Scaffold(
-        body: Center(child: Text(_error!, style: AppTextStyles.bodyMedium)),
+        body: Stack(
+          children: [
+            Center(child: Text(_error!, style: AppTextStyles.bodyMedium)),
+            Align(alignment: Alignment.topLeft, child: _buildCloseButton()),
+          ],
+        ),
       );
     }
 
     if (!_isInitialized || _controller == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Stack(
+          children: [
+            const Center(child: CircularProgressIndicator()),
+            Align(alignment: Alignment.topLeft, child: _buildCloseButton()),
+          ],
+        ),
       );
     }
 
@@ -115,6 +164,40 @@ class _AnalysisCameraPageState extends State<AnalysisCameraPage> {
         children: [
           CameraPreview(_controller!),
           CameraGuideOverlay(isRecording: _isRecording),
+          Align(alignment: Alignment.topLeft, child: _buildCloseButton()),
+          if (_isRecording)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatElapsed(_recordingSeconds),
+                          style: AppTextStyles.bodySmall.copyWith(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Positioned(
             bottom: 60,
             left: 0,
