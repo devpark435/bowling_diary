@@ -11,6 +11,8 @@ class AnalysisResultModel extends AnalysisResultEntity {
     super.videoLocalPath,
     super.linkedSessionId,
     required super.createdAt,
+    super.speedConfidence,
+    super.speedFailureReason,
   });
 
   factory AnalysisResultModel.fromJson(Map<String, dynamic> json) {
@@ -20,10 +22,12 @@ class AnalysisResultModel extends AnalysisResultEntity {
       recordedAt: DateTime.parse(json['recorded_at'] as String),
       speedKmh: (json['speed_kmh'] as num?)?.toDouble(),
       rpmEstimated: json['rpm_estimated'] as int?,
-      fpsUsed: json['fps_used'] as int,
+      fpsUsed: (json['fps_used'] as num?)?.toInt() ?? 30,
       videoLocalPath: json['video_local_path'] as String?,
       linkedSessionId: json['linked_session_id'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
+      speedConfidence: (json['speed_confidence'] as num?)?.toDouble() ?? 0.0,
+      speedFailureReason: json['speed_failure_reason'] as String?,
     );
   }
 
@@ -36,5 +40,7 @@ class AnalysisResultModel extends AnalysisResultEntity {
     'fps_used': fpsUsed,
     if (videoLocalPath != null) 'video_local_path': videoLocalPath,
     if (linkedSessionId != null) 'linked_session_id': linkedSessionId,
+    'speed_confidence': speedConfidence,
+    if (speedFailureReason != null) 'speed_failure_reason': speedFailureReason,
   };
 }
