@@ -130,7 +130,8 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
       }
 
       // 4. 릴리즈 프레임 감지
-      final releaseFrame = _releaseDetector.findReleaseFrame(ballDetections) ?? 0;
+      final releaseResult = _releaseDetector.findRelease(ballDetections);
+      final releaseFrame = releaseResult.isFound ? releaseResult.frame : 0;
       debugPrint('[Trim] 릴리즈 프레임: $releaseFrame');
 
       // 5. 핀 충돌 프레임 감지
