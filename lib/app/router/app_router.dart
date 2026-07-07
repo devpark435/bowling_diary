@@ -17,8 +17,6 @@ import 'package:bowling_diary/features/admin/presentation/pages/catalog_manage_p
 // import 'package:bowling_diary/features/analysis/presentation/pages/analysis_tab_page.dart'; // 임시 비활성화
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_camera_page.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -100,17 +98,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/analysis/camera',
         builder: (context, state) => const AnalysisCameraPage(),
-      ),
-      GoRoute(
-        path: '/analysis/result',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
-          return AnalysisResultPage(
-            analysisData: extra['analysisData'] as AnalysisData,
-            videoPath: extra['videoPath'] as String,
-            recordedAt: extra['recordedAt'] as DateTime,
-          );
-        },
       ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) {
