@@ -92,7 +92,7 @@ class AnalysisStateMachine {
     if (lanePos != null) {
       _trajectory.add((frame: frameIdx, lane: lanePos));
     }
-    if (lanePos != null && lanePos.yM >= 18.0) {
+    if (lanePos != null && lanePos.yM >= 18.29) {
       _impactFrame = frameIdx;
       _transitionTo(AnalysisPhase.impact, frameIdx);
       return;

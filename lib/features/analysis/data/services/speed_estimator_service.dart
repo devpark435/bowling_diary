@@ -69,7 +69,7 @@ class SpeedEstimatorService {
     final windowSize = flightEnd - flightStart;
     final sampleCoverage = (samples.length / windowSize).clamp(0.0, 1.0);
     final impactPenalty = impact.confidence == ImpactConfidence.medium ? 0.85 : 1.0;
-    final confidence = (sampleCoverage * impactPenalty).clamp(0.0, 1.0);
+    final confidence = (sampleCoverage * impactPenalty * release.confidence).clamp(0.0, 1.0);
 
     final rounded = double.parse(kmh.toStringAsFixed(1));
     return SpeedResult.success(rounded, confidence);

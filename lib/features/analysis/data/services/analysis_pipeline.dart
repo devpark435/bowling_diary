@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:image/image.dart' as img;
+
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
@@ -28,23 +32,32 @@ class AnalysisPipeline {
     required this.driftChecker,
   });
 
-  Future<AnalysisData> run(String videoPath, CalibrationProfile profile, int fpsHint) async {
+  Future<AnalysisData> run(String videoPath, CalibrationProfile profile) async {
     final extracted = await frameExtractor.extract(videoPath);
     final frames = extracted.frames;
     if (frames.isEmpty) {
       return AnalysisData(
+        speedFailure: SpeedFailure.lowConfidence,
         driftStatus: DriftStatus.ok,
         framesAnalyzed: 0,
         fpsUsed: extracted.sampleFps,
       );
     }
 
-    final driftResult = driftChecker.check(
-      referenceFrame: frames.first,
-      currentFrame: frames.first,
-      referencePoints: profile.framePoints,
-      homography: profile.homography,
-    );
+    final referenceFrame = await _loadReferenceFrame(profile.referenceImagePath);
+
+    final driftResult = referenceFrame != null
+        ? driftChecker.check(
+            referenceFrame: referenceFrame,
+            currentFrame: frames.first,
+            referencePoints: profile.framePoints,
+            homography: profile.homography,
+          )
+        : DriftCheckResult(
+            status: DriftStatus.recalibrationRequired,
+            homography: profile.homography,
+            driftScoreNormalized: 1.0,
+          );
 
     if (driftResult.status == DriftStatus.recalibrationRequired) {
       return AnalysisData(
@@ -96,13 +109,27 @@ class AnalysisPipeline {
       sampleFps: extracted.sampleFps,
     );
 
+    final driftPenalty = driftResult.status == DriftStatus.autoCorrected ? 0.9 : 1.0;
+    final adjustedConfidence = (speed.confidence * driftPenalty).clamp(0.0, 1.0);
+
     return AnalysisData(
       speedKmh: speed.kmh,
-      speedConfidence: speed.confidence,
+      speedConfidence: adjustedConfidence,
       speedFailure: speed.failure,
       driftStatus: driftResult.status,
       framesAnalyzed: frames.length,
       fpsUsed: extracted.sampleFps,
     );
+  }
+
+  /// 캘리브레이션 시점 레퍼런스 이미지를 로드/디코드한다.
+  /// 파일이 없거나 디코드 실패 시 null을 반환 — 호출부에서 recalibrationRequired로 처리(fail safe).
+  Future<img.Image?> _loadReferenceFrame(String path) async {
+    try {
+      final bytes = await File(path).readAsBytes();
+      return img.decodeImage(bytes);
+    } catch (_) {
+      return null;
+    }
   }
 }

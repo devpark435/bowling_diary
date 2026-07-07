@@ -148,7 +148,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         speedEstimator: SpeedEstimatorService(),
         driftChecker: CalibrationDriftChecker(),
       );
-      final analysisData = await pipeline.run(trimmedPath, profile, widget.fps);
+      final analysisData = await pipeline.run(trimmedPath, profile);
 
       if (!mounted) return;
       await Navigator.pushReplacement(context, MaterialPageRoute(

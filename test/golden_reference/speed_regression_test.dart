@@ -60,7 +60,7 @@ void main() {
         driftChecker: CalibrationDriftChecker(),
       );
 
-      final result = await pipeline.run(mp4.path, profile, 30);
+      final result = await pipeline.run(mp4.path, profile);
       final groundTruth = (expected['groundTruthKmh'] as num).toDouble();
       final tolerance = (expected['toleranceKmh'] as num).toDouble();
 
