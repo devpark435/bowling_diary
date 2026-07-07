@@ -2,18 +2,58 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image/image.dart' as img;
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/calibration_profile.dart';
 import 'package:bowling_diary/features/analysis/presentation/providers/calibration_providers.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/calibration_overlay.dart';
 
-class CalibrationPage extends ConsumerWidget {
+const _stepGuides = [
+  '① 파울라인 왼쪽 끝을 탭하세요',
+  '② 파울라인 오른쪽 끝을 탭하세요',
+  '③ 핀 쪽 레인 오른쪽 끝을 탭하세요',
+  '④ 핀 쪽 레인 왼쪽 끝을 탭하세요',
+];
+
+class CalibrationPage extends ConsumerStatefulWidget {
   final String referenceImagePath;
   const CalibrationPage({super.key, required this.referenceImagePath});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CalibrationPage> createState() => _CalibrationPageState();
+}
+
+class _CalibrationPageState extends ConsumerState<CalibrationPage> {
+  Size? _imageSize;
+  bool _imageLoadFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImageSize();
+  }
+
+  Future<void> _loadImageSize() async {
+    try {
+      final bytes = await File(widget.referenceImagePath).readAsBytes();
+      final decoded = img.decodeImage(bytes);
+      if (!mounted) return;
+      if (decoded == null) {
+        setState(() => _imageLoadFailed = true);
+        return;
+      }
+      setState(() {
+        _imageSize = Size(decoded.width.toDouble(), decoded.height.toDouble());
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _imageLoadFailed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final vm = ref.watch(calibrationVMProvider.notifier);
     final state = ref.watch(calibrationVMProvider);
     final repoAsync = ref.watch(calibrationRepoProvider);
@@ -24,6 +64,11 @@ class CalibrationPage extends ConsumerWidget {
     if (repoAsync.hasError) {
       return Scaffold(
         body: Center(child: Text('저장소 초기화 실패: ${repoAsync.error}', style: AppTextStyles.bodyMedium)),
+      );
+    }
+    if (_imageLoadFailed) {
+      return Scaffold(
+        body: Center(child: Text('이미지를 불러올 수 없습니다', style: AppTextStyles.bodyMedium)),
       );
     }
 
@@ -42,13 +87,19 @@ class CalibrationPage extends ConsumerWidget {
       body: Column(
         children: [
           Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(File(referenceImagePath), fit: BoxFit.contain),
-                CalibrationOverlay(points: state.framePoints, onTap: vm.addPoint),
-              ],
-            ),
+            child: _imageSize == null
+                ? const Center(child: CircularProgressIndicator())
+                : Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.file(File(widget.referenceImagePath), fit: BoxFit.contain),
+                      CalibrationOverlay(
+                        points: state.framePoints,
+                        onTap: vm.addPoint,
+                        imageSize: _imageSize!,
+                      ),
+                    ],
+                  ),
           ),
           Container(
             color: AppColors.darkCard,
@@ -59,7 +110,7 @@ class CalibrationPage extends ConsumerWidget {
               children: [
                 Text(
                   step < 4
-                      ? '${step + 1}번 점을 탭하세요 (foul좌→foul우→pin우→pin좌)'
+                      ? _stepGuides[step]
                       : '4점 입력 완료. 이름과 시점 선택 후 저장.',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: step < 4 ? AppColors.neonOrange : AppColors.mint,
@@ -106,7 +157,7 @@ class CalibrationPage extends ConsumerWidget {
                     onPressed: (state.saving || state.name.trim().isEmpty)
                         ? null
                         : () async {
-                            final profile = await vm.save(referenceImagePath: referenceImagePath);
+                            final profile = await vm.save(referenceImagePath: widget.referenceImagePath);
                             if (profile != null && context.mounted) {
                               Navigator.of(context).pop(profile);
                             }
