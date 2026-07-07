@@ -18,7 +18,7 @@ import 'package:bowling_diary/features/admin/presentation/pages/catalog_manage_p
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_camera_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);

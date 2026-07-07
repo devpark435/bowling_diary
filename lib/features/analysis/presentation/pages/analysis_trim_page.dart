@@ -1,18 +1,24 @@
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/features/analysis/data/repositories/calibration_repository_impl.dart';
+import 'package:bowling_diary/features/analysis/data/services/analysis_pipeline.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/ball_rotation_tracker_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/gemini_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/calibration_profile.dart';
+import 'package:bowling_diary/features/analysis/domain/services/calibration_drift_checker.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/calibration_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
 
 class AnalysisTrimPage extends StatefulWidget {
@@ -30,24 +36,39 @@ class AnalysisTrimPage extends StatefulWidget {
 }
 
 class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
-  final _geminiService = GeminiAnalysisService();
-  final _frameExtractor = VideoFrameExtractorService();
-  final _ballDetector = BallDetectionService();
-  final _releaseDetector = ReleaseDetectorService();
-  final _pinImpactDetector = PinImpactDetectorService();
-  final _rotationTracker = BallRotationTrackerService();
-
   VideoPlayerController? _controller;
   double _startSec = 0;
   double _endSec = 0;
   double _totalSec = 0;
   bool _isAnalyzing = false;
   String? _trimmedPath;
+  CalibrationProfile? _calibrationProfile;
 
   @override
   void initState() {
     super.initState();
     _initVideo();
+    _loadDefaultCalibrationProfile();
+  }
+
+  Future<void> _loadDefaultCalibrationProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final profile = await CalibrationRepositoryImpl(prefs).getDefault();
+    if (mounted) setState(() => _calibrationProfile = profile);
+  }
+
+  Future<void> _openCalibration() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    if (!mounted) return;
+    final profile = await Navigator.push<CalibrationProfile>(
+      context,
+      MaterialPageRoute(builder: (_) => CalibrationPage(referenceImagePath: picked.path)),
+    );
+    if (profile != null) {
+      await _loadDefaultCalibrationProfile();
+    }
   }
 
   Future<void> _initVideo() async {
@@ -99,14 +120,18 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   }
 
   Future<void> _startAnalysis() async {
+    final profile = _calibrationProfile;
+    if (profile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('캘리브레이션 프로파일이 없습니다. 먼저 캘리브레이션을 완료해 주세요')),
+      );
+      return;
+    }
+
     setState(() => _isAnalyzing = true);
-
     try {
-      // 1. ffmpeg로 선택 구간 자르기
       final tempDir = await getTemporaryDirectory();
-      final trimmedPath =
-          '${tempDir.path}/trimmed_${DateTime.now().millisecondsSinceEpoch}.mp4';
-
+      final trimmedPath = '${tempDir.path}/trimmed_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final session = await FFmpegKit.execute(
         '-i "${widget.videoPath}" -ss $_startSec -to $_endSec -c copy "$trimmedPath"',
       );
@@ -115,99 +140,26 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
 
       if (mounted) setState(() => _trimmedPath = trimmedPath);
 
-      // 2. 프레임 추출 (30fps)
-      final extracted = await _frameExtractor.extract(trimmedPath);
-
-      // 3. YOLO 볼 감지 (전 프레임)
-      List<BallDetection?> ballDetections = [];
-      try {
-        await _ballDetector.init();
-        ballDetections = extracted.frames.map((f) => _ballDetector.detect(f)).toList();
-      } catch (e) {
-        debugPrint('[Trim] YOLO 오류: $e');
-      } finally {
-        _ballDetector.dispose();
-      }
-
-      // 4. 릴리즈 프레임 감지
-      final releaseResult = _releaseDetector.findRelease(ballDetections);
-      final releaseFrame = releaseResult.isFound ? releaseResult.frame : 0;
-      debugPrint('[Trim] 릴리즈 프레임: $releaseFrame');
-
-      // 5. 핀 충돌 프레임 감지
-      final impactFrame = _pinImpactDetector.findImpactFrame(extracted.frames, releaseFrame);
-      debugPrint('[Trim] 핀 충돌 프레임: $impactFrame');
-
-      // 6. Gemini 통합 분석 (속도 + RPM) — 1차
-      double? speedKmh;
-      int? rpm;
-
-      try {
-        final geminiResult = await _geminiService.analyzeUnified(
-          frames: extracted.frames,
-          ballDetections: ballDetections,
-          releaseFrame: releaseFrame,
-          sampleFps: extracted.sampleFps,
-        );
-        speedKmh = geminiResult.speedKmh;
-        rpm = geminiResult.rpmEstimated;
-        debugPrint('[Trim] Gemini 통합 결과: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h, RPM=$rpm');
-      } on GeminiQuotaExceededException {
-        debugPrint('[Trim] Gemini 할당량 초과 → 로컬 폴백');
-      } catch (e) {
-        debugPrint('[Trim] Gemini 오류: $e → 로컬 폴백');
-      }
-
-      // 속도 폴백: 이벤트 기반 → YOLO
-      if (speedKmh == null) {
-        if (impactFrame != null && impactFrame > releaseFrame) {
-          const laneLength = 18.29;
-          final elapsedSec = (impactFrame - releaseFrame) / extracted.sampleFps.toDouble();
-          final raw = (laneLength / elapsedSec) * 3.6;
-          if (raw >= 10 && raw <= 50) {
-            speedKmh = double.parse(raw.toStringAsFixed(1));
-            debugPrint('[Trim] 이벤트 기반 구속 폴백: ${speedKmh}km/h');
-          }
-        }
-        speedKmh ??= BallTracker.calcSpeedKmh(ballDetections, extracted.sampleFps.toDouble());
-        debugPrint('[Trim] YOLO 폴백 구속: ${speedKmh?.toStringAsFixed(1) ?? '측정불가'}km/h');
-      }
-
-      // RPM 폴백: 지공 홀 추적
-      if (rpm == null) {
-        rpm = _rotationTracker.trackRpm(
-          extracted.frames,
-          ballDetections,
-          releaseFrame,
-          extracted.sampleFps,
-        );
-        debugPrint('[Trim] 로컬 RPM 폴백: $rpm');
-      }
-
-      final analysisData = AnalysisData(
-        speedKmh: speedKmh,
-        rpmEstimated: rpm,
-        framesAnalyzed: extracted.frames.length,
-        fpsUsed: extracted.sampleFps,
+      final pipeline = AnalysisPipeline(
+        frameExtractor: VideoFrameExtractorService(),
+        ballDetector: BallDetectionService(),
+        releaseDetector: ReleaseDetectorService(),
+        impactDetector: ImpactDetectorService(pinImpactDetector: PinImpactDetectorService()),
+        speedEstimator: SpeedEstimatorService(),
+        driftChecker: CalibrationDriftChecker(),
       );
+      final analysisData = await pipeline.run(trimmedPath, profile, widget.fps);
 
       if (!mounted) return;
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AnalysisResultPage(
-            analysisData: analysisData,
-            videoPath: trimmedPath,
-            recordedAt: DateTime.now(),
-          ),
+      await Navigator.pushReplacement(context, MaterialPageRoute(
+        builder: (_) => AnalysisResultPage(
+          analysisData: analysisData, videoPath: trimmedPath, recordedAt: DateTime.now(),
         ),
-      );
+      ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('분석 실패: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('분석 실패: $e')));
     }
   }
 
@@ -243,7 +195,16 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
     final selectedDuration = _endSec - _startSec;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('구간 선택')),
+      appBar: AppBar(
+        title: const Text('구간 선택'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.straighten),
+            tooltip: '레인 캘리브레이션',
+            onPressed: _openCalibration,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           // 영상 미리보기 (최대 화면 45%)

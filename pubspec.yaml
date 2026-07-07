@@ -31,7 +31,7 @@ dependencies:
 
   # 유틸리티
   intl: ^0.19.0
-  uuid: ^4.5.1
+  uuid: ^4.5.3
   shared_preferences: ^2.3.3
   google_sign_in: ^7.2.0
   sign_in_with_apple: ^7.0.1
