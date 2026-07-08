@@ -1,10 +1,6 @@
-import 'package:bowling_diary/features/analysis/domain/entities/drift_check_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 
-String speedFailureUserMessage(SpeedFailure? failure, DriftStatus driftStatus) {
-  if (driftStatus == DriftStatus.recalibrationRequired) {
-    return '카메라 위치를 다시 확인하고 촬영해 주세요';
-  }
+String speedFailureUserMessage(SpeedFailure? failure) {
   switch (failure) {
     case SpeedFailure.releaseNotFound:
     case SpeedFailure.impactNotFound:

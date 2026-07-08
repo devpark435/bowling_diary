@@ -291,7 +291,7 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              speedFailureUserMessage(data.speedFailure, data.driftStatus),
+                              speedFailureUserMessage(data.speedFailure),
                               style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
                               textAlign: TextAlign.center,
                             ),

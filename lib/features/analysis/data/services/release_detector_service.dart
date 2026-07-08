@@ -80,9 +80,16 @@ class ReleaseDetectorService {
       }
     }
 
+    // 제대로 트리밍된 클립이라면 release는 후반 25%(flight/impact/settle 구간)에
+    // 올 수 없다 — 이 범위에서 검출됐다면 다른 원인의 오검출일 가능성이 높으므로
+    // 조용히 틀린 프레임을 반환하는 대신 notFound로 실패를 명시한다.
+    if (bestStart! > (detections.length * 0.75).round()) {
+      return ReleaseResult.notFound;
+    }
+
     final confidence = (bestLen / _windowSize).clamp(0.0, 1.0);
     debugPrint('[ReleaseDetector] release=$bestStart, conf=$confidence');
-    return ReleaseResult(frame: bestStart!, confidence: confidence);
+    return ReleaseResult(frame: bestStart, confidence: confidence);
   }
 
   double _laneForwardScore(List<BallDetection?> detections, HomographyMatrix h, int startFrame) {
@@ -124,8 +131,13 @@ class ReleaseDetectorService {
   }
 
   int? _findBackswingPeak(List<BallDetection?> detections) {
+    // 백스윙 피크는 항상 클립 전반부에서만 발생한다. 실기기 로그에서
+    // 임팩트 이후 파편/모션블러로 인한 스퓨리어스 대형 bbox가 후반부에
+    // 잡혀 전체 스캔 시 이를 피크로 오검출, release 탐색을 통째로
+    // 건너뛰게 만드는 사례가 확인되어 스캔 범위를 전반 50%로 제한한다.
+    final scanEnd = (detections.length * 0.5).round();
     final areas = <(int, double)>[];
-    for (int i = 0; i < detections.length; i++) {
+    for (int i = 0; i < scanEnd; i++) {
       final d = detections[i];
       if (d == null) continue;
       areas.add((i, d.bw * d.bh));

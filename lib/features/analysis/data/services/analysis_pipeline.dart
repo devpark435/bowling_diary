@@ -1,19 +1,14 @@
-import 'dart:io';
-
-import 'package:image/image.dart' as img;
-
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/calibration_profile.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/drift_check_result.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
-import 'package:bowling_diary/features/analysis/domain/services/calibration_drift_checker.dart';
 
 class AnalysisPipeline {
   final VideoFrameExtractorService frameExtractor;
@@ -21,7 +16,18 @@ class AnalysisPipeline {
   final ReleaseDetectorService releaseDetector;
   final ImpactDetectorService impactDetector;
   final SpeedEstimatorService speedEstimator;
-  final CalibrationDriftChecker driftChecker;
+
+  /// FSM이 찾은 release가 ReleaseDetectorService 결과와 이 프레임 수 이내로
+  /// 일치하면 "교차검증됨(high agreement)"으로 취급한다.
+  static const int agreementFrameTolerance = 10;
+
+  /// FSM + ReleaseDetectorService 둘 다 일치할 때의 confidence.
+  static const double highAgreementConfidence = 0.9;
+
+  /// FSM만 release를 찾고 ReleaseDetectorService가 불일치하거나 못 찾았을 때의
+  /// confidence — 실기기 2회 연속 검증에서 FSM 단독 신호가 신뢰할 만하다고
+  /// 확인됐으므로, 이 경우도 실패 대신 FSM 프레임을 채택한다.
+  static const double fsmOnlyConfidence = 0.7;
 
   AnalysisPipeline({
     required this.frameExtractor,
@@ -29,45 +35,46 @@ class AnalysisPipeline {
     required this.releaseDetector,
     required this.impactDetector,
     required this.speedEstimator,
-    required this.driftChecker,
   });
 
-  Future<AnalysisData> run(String videoPath, CalibrationProfile profile) async {
+  /// release 신호 결합 로직 (순수 함수, 단독 유닛테스트 가능).
+  ///
+  /// 우선순위: FSM(bbox-area 피크 + lane-y 단조증가, 실기기 2회 연속 정답 검증됨)이
+  /// 1순위, ReleaseDetectorService(속도 휴리스틱)는 폴백/교차검증 신호.
+  /// impact에 이미 적용된 것과 동일한 패턴(ImpactDetectorService 참조).
+  ///
+  /// - FSM이 찾음: FSM 프레임 채택. detector가 근접 일치(±[agreementFrameTolerance]
+  ///   프레임 이내)하면 high confidence, 아니면(불일치하거나 detector가 못 찾았어도)
+  ///   FSM 단독 confidence로 채택 — detector 프레임으로 대체하지 않는다.
+  /// - FSM이 못 찾고 detector가 찾음: detector 결과를 그대로 폴백 사용.
+  /// - 둘 다 못 찾음: notFound.
+  static ReleaseResult combineRelease(int? fsmReleaseFrame, ReleaseResult detectorResult) {
+    if (fsmReleaseFrame != null) {
+      final agrees = detectorResult.isFound &&
+          (detectorResult.frame - fsmReleaseFrame).abs() <= agreementFrameTolerance;
+      return ReleaseResult(
+        frame: fsmReleaseFrame,
+        confidence: agrees ? highAgreementConfidence : fsmOnlyConfidence,
+      );
+    }
+    if (detectorResult.isFound) {
+      return detectorResult;
+    }
+    return ReleaseResult.notFound;
+  }
+
+  /// [homography]는 이 영상 전용으로 산출된 호모그래피다(레퍼런스 = 영상 자체이므로
+  /// drift 개념이 존재하지 않는다 — spec §10 참조).
+  Future<AnalysisData> run(String videoPath, HomographyMatrix homography) async {
     final extracted = await frameExtractor.extract(videoPath);
     final frames = extracted.frames;
     if (frames.isEmpty) {
       return AnalysisData(
         speedFailure: SpeedFailure.lowConfidence,
-        driftStatus: DriftStatus.ok,
         framesAnalyzed: 0,
         fpsUsed: extracted.sampleFps,
       );
     }
-
-    final referenceFrame = await _loadReferenceFrame(profile.referenceImagePath);
-
-    final driftResult = referenceFrame != null
-        ? driftChecker.check(
-            referenceFrame: referenceFrame,
-            currentFrame: frames.first,
-            referencePoints: profile.framePoints,
-            homography: profile.homography,
-          )
-        : DriftCheckResult(
-            status: DriftStatus.recalibrationRequired,
-            homography: profile.homography,
-            driftScoreNormalized: 1.0,
-          );
-
-    if (driftResult.status == DriftStatus.recalibrationRequired) {
-      return AnalysisData(
-        driftStatus: driftResult.status,
-        framesAnalyzed: 0,
-        fpsUsed: extracted.sampleFps,
-      );
-    }
-
-    final homography = driftResult.homography;
 
     List<BallDetection?> detections;
     try {
@@ -77,7 +84,7 @@ class AnalysisPipeline {
       ballDetector.dispose();
     }
 
-    final release = releaseDetector.findRelease(detections, homography: homography);
+    final detectorRelease = releaseDetector.findRelease(detections, homography: homography);
 
     final fsm = AnalysisStateMachine();
     for (var i = 0; i < detections.length; i++) {
@@ -86,10 +93,11 @@ class AnalysisPipeline {
       fsm.onFrame(frameIdx: i, detection: d, lanePos: lanePos);
     }
 
+    final release = combineRelease(fsm.releaseFrame, detectorRelease);
+
     if (!release.isFound || fsm.impactFrame == null) {
       return AnalysisData(
         speedFailure: !release.isFound ? SpeedFailure.releaseNotFound : SpeedFailure.impactNotFound,
-        driftStatus: driftResult.status,
         framesAnalyzed: frames.length,
         fpsUsed: extracted.sampleFps,
       );
@@ -109,27 +117,12 @@ class AnalysisPipeline {
       sampleFps: extracted.sampleFps,
     );
 
-    final driftPenalty = driftResult.status == DriftStatus.autoCorrected ? 0.9 : 1.0;
-    final adjustedConfidence = (speed.confidence * driftPenalty).clamp(0.0, 1.0);
-
     return AnalysisData(
       speedKmh: speed.kmh,
-      speedConfidence: adjustedConfidence,
+      speedConfidence: speed.confidence,
       speedFailure: speed.failure,
-      driftStatus: driftResult.status,
       framesAnalyzed: frames.length,
       fpsUsed: extracted.sampleFps,
     );
-  }
-
-  /// 캘리브레이션 시점 레퍼런스 이미지를 로드/디코드한다.
-  /// 파일이 없거나 디코드 실패 시 null을 반환 — 호출부에서 recalibrationRequired로 처리(fail safe).
-  Future<img.Image?> _loadReferenceFrame(String path) async {
-    try {
-      final bytes = await File(path).readAsBytes();
-      return img.decodeImage(bytes);
-    } catch (_) {
-      return null;
-    }
   }
 }

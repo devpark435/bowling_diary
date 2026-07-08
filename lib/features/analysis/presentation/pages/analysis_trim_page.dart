@@ -1,13 +1,11 @@
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
-import 'package:bowling_diary/features/analysis/data/repositories/calibration_repository_impl.dart';
 import 'package:bowling_diary/features/analysis/data/services/analysis_pipeline.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
@@ -15,11 +13,21 @@ import 'package:bowling_diary/features/analysis/data/services/pin_impact_detecto
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/calibration_profile.dart';
-import 'package:bowling_diary/features/analysis/domain/services/calibration_drift_checker.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
+import 'package:bowling_diary/features/analysis/domain/services/homography_solver.dart';
+import 'package:bowling_diary/features/analysis/domain/services/lane_detector_service.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/calibration_page.dart';
+import 'package:bowling_diary/features/analysis/presentation/pages/lane_confirm_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/widgets/analysis_loading_widget.dart';
+
+/// 레인 실측 좌표계(spec §10 기준: 파울라인=y0, 핀덱=y18.29m, 폭 1.05m).
+/// 순서는 코너 리스트와 동일하게 foul-left, foul-right, pin-right, pin-left.
+const _laneCorners = [
+  LanePoint(xM: 0, yM: 0),
+  LanePoint(xM: 1.05, yM: 0),
+  LanePoint(xM: 1.05, yM: 18.29),
+  LanePoint(xM: 0, yM: 18.29),
+];
 
 class AnalysisTrimPage extends StatefulWidget {
   final String videoPath;
@@ -42,63 +50,11 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   double _totalSec = 0;
   bool _isAnalyzing = false;
   String? _trimmedPath;
-  CalibrationProfile? _calibrationProfile;
 
   @override
   void initState() {
     super.initState();
     _initVideo();
-    _loadDefaultCalibrationProfile();
-  }
-
-  Future<void> _loadDefaultCalibrationProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final profile = await CalibrationRepositoryImpl(prefs).getDefault();
-    if (mounted) setState(() => _calibrationProfile = profile);
-  }
-
-  Future<void> _openCalibration() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
-    if (!mounted) return;
-    final profile = await Navigator.push<CalibrationProfile>(
-      context,
-      MaterialPageRoute(builder: (_) => CalibrationPage(referenceImagePath: picked.path)),
-    );
-    if (profile != null) {
-      await _loadDefaultCalibrationProfile();
-    }
-  }
-
-  Future<void> _showCalibrationRequiredDialog() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
-        title: Text(
-          '레인 캘리브레이션이 필요해요',
-          style: AppTextStyles.headingSmall.copyWith(color: AppColors.textPrimary),
-        ),
-        content: Text(
-          '첫 분석 전에 레인 위치를 한 번만 알려주면 돼요.\n레인이 잘 보이는 사진으로 4개 지점을 탭합니다.',
-          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('취소', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text('캘리브레이션 하기', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.neonOrange, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      await _openCalibration();
-    }
   }
 
   Future<void> _initVideo() async {
@@ -150,23 +106,49 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   }
 
   Future<void> _startAnalysis() async {
-    final profile = _calibrationProfile;
-    if (profile == null) {
-      await _showCalibrationRequiredDialog();
-      return;
-    }
-
     setState(() => _isAnalyzing = true);
     try {
       final tempDir = await getTemporaryDirectory();
       final trimmedPath = '${tempDir.path}/trimmed_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      final session = await FFmpegKit.execute(
+      final trimSession = await FFmpegKit.execute(
         '-i "${widget.videoPath}" -ss $_startSec -to $_endSec -c copy "$trimmedPath"',
       );
-      final rc = await session.getReturnCode();
-      if (rc == null || !rc.isValueSuccess()) throw Exception('영상 자르기 실패');
+      final trimRc = await trimSession.getReturnCode();
+      if (trimRc == null || !trimRc.isValueSuccess()) throw Exception('영상 자르기 실패');
 
       if (mounted) setState(() => _trimmedPath = trimmedPath);
+
+      // 트림된 영상의 첫 프레임을 뽑아 레인 4코너를 자동검출한다(spec §10:
+      // 영상별 자동검출+확인 — 저장형 캘리브레이션 프로파일 폐기).
+      final framePath = '${tempDir.path}/lane_frame_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final frameSession = await FFmpegKit.execute(
+        '-i "$trimmedPath" -frames:v 1 -q:v 3 "$framePath"',
+      );
+      final frameRc = await frameSession.getReturnCode();
+      if (frameRc == null || !frameRc.isValueSuccess()) throw Exception('첫 프레임 추출 실패');
+
+      final frameBytes = await File(framePath).readAsBytes();
+      final frame = img.decodeImage(frameBytes);
+      if (frame == null) throw Exception('첫 프레임 디코딩 실패');
+
+      final detection = LaneDetectorService().detect(frame);
+
+      if (!mounted) return;
+      final confirmedCorners = await Navigator.push<List<FramePoint>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LaneConfirmPage(framePath: framePath, detection: detection),
+        ),
+      );
+
+      if (!mounted) return;
+      if (confirmedCorners == null) {
+        // 유저가 확인 화면에서 취소함 — 분석을 중단하고 트림 화면으로 되돌아간다.
+        setState(() => _isAnalyzing = false);
+        return;
+      }
+
+      final homography = HomographySolver.solve4Point(confirmedCorners, _laneCorners);
 
       final pipeline = AnalysisPipeline(
         frameExtractor: VideoFrameExtractorService(),
@@ -174,9 +156,8 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         releaseDetector: ReleaseDetectorService(),
         impactDetector: ImpactDetectorService(pinImpactDetector: PinImpactDetectorService()),
         speedEstimator: SpeedEstimatorService(),
-        driftChecker: CalibrationDriftChecker(),
       );
-      final analysisData = await pipeline.run(trimmedPath, profile);
+      final analysisData = await pipeline.run(trimmedPath, homography);
 
       if (!mounted) return;
       await Navigator.pushReplacement(context, MaterialPageRoute(
@@ -228,13 +209,6 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('구간 선택'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.straighten),
-            tooltip: '레인 캘리브레이션',
-            onPressed: _openCalibration,
-          ),
-        ],
       ),
       body: Column(
         children: [
