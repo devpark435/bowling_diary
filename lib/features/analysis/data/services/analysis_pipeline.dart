@@ -9,6 +9,7 @@ import 'package:bowling_diary/features/analysis/domain/entities/homography_matri
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 class AnalysisPipeline {
   final VideoFrameExtractorService frameExtractor;
@@ -78,8 +79,22 @@ class AnalysisPipeline {
 
     List<BallDetection?> detections;
     try {
+      // 모델 로드 자체가 실패하면(GPU/CPU 둘 다 실패) 0프레임 분석은 의미가 없으므로
+      // 여기서는 예외를 그대로 전파해 analysis_trim_page의 상위 핸들러가 처리하게 둔다.
       await ballDetector.init();
-      detections = frames.map((f) => ballDetector.detect(f)).toList();
+
+      // 반면 프레임 단위 검출 실패는 치명적이지 않다 — 다운스트림(release/impact/speed
+      // estimator)이 이미 null 검출을 1급 케이스로 처리하도록 설계돼 있으므로, 개별
+      // 프레임에서 예외가 나도 해당 프레임만 null로 격하시키고 나머지는 계속 진행한다.
+      detections = <BallDetection?>[];
+      for (var i = 0; i < frames.length; i++) {
+        try {
+          detections.add(ballDetector.detect(frames[i]));
+        } catch (e) {
+          debugPrint('[AnalysisPipeline] frame $i 검출 실패: $e');
+          detections.add(null);
+        }
+      }
     } finally {
       ballDetector.dispose();
     }
