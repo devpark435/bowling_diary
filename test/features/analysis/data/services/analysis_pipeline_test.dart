@@ -34,6 +34,27 @@ class _FakeBallDetector implements BallDetectionService {
   BallDetection? detect(img.Image frame) => _i < sequence.length ? sequence[_i++] : null;
 }
 
+/// [failFrames]에 해당하는 프레임 인덱스에서 detect()가 예외를 던지는 페이크.
+/// 프레임 단위 검출 실패가 파이프라인 전체를 죽이지 않는지 검증하기 위한 회귀 테스트용.
+class _FlakyFakeBallDetector implements BallDetectionService {
+  final List<BallDetection?> sequence;
+  final Set<int> failFrames;
+  int _i = 0;
+  _FlakyFakeBallDetector(this.sequence, this.failFrames);
+  @override
+  Future<void> init() async {}
+  @override
+  void dispose() {}
+  @override
+  BallDetection? detect(img.Image frame) {
+    final i = _i++;
+    if (failFrames.contains(i)) {
+      throw StateError('synthetic per-frame detection failure at $i');
+    }
+    return i < sequence.length ? sequence[i] : null;
+  }
+}
+
 img.Image _blankFrame() {
   final image = img.Image(width: 20, height: 20);
   img.fill(image, color: img.ColorRgb8(10, 10, 10));
@@ -133,6 +154,32 @@ void main() {
 
     expect(result.framesAnalyzed, detections.length);
   });
+
+  test(
+    '특정 프레임에서 ballDetector.detect()가 예외를 던져도(예: TFLite 엣지 케이스) '
+    '해당 프레임만 null로 격하되고 파이프라인 전체는 중단 없이 완주해 속도를 산출한다',
+    () async {
+      final detections = _regressionDetections();
+      final frames = _regressionFrames();
+
+      final pipeline = AnalysisPipeline(
+        frameExtractor: _FakeFrameExtractor(
+          FrameExtractionResult(frames: frames, originalFps: 30, sampleFps: 30),
+        ),
+        ballDetector: _FlakyFakeBallDetector(detections, const {10}),
+        releaseDetector: ReleaseDetectorService(),
+        impactDetector: ImpactDetectorService(pinImpactDetector: PinImpactDetectorService()),
+        speedEstimator: SpeedEstimatorService(),
+      );
+
+      final result = await pipeline.run('fake.mp4', homography);
+
+      expect(result.framesAnalyzed, detections.length);
+      expect(result.speedFailure, isNull);
+      expect(result.speedKmh, isNotNull);
+      expect(result.speedKmh, inInclusiveRange(10.0, 50.0));
+    },
+  );
 
   group('AnalysisPipeline.combineRelease', () {
     test('FSM 찾음 + detector 근접 일치(10프레임 이내) → high confidence로 FSM 프레임 채택', () {
