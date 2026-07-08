@@ -8,10 +8,7 @@ import 'package:bowling_diary/features/analysis/data/services/pin_impact_detecto
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/calibration_profile.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
-import 'package:bowling_diary/features/analysis/domain/services/calibration_drift_checker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -28,6 +25,8 @@ void main() {
   for (final mp4 in mp4Files) {
     final name = mp4.uri.pathSegments.last.replaceAll('.mp4', '');
     test('$name 속도 회귀 비교', () async {
+      // fixture는 기존 캘리브레이션 프로파일 JSON 포맷을 그대로 유지한다(homography
+      // 배열 외 필드는 저장형 캘리브레이션 폐기 후 더 이상 쓰이지 않지만 무시하면 됨).
       final calibJson = jsonDecode(
         File('${fixturesDir.path}/$name.calibration.json').readAsStringSync(),
       ) as Map<String, dynamic>;
@@ -38,18 +37,6 @@ void main() {
       final homography = HomographyMatrix.fromRowMajor(
         (calibJson['homography'] as List).map((e) => (e as num).toDouble()).toList(),
       );
-      final framePoints = (calibJson['framePoints'] as List)
-          .map((e) => FramePoint(nx: (e['nx'] as num).toDouble(), ny: (e['ny'] as num).toDouble()))
-          .toList();
-      final profile = CalibrationProfile(
-        id: calibJson['id'] as String,
-        name: calibJson['name'] as String,
-        viewpoint: CameraViewpoint.values.firstWhere((v) => v.name == calibJson['viewpoint']),
-        homography: homography,
-        createdAt: DateTime.parse(calibJson['createdAt'] as String),
-        referenceImagePath: calibJson['referenceImagePath'] as String,
-        framePoints: framePoints,
-      );
 
       final pipeline = AnalysisPipeline(
         frameExtractor: VideoFrameExtractorService(),
@@ -57,10 +44,9 @@ void main() {
         releaseDetector: ReleaseDetectorService(),
         impactDetector: ImpactDetectorService(pinImpactDetector: PinImpactDetectorService()),
         speedEstimator: SpeedEstimatorService(),
-        driftChecker: CalibrationDriftChecker(),
       );
 
-      final result = await pipeline.run(mp4.path, profile);
+      final result = await pipeline.run(mp4.path, homography);
       final groundTruth = (expected['groundTruthKmh'] as num).toDouble();
       final tolerance = (expected['toleranceKmh'] as num).toDouble();
 

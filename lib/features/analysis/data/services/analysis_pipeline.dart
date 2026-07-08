@@ -1,19 +1,13 @@
-import 'dart:io';
-
-import 'package:image/image.dart' as img;
-
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/calibration_profile.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/drift_check_result.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
-import 'package:bowling_diary/features/analysis/domain/services/calibration_drift_checker.dart';
 
 class AnalysisPipeline {
   final VideoFrameExtractorService frameExtractor;
@@ -21,7 +15,6 @@ class AnalysisPipeline {
   final ReleaseDetectorService releaseDetector;
   final ImpactDetectorService impactDetector;
   final SpeedEstimatorService speedEstimator;
-  final CalibrationDriftChecker driftChecker;
 
   AnalysisPipeline({
     required this.frameExtractor,
@@ -29,45 +22,20 @@ class AnalysisPipeline {
     required this.releaseDetector,
     required this.impactDetector,
     required this.speedEstimator,
-    required this.driftChecker,
   });
 
-  Future<AnalysisData> run(String videoPath, CalibrationProfile profile) async {
+  /// [homography]는 이 영상 전용으로 산출된 호모그래피다(레퍼런스 = 영상 자체이므로
+  /// drift 개념이 존재하지 않는다 — spec §10 참조).
+  Future<AnalysisData> run(String videoPath, HomographyMatrix homography) async {
     final extracted = await frameExtractor.extract(videoPath);
     final frames = extracted.frames;
     if (frames.isEmpty) {
       return AnalysisData(
         speedFailure: SpeedFailure.lowConfidence,
-        driftStatus: DriftStatus.ok,
         framesAnalyzed: 0,
         fpsUsed: extracted.sampleFps,
       );
     }
-
-    final referenceFrame = await _loadReferenceFrame(profile.referenceImagePath);
-
-    final driftResult = referenceFrame != null
-        ? driftChecker.check(
-            referenceFrame: referenceFrame,
-            currentFrame: frames.first,
-            referencePoints: profile.framePoints,
-            homography: profile.homography,
-          )
-        : DriftCheckResult(
-            status: DriftStatus.recalibrationRequired,
-            homography: profile.homography,
-            driftScoreNormalized: 1.0,
-          );
-
-    if (driftResult.status == DriftStatus.recalibrationRequired) {
-      return AnalysisData(
-        driftStatus: driftResult.status,
-        framesAnalyzed: 0,
-        fpsUsed: extracted.sampleFps,
-      );
-    }
-
-    final homography = driftResult.homography;
 
     List<BallDetection?> detections;
     try {
@@ -89,7 +57,6 @@ class AnalysisPipeline {
     if (!release.isFound || fsm.impactFrame == null) {
       return AnalysisData(
         speedFailure: !release.isFound ? SpeedFailure.releaseNotFound : SpeedFailure.impactNotFound,
-        driftStatus: driftResult.status,
         framesAnalyzed: frames.length,
         fpsUsed: extracted.sampleFps,
       );
@@ -109,27 +76,12 @@ class AnalysisPipeline {
       sampleFps: extracted.sampleFps,
     );
 
-    final driftPenalty = driftResult.status == DriftStatus.autoCorrected ? 0.9 : 1.0;
-    final adjustedConfidence = (speed.confidence * driftPenalty).clamp(0.0, 1.0);
-
     return AnalysisData(
       speedKmh: speed.kmh,
-      speedConfidence: adjustedConfidence,
+      speedConfidence: speed.confidence,
       speedFailure: speed.failure,
-      driftStatus: driftResult.status,
       framesAnalyzed: frames.length,
       fpsUsed: extracted.sampleFps,
     );
-  }
-
-  /// 캘리브레이션 시점 레퍼런스 이미지를 로드/디코드한다.
-  /// 파일이 없거나 디코드 실패 시 null을 반환 — 호출부에서 recalibrationRequired로 처리(fail safe).
-  Future<img.Image?> _loadReferenceFrame(String path) async {
-    try {
-      final bytes = await File(path).readAsBytes();
-      return img.decodeImage(bytes);
-    } catch (_) {
-      return null;
-    }
   }
 }

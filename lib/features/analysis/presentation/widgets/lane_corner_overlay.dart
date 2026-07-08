@@ -33,44 +33,85 @@ Rect computeContainRect(Size containerSize, Size imageSize) {
   return Rect.fromLTWH(left, top, width, height);
 }
 
-class CalibrationOverlay extends StatelessWidget {
+/// 레인 4코너(자동검출 또는 기본값)를 이미지 위에 번호 마커로 표시하고,
+/// 드래그로 보정할 수 있게 하는 오버레이.
+///
+/// [points]는 항상 정확히 4개가 존재한다는 전제로 동작한다 — 이 위젯은 점을
+/// 추가/삭제하지 않고, 기존 점을 드래그로 옮기는 것만 지원한다(자동검출
+/// 결과의 확인/보정 용도).
+class LaneCornerOverlay extends StatefulWidget {
   final List<FramePoint> points;
-  final ValueChanged<FramePoint> onTap;
+  final ValueChanged<List<FramePoint>> onChanged;
 
-  /// 참조 이미지의 고유(intrinsic) 픽셀 크기. [BoxFit.contain] 렌더링 영역을
-  /// 계산하기 위해 필요하다.
+  /// 렌더링 중인 프레임 이미지의 고유(intrinsic) 픽셀 크기. [BoxFit.contain]
+  /// 렌더링 영역을 계산하기 위해 필요하다.
   final Size imageSize;
 
-  const CalibrationOverlay({
+  const LaneCornerOverlay({
     super.key,
     required this.points,
-    required this.onTap,
+    required this.onChanged,
     required this.imageSize,
   });
+
+  @override
+  State<LaneCornerOverlay> createState() => _LaneCornerOverlayState();
+}
+
+class _LaneCornerOverlayState extends State<LaneCornerOverlay> {
+  /// 드래그 시작점 판정 반경(논리 픽셀). 이 범위 밖에서 시작된 드래그는 무시한다
+  /// (레터박스 영역 등에서 실수로 시작된 제스처가 아무 점도 옮기지 않게 함).
+  static const double _hitRadiusPx = 32.0;
+
+  int? _draggingIndex;
+
+  Offset _pointOffset(Rect imageRect, int index) {
+    final p = widget.points[index];
+    return Offset(
+      imageRect.left + p.nx * imageRect.width,
+      imageRect.top + p.ny * imageRect.height,
+    );
+  }
+
+  FramePoint _clampToRect(Rect imageRect, Offset local) {
+    final nx = ((local.dx - imageRect.left) / imageRect.width).clamp(0.0, 1.0);
+    final ny = ((local.dy - imageRect.top) / imageRect.height).clamp(0.0, 1.0);
+    return FramePoint(nx: nx, ny: ny);
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final containerSize = constraints.biggest;
-        final imageRect = computeContainRect(containerSize, imageSize);
+        final imageRect = computeContainRect(containerSize, widget.imageSize);
 
         return GestureDetector(
-          onTapUp: (details) {
-            if (points.length >= 4) return;
+          onPanStart: (details) {
             final pos = details.localPosition;
-            // 레터박스(이미지 밖) 영역의 탭은 무시한다.
-            if (!imageRect.contains(pos)) return;
-
-            final nx = ((pos.dx - imageRect.left) / imageRect.width)
-                .clamp(0.0, 1.0);
-            final ny = ((pos.dy - imageRect.top) / imageRect.height)
-                .clamp(0.0, 1.0);
-            onTap(FramePoint(nx: nx, ny: ny));
+            int? nearestIndex;
+            var nearestDist = double.infinity;
+            for (var i = 0; i < widget.points.length; i++) {
+              final dist = (_pointOffset(imageRect, i) - pos).distance;
+              if (dist < nearestDist) {
+                nearestDist = dist;
+                nearestIndex = i;
+              }
+            }
+            _draggingIndex = (nearestIndex != null && nearestDist <= _hitRadiusPx) ? nearestIndex : null;
           },
+          onPanUpdate: (details) {
+            final idx = _draggingIndex;
+            if (idx == null) return;
+            final updated = List<FramePoint>.of(widget.points);
+            updated[idx] = _clampToRect(imageRect, details.localPosition);
+            widget.onChanged(updated);
+          },
+          onPanEnd: (_) => _draggingIndex = null,
+          onPanCancel: () => _draggingIndex = null,
           child: CustomPaint(
             size: containerSize,
-            painter: _MarkerPainter(points, imageRect),
+            painter: _MarkerPainter(widget.points, imageRect),
           ),
         );
       },
