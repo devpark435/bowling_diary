@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 
 /// [BoxFit.contain]으로 렌더링된 이미지가 [containerSize] 안에서 실제로 차지하는
@@ -33,7 +34,7 @@ Rect computeContainRect(Size containerSize, Size imageSize) {
   return Rect.fromLTWH(left, top, width, height);
 }
 
-/// 레인 4코너(자동검출 또는 기본값)를 이미지 위에 번호 마커로 표시하고,
+/// 레인 4코너(자동검출 또는 기본값)를 이미지 위에 레인 영역(사변형)으로 표시하고,
 /// 드래그로 보정할 수 있게 하는 오버레이.
 ///
 /// [points]는 항상 정확히 4개가 존재한다는 전제로 동작한다 — 이 위젯은 점을
@@ -111,7 +112,7 @@ class _LaneCornerOverlayState extends State<LaneCornerOverlay> {
           onPanCancel: () => _draggingIndex = null,
           child: CustomPaint(
             size: containerSize,
-            painter: _MarkerPainter(widget.points, imageRect),
+            painter: _LaneRegionPainter(widget.points, imageRect),
           ),
         );
       },
@@ -119,43 +120,57 @@ class _LaneCornerOverlayState extends State<LaneCornerOverlay> {
   }
 }
 
-class _MarkerPainter extends CustomPainter {
+/// 레인 4코너를 이어 반투명 사변형(영역)으로 그리고, 각 꼭짓점에 드래그용
+/// 핸들 원을 그리는 페인터. 점(들)이 아니라 레인 영역 자체가 시각적으로
+/// 읽히도록 하는 것이 목적 — 번호 라벨은 없다(외곽선 자체로 파울/핀 코너
+/// 구분이 명확함).
+class _LaneRegionPainter extends CustomPainter {
   final List<FramePoint> points;
   final Rect imageRect;
-  _MarkerPainter(this.points, this.imageRect);
+  _LaneRegionPainter(this.points, this.imageRect);
+
+  /// 이미지-상대 정규화 좌표를 화면 좌표로 역변환한다.
+  Offset _offsetFor(int index) {
+    final p = points[index];
+    return Offset(
+      imageRect.left + p.nx * imageRect.width,
+      imageRect.top + p.ny * imageRect.height,
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.orangeAccent
+    if (points.isEmpty) return;
+
+    final regionColor = AppColors.neonOrange;
+    final path = Path()..moveTo(_offsetFor(0).dx, _offsetFor(0).dy);
+    for (var i = 1; i < points.length; i++) {
+      final offset = _offsetFor(i);
+      path.lineTo(offset.dx, offset.dy);
+    }
+    path.close();
+
+    final fillPaint = Paint()
+      ..color = regionColor.withValues(alpha: 0.18)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fillPaint);
+
+    final strokePaint = Paint()
+      ..color = regionColor.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, strokePaint);
+
+    final handlePaint = Paint()
+      ..color = regionColor
       ..style = PaintingStyle.fill;
     for (var i = 0; i < points.length; i++) {
-      // 이미지-상대 정규화 좌표를 화면 좌표로 역변환한다.
-      final offset = Offset(
-        imageRect.left + points[i].nx * imageRect.width,
-        imageRect.top + points[i].ny * imageRect.height,
-      );
-      canvas.drawCircle(offset, 12, paint);
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '${i + 1}',
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      textPainter.paint(
-        canvas,
-        offset - Offset(textPainter.width / 2, textPainter.height / 2),
-      );
+      canvas.drawCircle(_offsetFor(i), 10, handlePaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _MarkerPainter oldDelegate) =>
+  bool shouldRepaint(covariant _LaneRegionPainter oldDelegate) =>
       oldDelegate.points != points || oldDelegate.imageRect != imageRect;
 }
