@@ -2,14 +2,16 @@ import 'dart:io' as dart_io;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_result_entity.dart';
 import 'package:bowling_diary/features/analysis/presentation/providers/analysis_provider.dart';
+import 'package:bowling_diary/features/analysis/presentation/utils/speed_failure_copy.dart';
 import 'package:bowling_diary/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bowling_diary/features/record/domain/entities/session_entity.dart';
 
@@ -80,11 +82,12 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
       userId: auth.user.id,
       recordedAt: widget.recordedAt,
       speedKmh: widget.analysisData.speedKmh,
-      rpmEstimated: widget.analysisData.rpmEstimated,
       fpsUsed: widget.analysisData.fpsUsed,
       videoLocalPath: widget.videoPath,
       linkedSessionId: linkedSessionId,
       createdAt: DateTime.now(),
+      speedConfidence: widget.analysisData.speedConfidence,
+      speedFailureReason: widget.analysisData.speedFailure?.name,
     );
 
     await ref.read(analysisRepositoryProvider).save(entity);
@@ -279,26 +282,48 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (data.speedKmh == null) ...[
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              speedFailureUserMessage(data.speedFailure, data.driftStatus),
+                              style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.neonOrange,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () => context.go('/analysis/camera'),
+                              child: Text(
+                                '다시 촬영하기',
+                                style: AppTextStyles.bodyLarge.copyWith(
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
                         // 구속
                         _StatRow(
                           label: '구속',
                           value: data.speedKmh?.toStringAsFixed(1),
                           unit: 'km/h',
                           highlight: true,
-                        ),
-                        const SizedBox(height: 2),
-                        // 구분선
-                        Divider(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          height: 16,
-                        ),
-                        // RPM
-                        _StatRow(
-                          label: 'RPM',
-                          value: data.rpmEstimated?.toString(),
-                          unit: 'rpm',
-                          highlight: false,
-                          badge: '추정값',
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -310,10 +335,34 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // 저장 버튼
+                        // 저장 버튼 (측정 실패 시 다시 촬영하기가 primary이므로 secondary로)
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton(
+                          child: data.speedKmh == null
+                              ? OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.neonOrange,
+                                    side: BorderSide(color: AppColors.neonOrange),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  onPressed: _isSaving ? null : _onSavePressed,
+                                  child: _isSaving
+                                      ? SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppColors.neonOrange))
+                                      : Text(
+                                          '저장하기',
+                                          style: AppTextStyles.bodyLarge.copyWith(
+                                              fontWeight: FontWeight.w700),
+                                        ),
+                                )
+                              : ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.neonOrange,
                               foregroundColor: Colors.black,

@@ -79,7 +79,6 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
   Widget build(BuildContext context) {
     final r = widget.result;
     final hasSpeed = r.speedKmh != null;
-    final hasRpm = r.rpmEstimated != null;
     final dateStr = DateFormat('yyyy.MM.dd  HH:mm').format(r.recordedAt);
 
     return Scaffold(
@@ -209,140 +208,74 @@ class _AnalysisDetailPageState extends State<AnalysisDetailPage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 구속
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            if (hasSpeed) ...[
-                              Text(
-                                r.speedKmh!.toStringAsFixed(1),
-                                style: TextStyle(
-                                  fontSize: 56,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.neonOrange,
-                                  height: 1.0,
-                                  letterSpacing: -1.5,
+                        // 구속 (단독 지표 — 중앙 정렬)
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (hasSpeed) ...[
+                                Text(
+                                  r.speedKmh!.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    fontSize: 56,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.neonOrange,
+                                    height: 1.0,
+                                    letterSpacing: -1.5,
+                                  ),
                                 ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                    bottom: 8, left: 6),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text('km/h',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color: AppColors.neonOrange
-                                              .withValues(alpha: 0.75),
-                                          fontWeight: FontWeight.w500,
-                                        )),
-                                    const Text('구속',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white38,
-                                          letterSpacing: 1.2,
-                                        )),
-                                  ],
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      bottom: 8, left: 6),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text('km/h',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            color: AppColors.neonOrange
+                                                .withValues(alpha: 0.75),
+                                            fontWeight: FontWeight.w500,
+                                          )),
+                                      const Text('구속',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.white38,
+                                            letterSpacing: 1.2,
+                                          )),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ] else
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '측정불가',
-                                      style: TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white24,
-                                        height: 1.0,
-                                        letterSpacing: -0.5,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text('구속',
+                              ] else
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        '측정불가',
                                         style: TextStyle(
-                                          fontSize: 10,
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.w600,
                                           color: Colors.white24,
-                                          letterSpacing: 1.2,
-                                        )),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-
-                        Divider(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          height: 20,
-                        ),
-
-                        // RPM
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            if (hasRpm) ...[
-                              Text(
-                                '${r.rpmEstimated}',
-                                style: const TextStyle(
-                                  fontSize: 44,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  height: 1.0,
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 6, left: 6),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('rpm',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.white60,
-                                          fontWeight: FontWeight.w500,
-                                        )),
-                                    Text('RPM 추정값',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white30,
-                                          letterSpacing: 0.5,
-                                        )),
-                                  ],
-                                ),
-                              ),
-                            ] else
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 4),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '측정불가',
-                                      style: TextStyle(
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white24,
-                                        height: 1.0,
-                                        letterSpacing: -0.5,
+                                          height: 1.0,
+                                          letterSpacing: -0.5,
+                                        ),
                                       ),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text('RPM',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white24,
-                                          letterSpacing: 0.5,
-                                        )),
-                                  ],
+                                      const SizedBox(height: 2),
+                                      const Text('구속',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.white24,
+                                            letterSpacing: 1.2,
+                                          )),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
 
                         if (r.linkedSessionId != null) ...[

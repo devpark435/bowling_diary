@@ -33,5 +33,6 @@ jobs:
             한국어로 작성.
           claude_args: |
             --model claude-sonnet-4-6
-            --max-turns 15
+            --max-turns 40
+            # 대형 PR(수십 커밋)에서 15턴으로는 리뷰가 max-turns로 죽음 → 40으로 상향.
             # 더 강한 리뷰 원하면 위 모델을 claude-opus-4-8 로 바꿔라(구독 한도 더 소모).

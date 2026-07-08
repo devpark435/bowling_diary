@@ -97,9 +97,9 @@ class AnalysisSelectionPage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
+                color: AppColors.darkSurface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(color: AppColors.darkDivider),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,7 +126,7 @@ class AnalysisSelectionPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '💡 단색 공이라면 인서트 테이프를 붙이면 회전수 측정 정확도가 높아져요.',
+                    '💡 공이 릴리즈부터 핀까지 한 화면에 나오면 측정 정확도가 높아져요.',
                     style: AppTextStyles.bodySmall
                         .copyWith(color: AppColors.textSecondary),
                   ),

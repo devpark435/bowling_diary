@@ -8,6 +8,8 @@ class AnalysisResultEntity {
   final String? videoLocalPath;
   final String? linkedSessionId;
   final DateTime createdAt;
+  final double speedConfidence;
+  final String? speedFailureReason;
 
   const AnalysisResultEntity({
     required this.id,
@@ -19,5 +21,7 @@ class AnalysisResultEntity {
     this.videoLocalPath,
     this.linkedSessionId,
     required this.createdAt,
+    this.speedConfidence = 0.0,
+    this.speedFailureReason,
   });
 }

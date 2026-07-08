@@ -14,11 +14,9 @@ import 'package:bowling_diary/features/balls/presentation/pages/ball_form_page.d
 import 'package:bowling_diary/features/balls/presentation/pages/balls_page.dart';
 import 'package:bowling_diary/features/settings/presentation/pages/settings_page.dart';
 import 'package:bowling_diary/features/admin/presentation/pages/catalog_manage_page.dart';
-// import 'package:bowling_diary/features/analysis/presentation/pages/analysis_tab_page.dart'; // 임시 비활성화
+import 'package:bowling_diary/features/analysis/presentation/pages/analysis_tab_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_guide_page.dart';
 import 'package:bowling_diary/features/analysis/presentation/pages/analysis_camera_page.dart';
-import 'package:bowling_diary/features/analysis/presentation/pages/analysis_result_page.dart';
-import 'package:bowling_diary/features/analysis/data/services/video_analysis_service.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -101,17 +99,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/analysis/camera',
         builder: (context, state) => const AnalysisCameraPage(),
       ),
-      GoRoute(
-        path: '/analysis/result',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
-          return AnalysisResultPage(
-            analysisData: extra['analysisData'] as AnalysisData,
-            videoPath: extra['videoPath'] as String,
-            recordedAt: extra['recordedAt'] as DateTime,
-          );
-        },
-      ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) {
           return ScaffoldWithNavBar(navigationShell: navigationShell);
@@ -139,15 +126,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // 분석 탭 임시 비활성화 (앱스토어 이슈)
-          // StatefulShellBranch(
-          //   routes: [
-          //     GoRoute(
-          //       path: '/analysis',
-          //       builder: (context, state) => const AnalysisTabPage(),
-          //     ),
-          //   ],
-          // ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/analysis',
+                builder: (context, state) => const AnalysisTabPage(),
+              ),
+            ],
+          ),
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -223,21 +209,20 @@ class _CustomNavBar extends StatelessWidget {
                 isActive: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
-              // 분석 탭 임시 비활성화 (앱스토어 이슈)
-              // _NavItem(
-              //   icon: PhosphorIconsRegular.videoCamera,
-              //   activeIcon: PhosphorIconsFill.videoCamera,
-              //   label: '분석',
-              //   isActive: currentIndex == 2,
-              //   onTap: () => onTap(2),
-              //   showBeta: true,
-              // ),
+              _NavItem(
+                icon: PhosphorIconsRegular.videoCamera,
+                activeIcon: PhosphorIconsFill.videoCamera,
+                label: '분석',
+                isActive: currentIndex == 2,
+                onTap: () => onTap(2),
+                showBeta: true,
+              ),
               _NavItem(
                 icon: PhosphorIconsRegular.user,
                 activeIcon: PhosphorIconsFill.user,
                 label: '마이페이지',
-                isActive: currentIndex == 2,
-                onTap: () => onTap(2),
+                isActive: currentIndex == 3,
+                onTap: () => onTap(3),
               ),
             ],
           ),
