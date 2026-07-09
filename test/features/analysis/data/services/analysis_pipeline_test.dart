@@ -259,6 +259,11 @@ void main() {
       expect(result.speedFailure, isNull);
       expect(result.speedKmh, isNotNull);
       expect(result.speedKmh, inInclusiveRange(10.0, 50.0));
+      expect(result.trajectory.length, greaterThanOrEqualTo(2));
+      for (final p in result.trajectory) {
+        expect(p.nx, inInclusiveRange(0.0, 1.0));
+        expect(p.ny, inInclusiveRange(0.0, 1.0));
+      }
     },
   );
 }

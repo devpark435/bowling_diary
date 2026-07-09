@@ -110,11 +110,14 @@ class AnalysisPipeline {
 
     final release = combineRelease(fsm.releaseFrame, detectorRelease);
 
+    final trajectory = fsm.trajectory.map((e) => homography.laneToFrame(e.lane)).toList();
+
     if (!release.isFound || fsm.impactFrame == null) {
       return AnalysisData(
         speedFailure: !release.isFound ? SpeedFailure.releaseNotFound : SpeedFailure.impactNotFound,
         framesAnalyzed: frames.length,
         fpsUsed: extracted.sampleFps,
+        trajectory: trajectory,
       );
     }
 
@@ -138,6 +141,7 @@ class AnalysisPipeline {
       speedFailure: speed.failure,
       framesAnalyzed: frames.length,
       fpsUsed: extracted.sampleFps,
+      trajectory: trajectory,
     );
   }
 }
