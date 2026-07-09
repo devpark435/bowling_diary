@@ -10,6 +10,7 @@ import 'package:bowling_diary/features/analysis/domain/entities/homography_matri
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
+import 'package:bowling_diary/features/analysis/domain/services/trajectory_refiner.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 class AnalysisPipeline {
@@ -111,12 +112,18 @@ class AnalysisPipeline {
 
     final release = combineRelease(fsm.releaseFrame, detectorRelease);
 
-    final trajectory = fsm.trajectory
-        .map((e) => TrajectoryFramePoint(frame: e.frame, point: homography.laneToFrame(e.lane)))
+    final refined = refineTrajectory(fsm.trajectory);
+    const ribbonHalfWidthM = 0.11; // 볼 반경(공 지름 0.218m)
+    final trajectory = refined
+        .map((e) => TrajectoryRibbonPoint(
+              frame: e.frame,
+              left: homography.laneToFrame(LanePoint(xM: e.lane.xM - ribbonHalfWidthM, yM: e.lane.yM)),
+              right: homography.laneToFrame(LanePoint(xM: e.lane.xM + ribbonHalfWidthM, yM: e.lane.yM)),
+            ))
         .toList();
-    debugPrint('[Trajectory] ${trajectory.length}개 포인트, fsm.trajectory 첫/끝 프레임: '
-        '${fsm.trajectory.isEmpty ? "없음" : "${fsm.trajectory.first.frame}~${fsm.trajectory.last.frame}"}, '
-        '레인 y범위: ${fsm.trajectory.isEmpty ? "없음" : "${fsm.trajectory.first.lane.yM.toStringAsFixed(2)}~${fsm.trajectory.last.lane.yM.toStringAsFixed(2)}m"}');
+    debugPrint('[Trajectory] raw ${fsm.trajectory.length} → refined ${refined.length}개 포인트, '
+        '프레임: ${refined.isEmpty ? "없음" : "${refined.first.frame}~${refined.last.frame}"}, '
+        '레인 y범위: ${refined.isEmpty ? "없음" : "${refined.first.lane.yM.toStringAsFixed(2)}~${refined.last.lane.yM.toStringAsFixed(2)}m"}');
 
     if (!release.isFound || fsm.impactFrame == null) {
       return AnalysisData(
@@ -127,11 +134,23 @@ class AnalysisPipeline {
       );
     }
 
+    // 공이 핀에 근접(16m 이상)한 시점부터만 핀 플래시를 탐색 — 그 전 구간의
+    // 핀존 변화(볼러 팔로스루 등)는 물리적으로 핀 충돌일 수 없다.
+    const pinProximityY = 16.0;
+    int? pinSearchStart;
+    for (final s in refined) {
+      if (s.lane.yM >= pinProximityY) {
+        pinSearchStart = s.frame;
+        break;
+      }
+    }
+
     final impact = impactDetector.detect(
       frames: frames,
       releaseFrame: release.frame,
       homographyImpactFrame: fsm.impactFrame!,
       pinZone: PinImpactDetectorService.computePinZone(homography),
+      pinSearchStart: pinSearchStart,
     );
 
     final speed = speedEstimator.estimate(

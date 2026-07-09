@@ -8,6 +8,7 @@ import 'package:bowling_diary/features/analysis/data/services/release_detector_s
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
@@ -261,8 +262,10 @@ void main() {
       expect(result.speedKmh, inInclusiveRange(10.0, 50.0));
       expect(result.trajectory.length, greaterThanOrEqualTo(2));
       for (final p in result.trajectory) {
-        expect(p.point.nx, inInclusiveRange(0.0, 1.0));
-        expect(p.point.ny, inInclusiveRange(0.0, 1.0));
+        expect(p.left.nx, inInclusiveRange(0.0, 1.0));
+        expect(p.left.ny, inInclusiveRange(0.0, 1.0));
+        expect(p.right.nx, inInclusiveRange(0.0, 1.0));
+        expect(p.right.ny, inInclusiveRange(0.0, 1.0));
       }
       for (var i = 1; i < result.trajectory.length; i++) {
         expect(
@@ -272,4 +275,23 @@ void main() {
       }
     },
   );
+
+  group('리본 투영(ribbonHalfWidthM 오프셋 → homography.laneToFrame)', () {
+    test('레인 (0.5, 10.0) 지점에서 좌/우 가장자리가 볼 반경만큼 벌어져 투영된다', () {
+      // laneToFrame 역변환: nx = xM/1.05, ny = 1 - yM/18.29
+      final homography = HomographyMatrix.fromRowMajor(
+        const [1.05, 0, 0, 0, -18.29, 18.29, 0, 0, 1],
+      );
+      const ribbonHalfWidthM = 0.11;
+      const lane = LanePoint(xM: 0.5, yM: 10.0);
+
+      final left = homography.laneToFrame(LanePoint(xM: lane.xM - ribbonHalfWidthM, yM: lane.yM));
+      final right = homography.laneToFrame(LanePoint(xM: lane.xM + ribbonHalfWidthM, yM: lane.yM));
+
+      expect(left.nx, closeTo((0.5 - ribbonHalfWidthM) / 1.05, 1e-6));
+      expect(right.nx, closeTo((0.5 + ribbonHalfWidthM) / 1.05, 1e-6));
+      expect(left.ny, closeTo(1 - 10.0 / 18.29, 1e-6));
+      expect(right.ny, closeTo(1 - 10.0 / 18.29, 1e-6));
+    });
+  });
 }

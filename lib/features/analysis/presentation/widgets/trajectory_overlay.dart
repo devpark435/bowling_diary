@@ -43,7 +43,7 @@ int frameForPosition(Duration position, int fps) =>
     (position.inMicroseconds * fps) ~/ Duration.microsecondsPerSecond;
 
 /// frame 오름차순 정렬된 points에서 frame <= currentFrame 인 선두 구간 길이.
-int visiblePointCount(List<TrajectoryFramePoint> points, int currentFrame) {
+int visiblePointCount(List<TrajectoryRibbonPoint> points, int currentFrame) {
   var count = 0;
   for (final p in points) {
     if (p.frame > currentFrame) break;
@@ -52,12 +52,15 @@ int visiblePointCount(List<TrajectoryFramePoint> points, int currentFrame) {
   return count;
 }
 
-/// 볼 궤적을 [BoxFit.cover]로 렌더링 중인 영상 위에 폴리라인으로 그리는
-/// 비인터랙티브 오버레이. 드래그/탭 처리 없음 — 순수 표시용(spec §11).
+/// 볼 궤적을 [BoxFit.cover]로 렌더링 중인 영상 위에 레인 평면 리본(폭이 있는
+/// 폴리곤)으로 그리는 비인터랙티브 오버레이. 드래그/탭 처리 없음 — 순수
+/// 표시용(spec §11). 균일 두께 중심선 대신 공 폭만큼 벌린 좌우 가장자리를
+/// 잇는 리본을 그려, 원근(가까우면 넓고 멀면 좁음)이 반영된 "레인 위에 그려진"
+/// 느낌을 준다.
 ///
-/// 재생 위치에 동기화된 점진적 렌더링: 공이 실제로 지나간 지점까지만 선이
+/// 재생 위치에 동기화된 점진적 렌더링: 공이 실제로 지나간 지점까지만 리본이
 /// 그려지고, 그 이후(아직 재생되지 않은) 구간은 보이지 않는다. 루프가
-/// 재시작되면 position이 0으로 돌아가므로 선도 자연히 리셋된다.
+/// 재시작되면 position이 0으로 돌아가므로 리본도 자연히 리셋된다.
 ///
 /// [VideoPlayerValue.position]은 내부 타이머로 ~500ms 간격으로만 갱신되는데,
 /// 이 위젯이 목표로 하는 0.25x 재생에서는 500ms가 분석 프레임 기준 ~3.75프레임에
@@ -66,11 +69,11 @@ int visiblePointCount(List<TrajectoryFramePoint> points, int currentFrame) {
 /// 보간 추정한다.
 ///
 /// [points]는 이미 프레임 정규화좌표(FramePoint)로 변환되어 있고 frame 오름차순
-/// 정렬되어 있다고 가정한다(AnalysisPipeline이 homography.laneToFrame()을 미리
-/// 적용함). 현재 프레임까지 보이는 점이 2개 미만이면 그릴 선이 없으므로 아무것도
-/// 렌더링하지 않는다.
+/// 정렬되어 있다고 가정한다(AnalysisPipeline이 refineTrajectory + homography로
+/// 미리 리본 좌표를 산출함). 현재 프레임까지 보이는 점이 2개 미만이면 그릴
+/// 리본이 없으므로 아무것도 렌더링하지 않는다.
 class TrajectoryOverlay extends StatefulWidget {
-  final List<TrajectoryFramePoint> points;
+  final List<TrajectoryRibbonPoint> points;
 
   /// 렌더링 중인 영상의 고유(intrinsic) 픽셀 크기. BoxFit.cover 렌더링 영역을
   /// 계산하기 위해 필요하다(VideoPlayerController.value.size).
@@ -172,41 +175,48 @@ class _TrajectoryOverlayState extends State<TrajectoryOverlay>
         final videoRect = computeCoverRect(containerSize, widget.videoSize);
         return CustomPaint(
           size: containerSize,
-          painter: _TrajectoryPainter(
-            visible.map((e) => e.point).toList(),
-            videoRect,
-          ),
+          painter: _TrajectoryPainter(visible, videoRect),
         );
       },
     );
   }
 }
 
+/// 리본(폭이 있는 폴리곤) 페인터. 좌측 가장자리를 프레임 순으로 앞으로 이었다가
+/// 우측 가장자리를 역순으로 되짚어 닫힌 폴리곤을 만들고 채운다 — 균일 두께
+/// 중심선(폴리라인) 대신 원근이 반영된 리본 형태로 "레인 위에 그려진" 느낌을 준다.
 class _TrajectoryPainter extends CustomPainter {
-  final List<FramePoint> points;
+  final List<TrajectoryRibbonPoint> points;
   final Rect videoRect;
   _TrajectoryPainter(this.points, this.videoRect);
 
-  Offset _offsetFor(int index) {
-    final p = points[index];
-    return Offset(
-      videoRect.left + p.nx * videoRect.width,
-      videoRect.top + p.ny * videoRect.height,
-    );
-  }
+  Offset _project(FramePoint p) => Offset(
+        videoRect.left + p.nx * videoRect.width,
+        videoRect.top + p.ny * videoRect.height,
+      );
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path()..moveTo(_offsetFor(0).dx, _offsetFor(0).dy);
+    final path = Path()..moveTo(_project(points.first.left).dx, _project(points.first.left).dy);
     for (var i = 1; i < points.length; i++) {
-      final o = _offsetFor(i);
+      final o = _project(points[i].left);
       path.lineTo(o.dx, o.dy);
     }
+    for (var i = points.length - 1; i >= 0; i--) {
+      final o = _project(points[i].right);
+      path.lineTo(o.dx, o.dy);
+    }
+    path.close();
+
+    final fillPaint = Paint()
+      ..color = AppColors.neonOrange.withValues(alpha: 0.45)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fillPaint);
 
     final strokePaint = Paint()
       ..color = AppColors.neonOrange.withValues(alpha: 0.85)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
+      ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     canvas.drawPath(path, strokePaint);

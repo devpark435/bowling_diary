@@ -93,9 +93,21 @@ void main() {
 
   group('visiblePointCount', () {
     const points = [
-      TrajectoryFramePoint(frame: 10, point: FramePoint(nx: 0.1, ny: 0.1)),
-      TrajectoryFramePoint(frame: 20, point: FramePoint(nx: 0.2, ny: 0.2)),
-      TrajectoryFramePoint(frame: 30, point: FramePoint(nx: 0.3, ny: 0.3)),
+      TrajectoryRibbonPoint(
+        frame: 10,
+        left: FramePoint(nx: 0.09, ny: 0.1),
+        right: FramePoint(nx: 0.11, ny: 0.1),
+      ),
+      TrajectoryRibbonPoint(
+        frame: 20,
+        left: FramePoint(nx: 0.19, ny: 0.2),
+        right: FramePoint(nx: 0.21, ny: 0.2),
+      ),
+      TrajectoryRibbonPoint(
+        frame: 30,
+        left: FramePoint(nx: 0.29, ny: 0.3),
+        right: FramePoint(nx: 0.31, ny: 0.3),
+      ),
     ];
 
     test('빈 리스트 → 0', () {
@@ -126,9 +138,21 @@ void main() {
   group('TrajectoryOverlay 렌더링', () {
     // fps=10 기준: frame 5 → 500ms, frame 15 → 1500ms, frame 20 → 2000ms.
     const points = [
-      TrajectoryFramePoint(frame: 5, point: FramePoint(nx: 0.5, ny: 0.9)),
-      TrajectoryFramePoint(frame: 15, point: FramePoint(nx: 0.5, ny: 0.5)),
-      TrajectoryFramePoint(frame: 20, point: FramePoint(nx: 0.5, ny: 0.1)),
+      TrajectoryRibbonPoint(
+        frame: 5,
+        left: FramePoint(nx: 0.49, ny: 0.9),
+        right: FramePoint(nx: 0.51, ny: 0.9),
+      ),
+      TrajectoryRibbonPoint(
+        frame: 15,
+        left: FramePoint(nx: 0.49, ny: 0.5),
+        right: FramePoint(nx: 0.51, ny: 0.5),
+      ),
+      TrajectoryRibbonPoint(
+        frame: 20,
+        left: FramePoint(nx: 0.49, ny: 0.1),
+        right: FramePoint(nx: 0.51, ny: 0.1),
+      ),
     ];
 
     testWidgets('재생 전(position=0, currentFrame < 첫 점) → 아무것도 그리지 않는다', (tester) async {

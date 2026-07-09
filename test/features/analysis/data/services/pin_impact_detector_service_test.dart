@@ -60,6 +60,32 @@ void main() {
     expect(result, 30);
   });
 
+  group('searchStartOverride', () {
+    test('override가 주어지면 그 지점부터 탐색해 이전 구간의 변화는 무시한다', () {
+      // 프레임 25와 45가 모두 흰색. override 없이(legacy) 탐색하면 searchStart=20이라
+      // 먼저 만나는 25를 반환하지만, override=40을 주면 25는 이미 지나버린 구간이라
+      // 무시하고 45를 반환한다.
+      final frames = <img.Image>[
+        for (var i = 0; i < 60; i++) i == 25 || i == 45 ? _whiteFrame(100, 100) : _blackFrame(100, 100),
+      ];
+
+      expect(sut.findImpactFrame(frames, 0), 25);
+      expect(sut.findImpactFrame(frames, 0, searchStartOverride: 40), 45);
+    });
+
+    test('override <= releaseFrame이면 releaseFrame + minTravelFrames로 폴백한다', () {
+      // releaseFrame=30, override=10(<=releaseFrame) → 폴백 searchStart=30+20=50.
+      // 프레임 55만 흰색이므로 55가 반환되어야 폴백이 실제로 적용됐음을 확인할 수 있다.
+      final frames = <img.Image>[
+        for (var i = 0; i < 60; i++) i == 55 ? _whiteFrame(100, 100) : _blackFrame(100, 100),
+      ];
+
+      final result = sut.findImpactFrame(frames, 30, searchStartOverride: 10);
+
+      expect(result, 55);
+    });
+  });
+
   group('computePinZone', () {
     test('레인 평면 정사영 호모그래피에서 핀덱 상단부 존을 계산', () {
       final homography = HomographyMatrix.fromRowMajor(

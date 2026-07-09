@@ -52,11 +52,24 @@ class PinImpactDetectorService {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  int? findImpactFrame(List<img.Image> frames, int releaseFrame, {Rect? pinZone}) {
+  /// [searchStartOverride]가 주어지면(예: 공이 실제로 핀 근처(≥16m)에 도달한
+  /// 분석 프레임) 그 지점부터 탐색을 시작한다 — 릴리즈 직후 볼러 팔로스루 등
+  /// 핀존에 걸리는 무관한 움직임의 오탐을 원천 차단하기 위함. 다만
+  /// override가 releaseFrame 이하면 물리적으로 말이 안 되므로(공이 아직
+  /// 핀 근처에 갈 시간이 없었다는 뜻) 무시하고 기존 releaseFrame +
+  /// minTravelFrames 규칙으로 폴백한다. override가 없으면 기존 규칙 그대로.
+  int? findImpactFrame(
+    List<img.Image> frames,
+    int releaseFrame, {
+    Rect? pinZone,
+    int? searchStartOverride,
+  }) {
     if (frames.length < 2) return null;
     if (releaseFrame >= frames.length) return null;
 
-    final searchStart = releaseFrame + _minTravelFrames;
+    final searchStart = (searchStartOverride != null && searchStartOverride > releaseFrame)
+        ? searchStartOverride
+        : releaseFrame + _minTravelFrames;
     if (searchStart >= frames.length) return null;
 
     final threshold = pinZone != null ? _homographyZoneChangeThreshold : _changeThreshold;

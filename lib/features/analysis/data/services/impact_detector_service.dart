@@ -14,8 +14,14 @@ class ImpactDetectorService {
     required int releaseFrame,
     required int homographyImpactFrame,
     Rect? pinZone,
+    int? pinSearchStart,
   }) {
-    final pinFrame = pinImpactDetector.findImpactFrame(frames, releaseFrame, pinZone: pinZone);
+    final pinFrame = pinImpactDetector.findImpactFrame(
+      frames,
+      releaseFrame,
+      pinZone: pinZone,
+      searchStartOverride: pinSearchStart,
+    );
 
     if (pinFrame == null) {
       return ImpactResult(frame: homographyImpactFrame, confidence: ImpactConfidence.low);
