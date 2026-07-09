@@ -15,3 +15,13 @@ class FramePoint extends Equatable {
   @override
   List<Object?> get props => [nx, ny];
 }
+
+/// 궤적 한 점 — 어느 분석 프레임(frame)에서 관측됐는지와 그 시점의 프레임 정규화좌표(point).
+/// frame은 재생 위치와 동기화된 점진적 오버레이 렌더링(현재 프레임까지만 그리기)에 쓰인다.
+class TrajectoryFramePoint extends Equatable {
+  final int frame;
+  final FramePoint point;
+  const TrajectoryFramePoint({required this.frame, required this.point});
+  @override
+  List<Object?> get props => [frame, point];
+}

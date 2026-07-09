@@ -58,12 +58,6 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
   Future<void> _initVideo() async {
     final ctrl = VideoPlayerController.file(dart_io.File(widget.videoPath));
     await ctrl.initialize();
-    // 진단용 — TrajectoryOverlay가 이 size를 BoxFit.cover 매핑 기준으로 쓰는데,
-    // 이게 ffmpeg가 추출한 분석용 프레임(480x853 portrait, 호모그래피 좌표계 기준)과
-    // 가로/세로 비율이 안 맞으면 궤적이 화면에서 엉뚱한 위치에 그려진다.
-    debugPrint('[TrajectoryOverlay] VideoPlayerController.value.size = ${ctrl.value.size} '
-        '(가로/세로 비율: ${(ctrl.value.size.width / ctrl.value.size.height).toStringAsFixed(3)}, '
-        '분석 프레임 480x853 비율: ${(480 / 853).toStringAsFixed(3)}과 비교)');
     await ctrl.setPlaybackSpeed(0.25);
     await ctrl.setLooping(true);
     await ctrl.play();
@@ -178,6 +172,8 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
               child: TrajectoryOverlay(
                 points: data.trajectory,
                 videoSize: _videoController!.value.size,
+                playback: _videoController!,
+                fps: widget.analysisData.fpsUsed,
               ),
             ),
 
