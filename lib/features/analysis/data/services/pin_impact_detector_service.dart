@@ -16,14 +16,18 @@ class PinImpactDetectorService {
     final searchStart = releaseFrame + _minTravelFrames;
     if (searchStart >= frames.length) return null;
 
-    // 릴리즈 프레임을 기준으로 prevZone 초기화 (릴리즈 이후 변화를 무시하기 위해)
-    final seedFrame = frames[releaseFrame];
+    // 검색 시작 프레임 자체를 씨드(기준)로 삼는다 — release~searchStart 구간의 자연스러운
+    // 드리프트(카메라 미동/조명 변화)를 비교 대상에서 아예 제외해, 그 구간을 건너뛰고
+    // 여기서부터의 "급격한" 변화만 감지한다. 과거(release=36, searchStart=56)에는 이 구간을
+    // 넘어 release 프레임과 비교하다가, 첫 비교 자체가 20프레임 격차라 자연드리프트만으로도
+    // 매번 임계값을 넘겨 검색 시작 지점에서 곧바로 오탐(핀 충돌 아님)이 발생했다.
+    final seedFrame = frames[searchStart];
     final seedH = (seedFrame.height * _pinZoneRatio).round().clamp(1, seedFrame.height);
     img.Image prevZone = img.grayscale(
       img.copyCrop(seedFrame, x: 0, y: 0, width: seedFrame.width, height: seedH),
     );
 
-    for (int i = searchStart; i < frames.length; i++) {
+    for (int i = searchStart + 1; i < frames.length; i++) {
       final frame = frames[i];
       final zoneH = (frame.height * _pinZoneRatio).round().clamp(1, frame.height);
       final zone = img.copyCrop(frame, x: 0, y: 0, width: frame.width, height: zoneH);

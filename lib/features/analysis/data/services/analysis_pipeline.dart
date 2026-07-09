@@ -111,6 +111,9 @@ class AnalysisPipeline {
     final release = combineRelease(fsm.releaseFrame, detectorRelease);
 
     final trajectory = fsm.trajectory.map((e) => homography.laneToFrame(e.lane)).toList();
+    debugPrint('[Trajectory] ${trajectory.length}개 포인트, fsm.trajectory 첫/끝 프레임: '
+        '${fsm.trajectory.isEmpty ? "없음" : "${fsm.trajectory.first.frame}~${fsm.trajectory.last.frame}"}, '
+        '레인 y범위: ${fsm.trajectory.isEmpty ? "없음" : "${fsm.trajectory.first.lane.yM.toStringAsFixed(2)}~${fsm.trajectory.last.lane.yM.toStringAsFixed(2)}m"}');
 
     if (!release.isFound || fsm.impactFrame == null) {
       return AnalysisData(
