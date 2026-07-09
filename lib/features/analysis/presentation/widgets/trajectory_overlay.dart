@@ -5,7 +5,10 @@ import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 /// [BoxFit.cover]로 렌더링된 영상이 [containerSize] 안에서 실제로 차지하는
 /// 사각형을 계산한다. 컨테이너를 레터박스 없이 꽉 채우도록 확대하며, 넘치는
 /// 부분은 컨테이너 경계 밖으로 나간다(음수 left/top 또는 컨테이너보다 큰
-/// width/height로 표현됨 — 실제 클리핑은 Canvas가 담당).
+/// width/height로 표현됨). CustomPaint는 기본적으로 클리핑하지 않는다 — 이
+/// 위젯에서 화면 밖으로 나가는 게 문제되지 않는 건 컨테이너 밖 좌표가 실제로도
+/// 화면 밖(잘려나간 영상 영역)에 해당해서 우연히 안전한 것이지, 별도 클리핑
+/// 보장이 있는 게 아니다. 명시적 보장이 필요해지면 ClipRect로 감쌀 것.
 ///
 /// [lane_corner_overlay.dart]의 computeContainRect와 형태는 같지만 스케일
 /// 계산이 반대(compare: min → contain, max → cover)다. 그 함수는 여전히
