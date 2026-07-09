@@ -27,6 +27,12 @@ class PinImpactDetectorService {
       img.copyCrop(seedFrame, x: 0, y: 0, width: seedFrame.width, height: seedH),
     );
 
+    // 진단용 — 탐색 전체에서 관측된 최대 변화율과 그 프레임. 임계값을 못 넘어
+    // "미감지"로 끝나는 경우, 이 값으로 "핀존 자체에 변화가 거의 없었다"(존/각도
+    // 문제)와 "근접했는데 문턱을 못 넘었다"(임계값 튜닝 문제)를 구분한다.
+    double maxRatio = 0;
+    int maxRatioFrame = searchStart;
+
     for (int i = searchStart + 1; i < frames.length; i++) {
       final frame = frames[i];
       final zoneH = (frame.height * _pinZoneRatio).round().clamp(1, frame.height);
@@ -34,13 +40,19 @@ class PinImpactDetectorService {
       final grayZone = img.grayscale(zone);
 
       final ratio = _changeRatio(prevZone, grayZone);
+      if (ratio > maxRatio) {
+        maxRatio = ratio;
+        maxRatioFrame = i;
+      }
       if (ratio >= _changeThreshold) {
         debugPrint('[PinImpact] 핀 충돌 프레임: $i (변화율: ${(ratio * 100).toStringAsFixed(1)}%)');
         return i;
       }
       prevZone = grayZone;
     }
-    debugPrint('[PinImpact] 핀 충돌 미감지');
+    debugPrint('[PinImpact] 핀 충돌 미감지 (임계값 ${(_changeThreshold * 100).toStringAsFixed(0)}%, '
+        '탐색구간 최대 변화율 ${(maxRatio * 100).toStringAsFixed(1)}% @ 프레임 $maxRatioFrame, '
+        '핀존 비율 ${(_pinZoneRatio * 100).toStringAsFixed(0)}%)');
     return null;
   }
 
