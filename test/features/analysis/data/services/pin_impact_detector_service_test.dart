@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
@@ -55,5 +58,53 @@ void main() {
     ];
     final result = sut.findImpactFrame(frames, 0);
     expect(result, 30);
+  });
+
+  group('computePinZone', () {
+    test('레인 평면 정사영 호모그래피에서 핀덱 상단부 존을 계산', () {
+      final homography = HomographyMatrix.fromRowMajor(
+        [1.05, 0, 0, 0, -18.29, 18.29, 0, 0, 1],
+      );
+      final zone = PinImpactDetectorService.computePinZone(homography);
+      expect(zone, isNotNull);
+      expect(zone!.left, closeTo(0.0, 1e-3));
+      expect(zone.top, closeTo(0.0, 1e-3));
+      expect(zone.right, closeTo(1.0, 1e-3));
+      expect(zone.bottom, closeTo(0.0353, 1e-3));
+    });
+
+    test('퇴화 존(identity 호모그래피)은 null', () {
+      final homography = HomographyMatrix.identity();
+      final zone = PinImpactDetectorService.computePinZone(homography);
+      expect(zone, isNull);
+    });
+  });
+
+  group('findImpactFrame with pinZone', () {
+    test('존 내부 변화는 충돌로 감지', () {
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      final frames = List.generate(30, (i) {
+        final frame = img.Image(width: 100, height: 100);
+        if (i == 25) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 59, y2: 19, color: img.ColorRgb8(255, 255, 255));
+        }
+        return frame;
+      });
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      expect(result, 25);
+    });
+
+    test('존 외부 변화는 무시', () {
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      final frames = List.generate(30, (i) {
+        final frame = img.Image(width: 100, height: 100);
+        if (i == 25) {
+          img.fillRect(frame, x1: 0, y1: 50, x2: 99, y2: 99, color: img.ColorRgb8(255, 255, 255));
+        }
+        return frame;
+      });
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      expect(result, isNull);
+    });
   });
 }

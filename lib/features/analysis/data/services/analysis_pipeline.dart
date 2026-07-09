@@ -1,5 +1,6 @@
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
+import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
@@ -130,6 +131,7 @@ class AnalysisPipeline {
       frames: frames,
       releaseFrame: release.frame,
       homographyImpactFrame: fsm.impactFrame!,
+      pinZone: PinImpactDetectorService.computePinZone(homography),
     );
 
     final speed = speedEstimator.estimate(

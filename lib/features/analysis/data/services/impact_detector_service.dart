@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:image/image.dart' as img;
 
 import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
@@ -11,8 +13,9 @@ class ImpactDetectorService {
     required List<img.Image> frames,
     required int releaseFrame,
     required int homographyImpactFrame,
+    Rect? pinZone,
   }) {
-    final pinFrame = pinImpactDetector.findImpactFrame(frames, releaseFrame);
+    final pinFrame = pinImpactDetector.findImpactFrame(frames, releaseFrame, pinZone: pinZone);
 
     if (pinFrame == null) {
       return ImpactResult(frame: homographyImpactFrame, confidence: ImpactConfidence.low);
