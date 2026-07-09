@@ -12,6 +12,7 @@ import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.da
 import 'package:bowling_diary/features/analysis/domain/entities/analysis_result_entity.dart';
 import 'package:bowling_diary/features/analysis/presentation/providers/analysis_provider.dart';
 import 'package:bowling_diary/features/analysis/presentation/utils/speed_failure_copy.dart';
+import 'package:bowling_diary/features/analysis/presentation/widgets/trajectory_overlay.dart';
 import 'package:bowling_diary/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bowling_diary/features/record/domain/entities/session_entity.dart';
 
@@ -163,6 +164,15 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
           else
             const Center(
               child: CircularProgressIndicator(color: Colors.white38),
+            ),
+
+          // 궤적 오버레이 — 영상 위, 그라데이션/컨트롤 아래
+          if (isReady)
+            Positioned.fill(
+              child: TrajectoryOverlay(
+                points: data.trajectory,
+                videoSize: _videoController!.value.size,
+              ),
             ),
 
           // 상단 그라데이션 (앱바 영역)
