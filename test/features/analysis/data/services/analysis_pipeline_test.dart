@@ -24,6 +24,8 @@ class _FakeFrameExtractor implements VideoFrameExtractorService {
 }
 
 class _FakeBallDetector implements BallDetectionService {
+  @override
+  double debugMaxScore = 0;
   final List<BallDetection?> sequence;
   int _i = 0;
   _FakeBallDetector(this.sequence);
@@ -38,6 +40,8 @@ class _FakeBallDetector implements BallDetectionService {
 /// [failFrames]에 해당하는 프레임 인덱스에서 detect()가 예외를 던지는 페이크.
 /// 프레임 단위 검출 실패가 파이프라인 전체를 죽이지 않는지 검증하기 위한 회귀 테스트용.
 class _FlakyFakeBallDetector implements BallDetectionService {
+  @override
+  double debugMaxScore = 0;
   final List<BallDetection?> sequence;
   final Set<int> failFrames;
   int _i = 0;

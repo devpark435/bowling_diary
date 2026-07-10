@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
@@ -25,6 +26,34 @@ class BallDetection {
   /// 투영되는 계통 오차가 생긴다(거리에 비례해 증가 — 실측: 궤적 y가 핀덱
   /// 18.29m를 넘는 18.65m까지 관측). 접점은 평면 위의 점이라 바이어스가 없다.
   FramePoint get contactPoint => FramePoint(nx: cx, ny: (cy + bh / 2).clamp(0.0, 1.0));
+}
+
+/// letterbox 배치: 원본을 비율 유지로 [dstSize] 안에 맞췄을 때의 스케일 결과
+/// 크기와 패딩 오프셋. 순수 함수 — 위젯/인터프리터 없이 단위 테스트 가능.
+typedef LetterboxLayout = ({int scaledW, int scaledH, int padX, int padY});
+
+LetterboxLayout computeLetterbox(int srcW, int srcH, int dstSize) {
+  final scale = math.min(dstSize / srcW, dstSize / srcH);
+  final scaledW = (srcW * scale).round().clamp(1, dstSize);
+  final scaledH = (srcH * scale).round().clamp(1, dstSize);
+  return (
+    scaledW: scaledW,
+    scaledH: scaledH,
+    padX: (dstSize - scaledW) ~/ 2,
+    padY: (dstSize - scaledH) ~/ 2,
+  );
+}
+
+/// 모델 입력(letterbox 캔버스) 기준 정규화 좌표를 원본 프레임 기준 정규화
+/// 좌표로 역매핑한다.
+BallDetection unletterbox(BallDetection d, LetterboxLayout lb, int dstSize) {
+  return BallDetection(
+    cx: ((d.cx * dstSize - lb.padX) / lb.scaledW).clamp(0.0, 1.0),
+    cy: ((d.cy * dstSize - lb.padY) / lb.scaledH).clamp(0.0, 1.0),
+    bw: (d.bw * dstSize / lb.scaledW).clamp(0.0, 1.0),
+    bh: (d.bh * dstSize / lb.scaledH).clamp(0.0, 1.0),
+    confidence: d.confidence,
+  );
 }
 
 class BallDetectionService {
@@ -100,11 +129,23 @@ class BallDetectionService {
     _interpreter = null;
   }
 
+  /// 진단용 — 임계값 미달 포함, 전 detect() 호출에서 관측된 최고 신뢰도.
+  /// "검출 0건"이 (a) 추론 자체가 깨져 점수가 ~0인지 (b) 실제 점수가 임계값
+  /// 바로 아래(전처리/클래스 문제)인지 구분하는 데 쓴다.
+  double debugMaxScore = 0;
+
   BallDetection? detect(img.Image frame) {
     if (_interpreter == null) return null;
 
-    final resized = img.copyResize(frame, width: _inputSize, height: _inputSize);
-    final input = _toFloat32Input(resized);
+    // letterbox: ultralytics 학습 전처리와 동일하게 비율 유지 + 회색 패딩.
+    // 스쿼시 리사이즈(비율 무시)는 480x853 포트레이트에서 공을 타원으로
+    // 찌그러뜨려 범용 COCO 모델의 점수를 크게 떨어뜨린다.
+    final lb = computeLetterbox(frame.width, frame.height, _inputSize);
+    final scaled = img.copyResize(frame, width: lb.scaledW, height: lb.scaledH);
+    final canvas = img.Image(width: _inputSize, height: _inputSize)
+      ..clear(img.ColorRgb8(114, 114, 114)); // ultralytics 표준 패딩색
+    img.compositeImage(canvas, scaled, dstX: lb.padX, dstY: lb.padY);
+    final input = _toFloat32Input(canvas);
 
     final output = List.generate(
       1,
@@ -113,7 +154,10 @@ class BallDetectionService {
 
     _interpreter!.run(input, output);
 
-    return _parseBest(output[0]);
+    final best = _parseBest(output[0]);
+    if (best == null) return null;
+    // letterbox 좌표(모델 입력 기준 0~1)를 원본 프레임 기준 0~1로 역매핑.
+    return unletterbox(best, lb, _inputSize);
   }
 
   List<List<List<List<double>>>> _toFloat32Input(img.Image image) {
@@ -154,6 +198,7 @@ class BallDetectionService {
 
     for (int i = 0; i < _numAnchors; i++) {
       final conf = raw[confRow][i];
+      if (conf > debugMaxScore) debugMaxScore = conf;
       if (conf <= maxConf) continue;
       maxConf = conf;
       best = BallDetection(

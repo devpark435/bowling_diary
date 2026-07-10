@@ -100,6 +100,11 @@ class AnalysisPipeline {
           detections.add(null);
         }
       }
+      // 진단 — "검출 0건"일 때 추론이 깨진 것(최고 점수 ~0)인지 임계값 바로
+      // 아래(전처리/클래스 문제)인지 즉시 구분 가능하게 한다.
+      debugPrint('[BallDetection] 검출 ${detections.whereType<BallDetection>().length}'
+          '/${frames.length} 프레임, 전 구간 최고 점수 '
+          '${ballDetector.debugMaxScore.toStringAsFixed(3)} (임계값 0.3)');
     } finally {
       ballDetector.dispose();
     }
