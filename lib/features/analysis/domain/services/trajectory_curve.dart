@@ -56,6 +56,54 @@ List<TrajectorySample> fitAndResample(
   return result;
 }
 
+/// 리샘플된 곡선을 시작 방향(파울라인 쪽)으로 선형 연장한다.
+///
+/// 정제 단계가 초반 구간의 지속적 검출 노이즈를 잘라내면 곡선이 레인
+/// 중간(실측 8m대)부터 시작해 선 앞 절반이 비어 보인다. 릴리즈 직후
+/// 2~8m는 스키드 구간이라 물리적으로 직선에 가깝므로, 곡선 시작점의
+/// 기울기(dx/dy, dframe/dy)를 그대로 [targetStartY]까지 [yStepM] 간격으로
+/// 늘린다. 3차식 자체를 데이터 범위 밖으로 외삽하면 꼬리가 요동치므로
+/// 선형만 쓴다. xM은 레인 폭(0~1.05m), frame은 0 이상으로 클램프.
+///
+/// 곡선이 이미 [targetStartY] 이하에서 시작하거나 포인트가 2개 미만이면
+/// 그대로 반환한다.
+List<TrajectorySample> extendCurveStart(
+  List<TrajectorySample> curve, {
+  required double targetStartY,
+  double yStepM = 0.25,
+}) {
+  if (curve.length < 2) return curve;
+  final first = curve.first;
+  final second = curve[1];
+  final dy = second.lane.yM - first.lane.yM;
+  if (dy <= 0 || first.lane.yM <= targetStartY + 1e-9) return curve;
+
+  final dxPerY = (second.lane.xM - first.lane.xM) / dy;
+  final dfPerY = (second.frame - first.frame) / dy;
+
+  final prefix = <TrajectorySample>[];
+  var y = first.lane.yM - yStepM;
+  while (y > targetStartY + 1e-9) {
+    prefix.add(_extrapolated(first, y, dxPerY, dfPerY));
+    y -= yStepM;
+  }
+  prefix.add(_extrapolated(first, targetStartY, dxPerY, dfPerY));
+
+  return [...prefix.reversed, ...curve];
+}
+
+TrajectorySample _extrapolated(
+  TrajectorySample anchor,
+  double y,
+  double dxPerY,
+  double dfPerY,
+) {
+  final back = anchor.lane.yM - y;
+  final x = (anchor.lane.xM - dxPerY * back).clamp(0.0, 1.05);
+  final frame = (anchor.frame - dfPerY * back).round().clamp(0, 1 << 30);
+  return (frame: frame, lane: LanePoint(xM: x, yM: y));
+}
+
 /// [points]는 frame 오름차순, y 단조증가로 가정. [y]를 감싸는 원본 구간을 찾아
 /// frame을 구간선형 보간(round)한다. 범위 밖이면 경계값으로 클램프한다.
 int _interpolateFrame(List<TrajectorySample> points, double y) {

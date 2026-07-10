@@ -99,4 +99,59 @@ void main() {
       }
     });
   });
+
+  group('extendCurveStart', () {
+    test('시작 방향 선형 연장: targetStartY까지 기울기 유지, y/frame 오름차순 보존', () {
+      // y 8.0부터 시작하는 곡선 (x가 y당 +0.01, frame이 y당 +4)
+      final curve = <TrajectorySample>[
+        for (var i = 0; i <= 8; i++)
+          (
+            frame: 46 + i, // 0.25m당 1프레임 = y당 4프레임
+            lane: LanePoint(xM: 0.5 + 0.0025 * i, yM: 8.0 + 0.25 * i),
+          ),
+      ];
+
+      final result = extendCurveStart(curve, targetStartY: 2.5);
+
+      expect(result.first.lane.yM, closeTo(2.5, 1e-9));
+      // 기울기 유지: y=2.5는 앵커(8.0)에서 5.5m 뒤 → x = 0.5 - 0.01*5.5 = 0.445
+      expect(result.first.lane.xM, closeTo(0.445, 1e-9));
+      // frame = 46 - 4*5.5 = 24
+      expect(result.first.frame, 24);
+      // 원본 구간은 그대로 뒤에 붙어 있다
+      expect(result.sublist(result.length - curve.length), curve);
+      // y·frame 모두 비내림차순
+      for (var i = 1; i < result.length; i++) {
+        expect(result[i].lane.yM, greaterThan(result[i - 1].lane.yM));
+        expect(result[i].frame, greaterThanOrEqualTo(result[i - 1].frame));
+      }
+    });
+
+    test('frame은 0 미만으로 외삽되지 않고, xM은 레인 폭으로 클램프된다', () {
+      final curve = <TrajectorySample>[
+        (frame: 2, lane: const LanePoint(xM: 0.05, yM: 10.0)),
+        (frame: 4, lane: const LanePoint(xM: 0.30, yM: 10.25)),
+      ];
+
+      final result = extendCurveStart(curve, targetStartY: 2.5);
+
+      expect(result.first.frame, 0); // 2 - 8*(7.5/0.25) → 음수 → 0 클램프
+      expect(result.first.lane.xM, 0.0); // x 기울기 -1.0/m → 음수 → 0 클램프
+    });
+
+    test('곡선이 이미 targetStartY 이하에서 시작하면 그대로 반환', () {
+      final curve = <TrajectorySample>[
+        (frame: 40, lane: const LanePoint(xM: 0.5, yM: 2.4)),
+        (frame: 44, lane: const LanePoint(xM: 0.5, yM: 3.4)),
+      ];
+      expect(extendCurveStart(curve, targetStartY: 2.5), curve);
+    });
+
+    test('포인트 2개 미만이면 그대로 반환', () {
+      final curve = <TrajectorySample>[
+        (frame: 40, lane: const LanePoint(xM: 0.5, yM: 8.0)),
+      ];
+      expect(extendCurveStart(curve, targetStartY: 2.5), curve);
+    });
+  });
 }

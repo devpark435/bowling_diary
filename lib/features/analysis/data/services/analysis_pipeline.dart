@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/pin_impact_detector_service.dart';
@@ -114,7 +116,13 @@ class AnalysisPipeline {
     final release = combineRelease(fsm.releaseFrame, detectorRelease);
 
     final refined = refineTrajectory(fsm.trajectory);
-    final curve = fitAndResample(refined);
+    final fitted = fitAndResample(refined);
+    // 정제가 초반 노이즈 구간을 잘라내도 릴리즈 직후부터 선이 보이도록,
+    // 원시 궤적의 실제 시작 y(최소 2.5m)까지 곡선을 선형 연장한다.
+    final curve = fsm.trajectory.isEmpty
+        ? fitted
+        : extendCurveStart(fitted,
+            targetStartY: math.max(2.5, fsm.trajectory.first.lane.yM));
     const ribbonHalfWidthM = 0.11; // 볼 반경(공 지름 0.218m)
     final trajectory = curve
         .map((e) => TrajectoryRibbonPoint(
@@ -125,7 +133,7 @@ class AnalysisPipeline {
         .toList();
     debugPrint('[Trajectory] raw ${fsm.trajectory.length} → refined ${refined.length} → curve ${curve.length}개 포인트, '
         '프레임: ${refined.isEmpty ? "없음" : "${refined.first.frame}~${refined.last.frame}"}, '
-        '레인 y범위: ${refined.isEmpty ? "없음" : "${refined.first.lane.yM.toStringAsFixed(2)}~${refined.last.lane.yM.toStringAsFixed(2)}m"}');
+        '레인 y범위(연장 후): ${curve.isEmpty ? "없음" : "${curve.first.lane.yM.toStringAsFixed(2)}~${curve.last.lane.yM.toStringAsFixed(2)}m"}');
 
     if (!release.isFound || fsm.impactFrame == null) {
       return AnalysisData(
