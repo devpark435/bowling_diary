@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:new_version_plus/new_version_plus.dart';
 
@@ -7,6 +8,9 @@ class AppUpdateService {
   static bool _hasChecked = false;
 
   static Future<void> checkForUpdate(BuildContext context) async {
+    // debug 빌드는 스토어 미등록 번들 id 조회로 에러 로그만 만들고
+    // 업데이트 안내가 의미도 없으므로 건너뛴다.
+    if (kDebugMode) return;
     if (_hasChecked) return;
     _hasChecked = true;
 
