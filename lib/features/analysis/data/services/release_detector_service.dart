@@ -3,7 +3,6 @@ import 'dart:math' show sqrt;
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
-import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 
@@ -97,7 +96,7 @@ class ReleaseDetectorService {
     for (var i = startFrame; i < startFrame + 10 && i < detections.length; i++) {
       final d = detections[i];
       if (d == null) continue;
-      ys.add(h.frameToLane(FramePoint(nx: d.cx, ny: d.cy)).yM);
+      ys.add(h.frameToLane(d.contactPoint).yM);
     }
     if (ys.length < 3) return 0.0;
     var inc = 0;

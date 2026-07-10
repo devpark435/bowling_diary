@@ -109,13 +109,14 @@ class AnalysisPipeline {
     final fsm = AnalysisStateMachine();
     for (var i = 0; i < detections.length; i++) {
       final d = detections[i];
-      final lanePos = d != null ? homography.frameToLane(FramePoint(nx: d.cx, ny: d.cy)) : null;
+      final lanePos = d != null ? homography.frameToLane(d.contactPoint) : null;
       fsm.onFrame(frameIdx: i, detection: d, lanePos: lanePos);
     }
 
     final release = combineRelease(fsm.releaseFrame, detectorRelease);
 
     final refined = refineTrajectory(fsm.trajectory);
+    debugPrint('[Trajectory] refined (frame:y) = ${refined.map((s) => "${s.frame}:${s.lane.yM.toStringAsFixed(1)}").join(" ")}');
     final fitted = fitAndResample(refined);
     // 정제가 초반 노이즈 구간을 잘라내도 릴리즈 직후부터 선이 보이도록,
     // 원시 궤적의 실제 시작 y(최소 2.5m)까지 곡선을 선형 연장한다.

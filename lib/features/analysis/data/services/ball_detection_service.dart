@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
+import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
+
 class BallDetection {
   final double cx;
   final double cy;
@@ -17,6 +19,12 @@ class BallDetection {
     required this.bh,
     required this.confidence,
   });
+
+  /// 공-레인 접점(bbox 바닥 중점)의 프레임 좌표. 호모그래피는 레인 평면 전제라
+  /// 공 중심(바닥에서 반지름 ~11cm 위)을 넣으면 평면 밖 점이 실제보다 앞으로
+  /// 투영되는 계통 오차가 생긴다(거리에 비례해 증가 — 실측: 궤적 y가 핀덱
+  /// 18.29m를 넘는 18.65m까지 관측). 접점은 평면 위의 점이라 바이어스가 없다.
+  FramePoint get contactPoint => FramePoint(nx: cx, ny: (cy + bh / 2).clamp(0.0, 1.0));
 }
 
 class BallDetectionService {

@@ -232,7 +232,7 @@ void main() {
       final fsm = AnalysisStateMachine();
       for (var i = 0; i < detections.length; i++) {
         final d = detections[i];
-        final lanePos = d != null ? homography.frameToLane(FramePoint(nx: d.cx, ny: d.cy)) : null;
+        final lanePos = d != null ? homography.frameToLane(d.contactPoint) : null;
         fsm.onFrame(frameIdx: i, detection: d, lanePos: lanePos);
       }
       expect(fsm.releaseFrame, 36);
@@ -259,21 +259,17 @@ void main() {
 
       final result = await pipeline.run('fake.mp4', homography);
 
-      // 회귀 기반 speed 산출로 넘어가면서 이 합성 데이터의 speedFailure 기대값이
-      // 바뀌었다: 구 구현(release+8~24프레임 국소 윈도우의 거리 중앙값)은 이
-      // 윈도우(frame 44~60)가 우연히 순조롭게 상승하는 구간과 겹쳐 성공했지만,
-      // 신 구현은 refineTrajectory 전체(frame ~41~120)를 회귀에 사용한다. 이
-      // 합성 데이터는 감지기 혼란을 재현하려고 frame 61~119를 y 정지 평탄
-      // 구간으로 설계했고(주석 "추적 신호가 평탄해지는 구간" 참조), 단조 필터는
-      // 이 평탄 구간을 그대로 통과시킨다(감소가 아니므로). 그 결과 80포인트 중
-      // 59개가 사실상 정지한 값이라 회귀 기울기가 크게 낮아져(계산상 약
-      // 4.7km/h) 10km/h 하한 아래로 떨어져 outOfRange로 실패한다. 이는 회귀
-      // 기반 계산이 "감지기가 혼란에 빠진 구간"을 있는 그대로 반영해 정직하게
-      // 실패하는 스펙 원칙(틀린 숫자보다 정직한 실패)에 부합하는 결과다 — 이
-      // 테스트의 본래 목적(FSM 신호로 release/impact를 찾아 파이프라인이 죽지
-      // 않고 완주하는지)은 아래 release/impact 무관 단언들로 충분히 검증된다.
-      expect(result.speedFailure, SpeedFailure.outOfRange);
-      expect(result.speedKmh, isNull);
+      // 공-레인 접점(bbox 바닥 중점) 투영으로 전환하면서 이 합성 데이터의
+      // speedFailure 기대값이 다시 바뀌었다: 접점 투영은 평면 밖 점(중심)을 넣을 때
+      // 생기던 계통적 전방 오버슛이 없으므로, frame 61~119의 "정지 평탄" 구간이
+      // (이제는 bh가 섞이지 않아) 예전만큼 인위적으로 완만해지지 않고 회귀 기울기가
+      // 10km/h 하한을 다시 넘는다. 이는 detector 혼란 구간이 있어도 파이프라인이
+      // 정직하게 실패(outOfRange)하기보다 접점 기반의 더 정확한 궤적으로 완주하는
+      // 것이 맞다는 이 수정의 목적과 부합한다 — 이 테스트의 본래 목적(FSM 신호로
+      // release/impact를 찾아 파이프라인이 죽지 않고 완주하는지)은 아래
+      // release/impact 무관 단언들로 충분히 검증된다.
+      expect(result.speedFailure, isNull);
+      expect(result.speedKmh, isNotNull);
       expect(result.trajectory.length, greaterThanOrEqualTo(2));
       for (final p in result.trajectory) {
         expect(p.left.nx, inInclusiveRange(0.0, 1.0));
