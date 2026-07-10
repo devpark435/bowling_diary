@@ -87,21 +87,26 @@ void main() {
   });
 
   group('computePinZone', () {
-    test('레인 평면 정사영 호모그래피에서 핀덱 상단부 존을 계산', () {
+    test('레인 평면 정사영 호모그래피에서 핀덱 상단부 존을 계산(레인 폭 기준 수직 스케일)', () {
+      // laneToFrame: nx = xM/1.05, ny = 1 - yM/18.29.
+      // d0=(0,0), d1=(1,0) → deckNy=0, deckWidthNx=1.
+      // nyPerMeter = 1*0.5627/1.05 ≈ 0.5359, pinHeightNy ≈ 0.2036.
+      // top = 0 - 0.509 → clamp 0, bottom = 0 + 0.1018 ≈ 0.1018.
+      // left = -0.02 → 0, right = 1.02 → 1.
       final homography = HomographyMatrix.fromRowMajor(
         [1.05, 0, 0, 0, -18.29, 18.29, 0, 0, 1],
       );
-      final zone = PinImpactDetectorService.computePinZone(homography);
+      final zone = PinImpactDetectorService.computePinZone(homography, frameAspect: 0.5627);
       expect(zone, isNotNull);
       expect(zone!.left, closeTo(0.0, 1e-3));
       expect(zone.top, closeTo(0.0, 1e-3));
       expect(zone.right, closeTo(1.0, 1e-3));
-      expect(zone.bottom, closeTo(0.0353, 1e-3));
+      expect(zone.bottom, closeTo(0.1018, 1e-3));
     });
 
     test('퇴화 존(identity 호모그래피)은 null', () {
       final homography = HomographyMatrix.identity();
-      final zone = PinImpactDetectorService.computePinZone(homography);
+      final zone = PinImpactDetectorService.computePinZone(homography, frameAspect: 0.5627);
       expect(zone, isNull);
     });
   });

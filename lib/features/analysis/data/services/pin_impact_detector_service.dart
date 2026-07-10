@@ -19,15 +19,24 @@ class PinImpactDetectorService {
   /// 호모그래피로 핀 영역을 프레임 정규화좌표 존으로 투영한다.
   ///
   /// 핀덱 라인(y=18.29m)의 좌우 끝과 1.29m 앞(y=17.0m)의 좌우 끝, 총 4점을
-  /// laneToFrame으로 투영해 핀덱의 화면상 위치와 그 거리에서의 원근 스케일
-  /// (레인 1.29m가 화면에서 차지하는 높이 = unit)을 얻는다. 핀(높이 0.38m)은
-  /// 레인 평면 위로 서 있는 수직 물체라 호모그래피로 직접 투영할 수 없으므로,
-  /// 핀덱 라인에서 위로 1.5*unit(서 있는 핀 + 튀어오르는 핀 여유), 아래로
-  /// 0.5*unit을 존으로 잡는다. 좌우는 4점의 nx 범위 ± 0.02.
+  /// laneToFrame으로 투영해 핀덱의 화면상 위치(좌우 범위 산출용)를 얻는다.
+  ///
+  /// 수직(존 높이) 스케일은 더 이상 바닥 원근 압축(17→18.29m 투영 높이)에서
+  /// 유도하지 않는다 — 낮은 카메라 각에서 바닥 깊이는 원근으로 극도로
+  /// 압축되는 반면(실측 unit≈0.01) 서 있는 핀은 레인 평면 위 수직 물체라
+  /// 이 압축을 받지 않으므로, 그 스케일을 그대로 쓰면 존이 핀을 못 담는다
+  /// (실측 LTRB(0.50,0.41,0.75,0.43) — 높이 17px). 대신 압축 없는 **레인
+  /// 폭**(핀덱 라인의 화면상 수평 폭, 실제 1.05m)에서 "이 거리에서 1m가
+  /// 화면상 몇 ny인지"를 역산해 핀 높이(0.38m)를 존 높이로 환산한다.
+  /// nx/ny 정규화 기준(각각 프레임 폭/높이)이 다르므로 [frameAspect](width/height)로
+  /// 보정한다.
   ///
   /// 투영 결과가 화면 밖이거나(0~1 clamp 후) 존이 퇴화하면(빈 영역) null을
   /// 반환한다 — 호출부는 null이면 legacy 존으로 폴백해야 한다.
-  static Rect? computePinZone(HomographyMatrix homography) {
+  static Rect? computePinZone(
+    HomographyMatrix homography, {
+    required double frameAspect,
+  }) {
     final d0 = homography.laneToFrame(const LanePoint(xM: 0, yM: 18.29));
     final d1 = homography.laneToFrame(const LanePoint(xM: 1.05, yM: 18.29));
     final n0 = homography.laneToFrame(const LanePoint(xM: 0, yM: 17.0));
@@ -36,17 +45,24 @@ class PinImpactDetectorService {
     for (final p in [d0, d1, n0, n1]) {
       if (!p.nx.isFinite || !p.ny.isFinite) return null;
     }
+    if (frameAspect <= 0 || !frameAspect.isFinite) return null;
 
     final deckNy = (d0.ny + d1.ny) / 2;
-    final nearNy = (n0.ny + n1.ny) / 2;
-    final unit = (nearNy - deckNy).abs();
-    if (unit <= 0 || !unit.isFinite) return null;
+    final deckWidthNx = (d1.nx - d0.nx).abs();
+    if (deckWidthNx <= 0 || !deckWidthNx.isFinite) return null;
+
+    // nx는 프레임 폭, ny는 프레임 높이로 정규화돼 있으므로 aspect로 환산해
+    // 핀덱 거리에서 1m가 화면상 몇 ny인지 구한다.
+    final nyPerMeter = deckWidthNx * frameAspect / 1.05;
+    const pinHeightM = 0.38;
+    final pinHeightNy = pinHeightM * nyPerMeter;
+    if (pinHeightNy <= 0 || !pinHeightNy.isFinite) return null;
 
     final xs = [d0.nx, d1.nx, n0.nx, n1.nx];
     final left = (xs.reduce(math.min) - 0.02).clamp(0.0, 1.0);
     final right = (xs.reduce(math.max) + 0.02).clamp(0.0, 1.0);
-    final top = (deckNy - unit * 1.5).clamp(0.0, 1.0);
-    final bottom = (deckNy + unit * 0.5).clamp(0.0, 1.0);
+    final top = (deckNy - pinHeightNy * 2.5).clamp(0.0, 1.0); // 서 있는 핀 + 튀는 핀 여유
+    final bottom = (deckNy + pinHeightNy * 0.5).clamp(0.0, 1.0); // 핀 베이스 아래 약간
 
     if (right - left < 0.01 || bottom - top < 0.005) return null;
     return Rect.fromLTRB(left, top, right, bottom);

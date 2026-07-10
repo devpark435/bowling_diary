@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -182,9 +185,12 @@ class _TrajectoryOverlayState extends State<TrajectoryOverlay>
   }
 }
 
-/// 리본(폭이 있는 폴리곤) 페인터. 좌측 가장자리를 프레임 순으로 앞으로 이었다가
-/// 우측 가장자리를 역순으로 되짚어 닫힌 폴리곤을 만들고 채운다 — 균일 두께
-/// 중심선(폴리라인) 대신 원근이 반영된 리본 형태로 "레인 위에 그려진" 느낌을 준다.
+/// 코멧(혜성) 스타일 페인터 — 골프 샷 트레이서류를 참조. 리본을 세그먼트별
+/// 사각형(quad)으로 채우되 꼬리(오래된 구간)는 옅게, 머리(최신 구간)는
+/// 진하게 불투명도를 램프시켜 진행 방향감을 준다. 인접 quad가 변을 공유해
+/// 이음새가 보이지 않으므로 stroke는 그리지 않는다(seg 경계에 stroke를 그으면
+/// 오히려 각짐이 도드라짐). 머리 끝에는 바깥 블러 글로우 + 안쪽 선명한 코어
+/// 두 겹의 원을 그려 "빛나는 공 머리" 느낌을 더한다.
 class _TrajectoryPainter extends CustomPainter {
   final List<TrajectoryRibbonPoint> points;
   final Rect videoRect;
@@ -197,29 +203,38 @@ class _TrajectoryPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path()..moveTo(_project(points.first.left).dx, _project(points.first.left).dy);
-    for (var i = 1; i < points.length; i++) {
-      final o = _project(points[i].left);
-      path.lineTo(o.dx, o.dy);
-    }
-    for (var i = points.length - 1; i >= 0; i--) {
-      final o = _project(points[i].right);
-      path.lineTo(o.dx, o.dy);
-    }
-    path.close();
+    if (points.length < 2) return;
 
-    final fillPaint = Paint()
-      ..color = AppColors.neonOrange.withValues(alpha: 0.45)
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(path, fillPaint);
+    final left = points.map((p) => _project(p.left)).toList();
+    final right = points.map((p) => _project(p.right)).toList();
+    final segCount = points.length - 1;
 
-    final strokePaint = Paint()
-      ..color = AppColors.neonOrange.withValues(alpha: 0.85)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(path, strokePaint);
+    final fillPaint = Paint()..style = PaintingStyle.fill;
+    for (var i = 0; i < segCount; i++) {
+      final t = segCount > 1 ? i / (segCount - 1) : 1.0;
+      final alpha = ui.lerpDouble(0.12, 0.6, t)!;
+      final quad = Path()
+        ..moveTo(left[i].dx, left[i].dy)
+        ..lineTo(left[i + 1].dx, left[i + 1].dy)
+        ..lineTo(right[i + 1].dx, right[i + 1].dy)
+        ..lineTo(right[i].dx, right[i].dy)
+        ..close();
+      fillPaint.color = AppColors.neonOrange.withValues(alpha: alpha);
+      canvas.drawPath(quad, fillPaint);
+    }
+
+    final head = (left.last + right.last) / 2;
+    final headWidth = (right.last - left.last).distance;
+    final outerRadius = math.max(4.0, headWidth * 0.7);
+    final innerRadius = outerRadius * 0.55;
+
+    final outerGlow = Paint()
+      ..color = AppColors.neonOrange.withValues(alpha: 0.55)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawCircle(head, outerRadius, outerGlow);
+
+    final innerCore = Paint()..color = AppColors.neonOrange.withValues(alpha: 0.95);
+    canvas.drawCircle(head, innerRadius, innerCore);
   }
 
   @override

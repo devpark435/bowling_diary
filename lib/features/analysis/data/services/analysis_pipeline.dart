@@ -10,6 +10,7 @@ import 'package:bowling_diary/features/analysis/domain/entities/homography_matri
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
+import 'package:bowling_diary/features/analysis/domain/services/trajectory_curve.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_refiner.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
@@ -113,15 +114,16 @@ class AnalysisPipeline {
     final release = combineRelease(fsm.releaseFrame, detectorRelease);
 
     final refined = refineTrajectory(fsm.trajectory);
+    final curve = fitAndResample(refined);
     const ribbonHalfWidthM = 0.11; // 볼 반경(공 지름 0.218m)
-    final trajectory = refined
+    final trajectory = curve
         .map((e) => TrajectoryRibbonPoint(
               frame: e.frame,
               left: homography.laneToFrame(LanePoint(xM: e.lane.xM - ribbonHalfWidthM, yM: e.lane.yM)),
               right: homography.laneToFrame(LanePoint(xM: e.lane.xM + ribbonHalfWidthM, yM: e.lane.yM)),
             ))
         .toList();
-    debugPrint('[Trajectory] raw ${fsm.trajectory.length} → refined ${refined.length}개 포인트, '
+    debugPrint('[Trajectory] raw ${fsm.trajectory.length} → refined ${refined.length} → curve ${curve.length}개 포인트, '
         '프레임: ${refined.isEmpty ? "없음" : "${refined.first.frame}~${refined.last.frame}"}, '
         '레인 y범위: ${refined.isEmpty ? "없음" : "${refined.first.lane.yM.toStringAsFixed(2)}~${refined.last.lane.yM.toStringAsFixed(2)}m"}');
 
@@ -149,7 +151,10 @@ class AnalysisPipeline {
       frames: frames,
       releaseFrame: release.frame,
       homographyImpactFrame: fsm.impactFrame!,
-      pinZone: PinImpactDetectorService.computePinZone(homography),
+      pinZone: PinImpactDetectorService.computePinZone(
+        homography,
+        frameAspect: frames[0].width / frames[0].height,
+      ),
       pinSearchStart: pinSearchStart,
     );
 
