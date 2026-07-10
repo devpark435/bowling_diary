@@ -111,26 +111,56 @@ void main() {
     });
   });
 
-  group('findImpactFrame with pinZone', () {
-    test('존 내부 변화는 충돌로 감지', () {
+  group('findImpactFrame with pinZone (씨드 대비 + 지속성)', () {
+    // 존은 20x20=400px (zone LTRB 0.4,0.0,0.6,0.2 on 100x100 프레임).
+    // releaseFrame=0 → searchStart = 0 + minTravelFrames(20) = 20 → 씨드는
+    // 프레임 20(검정).
+
+    test('폭발 감지: 프레임 30부터 끝까지 지속되는 존 내부 30% 면적 흰색 변화 → 30 반환', () {
       const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
-      final frames = List.generate(30, (i) {
+      final frames = List.generate(40, (i) {
         final frame = img.Image(width: 100, height: 100);
-        if (i == 25) {
-          img.fillRect(frame, x1: 40, y1: 0, x2: 59, y2: 19, color: img.ColorRgb8(255, 255, 255));
+        // 30% = 120px. 20col(40~59) x 6row(0~5) = 120px, 프레임 30부터 끝까지 유지.
+        if (i >= 30) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 59, y2: 5, color: img.ColorRgb8(255, 255, 255));
         }
         return frame;
       });
       final result = sut.findImpactFrame(frames, 0, pinZone: zone);
-      expect(result, 25);
+      expect(result, 30);
     });
 
-    test('존 외부 변화는 무시', () {
+    test('공 접근 램프 + 폭발 점프: 폭발 시점(최대 증가 프레임)을 반환한다 (실영상 재현)', () {
       const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
-      final frames = List.generate(30, (i) {
+      // 실영상 패턴 재현: 공이 존을 향해 접근하며 씨드 대비 diff가 프레임당
+      // ~2%p씩 완만히 증가(램프)하다가, 폭발 프레임에서 30%로 점프해 고착.
+      // 첫-돌파 방식은 램프가 15%를 통과하는 프레임(공)을 잡는 반면,
+      // Δd argmax는 점프 프레임(진짜 폭발)을 잡아야 한다.
+      // 존 400px: 프레임 21+k에서 4k px(=k%p) 변화 (k=1..12 → 1~12%),
+      // 프레임 34부터 120px(30%) 고정.
+      final frames = List.generate(45, (i) {
         final frame = img.Image(width: 100, height: 100);
-        if (i == 25) {
-          img.fillRect(frame, x1: 0, y1: 50, x2: 99, y2: 99, color: img.ColorRgb8(255, 255, 255));
+        if (i >= 34) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 59, y2: 5, color: img.ColorRgb8(255, 255, 255)); // 30%
+        } else if (i >= 22) {
+          final k = i - 21; // 1..12 → 4k px = k%
+          img.fillRect(frame, x1: 40, y1: 0, x2: 40 + 4 * k - 1, y2: 0, color: img.ColorRgb8(255, 255, 255));
+        }
+        return frame;
+      });
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      // 램프 구간(22~33, 최대 12% — floor 미달이지만 설령 넘더라도 Δd는
+      // 프레임당 1%p뿐)이 아니라 점프 프레임(34, Δd = 30-12 = 18%p)이어야 한다.
+      expect(result, 34);
+    });
+
+    test('공 통과 무시: 프레임 30~40에만 씨드 대비 8%짜리 흰 블롭, 41부터 원상복구 → null (floor 미달)', () {
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      // 8% = 32px. 16col(40~55) x 2row(0~1) = 32px.
+      final frames = List.generate(50, (i) {
+        final frame = img.Image(width: 100, height: 100);
+        if (i >= 30 && i <= 40) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 55, y2: 1, color: img.ColorRgb8(255, 255, 255));
         }
         return frame;
       });
@@ -138,44 +168,42 @@ void main() {
       expect(result, isNull);
     });
 
-    test('존 면적의 8%만 바뀌는(구 첫-돌파 10% 기준이면 미감지였을) 신호도 argmax+floor(4%)로 감지', () {
-      // 존은 20x20=400px. 16col x 2row = 32px 변경 → 32/400 = 8%.
-      // 구 첫-돌파 임계값(10%)이면 이 신호는 절대 문턱을 넘지 못해 미감지로
-      // 끝났을 것이다.
+    test('1-프레임 스파이크 무시: 프레임 30 한 프레임만 존 50% 변화, 31부터 원상복구 → null (지속성 실패)', () {
       const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
-      final frames = List.generate(30, (i) {
+      // 50% = 200px. 20col(40~59) x 10row(0~9) = 200px, 프레임 30에서만.
+      final frames = List.generate(40, (i) {
         final frame = img.Image(width: 100, height: 100);
-        if (i == 25) {
-          img.fillRect(frame, x1: 40, y1: 0, x2: 55, y2: 1, color: img.ColorRgb8(255, 255, 255));
+        if (i == 30) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 59, y2: 9, color: img.ColorRgb8(255, 255, 255));
         }
         return frame;
       });
       final result = sut.findImpactFrame(frames, 0, pinZone: zone);
-      expect(result, 25);
+      expect(result, isNull);
     });
 
-    test('존 면적의 5%만 바뀌는(구 6% 바닥이면 미감지였을) 신호도 완화된 바닥(4%)으로 감지', () {
-      // 존은 20x20=400px. 20col x 1row = 20px 변경 → 20/400 = 5%.
-      // 구 바닥(6%)이면 이 신호는 미감지로 끝났을 것이다.
+    test('경계: 변화가 마지막 3프레임에서 시작(이후 프레임 4개 미만) → 존재하는 프레임 전부 persist floor 이상이면 감지', () {
       const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
-      final frames = List.generate(30, (i) {
+      // 총 33프레임(0~32), searchStart=20, 마지막 인덱스는 32. 변화는
+      // 프레임 30부터 시작(30,31,32 — 마지막 3프레임)해 끝까지 지속되므로
+      // 이후 프레임은 2개(31,32)뿐이나 전부 persist floor 이상이어야 감지된다.
+      final frames = List.generate(33, (i) {
         final frame = img.Image(width: 100, height: 100);
-        if (i == 25) {
-          img.fillRect(frame, x1: 40, y1: 0, x2: 59, y2: 0, color: img.ColorRgb8(255, 255, 255));
+        if (i >= 30) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 59, y2: 5, color: img.ColorRgb8(255, 255, 255));
         }
         return frame;
       });
       final result = sut.findImpactFrame(frames, 0, pinZone: zone);
-      expect(result, 25);
+      expect(result, 30);
     });
 
-    test('탐색구간 전체 변화율이 4% 미만이면 null', () {
-      // 존은 20x20=400px. 4col x 3row = 12px 변경 → 12/400 = 3% < floor(4%).
+    test('존 외부 변화는 무시', () {
       const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
-      final frames = List.generate(30, (i) {
+      final frames = List.generate(40, (i) {
         final frame = img.Image(width: 100, height: 100);
-        if (i == 25) {
-          img.fillRect(frame, x1: 40, y1: 0, x2: 43, y2: 2, color: img.ColorRgb8(255, 255, 255));
+        if (i >= 30) {
+          img.fillRect(frame, x1: 0, y1: 50, x2: 99, y2: 99, color: img.ColorRgb8(255, 255, 255));
         }
         return frame;
       });
