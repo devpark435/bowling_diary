@@ -44,6 +44,12 @@ class BallDetectionService {
   /// 사용되지 않는다(_parseBest 참조).
   static const _ballClassIndex = 32;
 
+  /// yolo11s는 신형 litert 변환기 산출물이라 torch 채널-우선(NCHW
+  /// [1,3,640,640]) 입력을 요구한다 — NHWC로 넣으면 CONV_2D가 준비 단계에서
+  /// 실패(input_channel % filter_input_channel != 0, 실기기 확인). 구형 tf 경유
+  /// export(yolov8n)는 NHWC [1,320,320,3] — 롤백 시 false로 되돌릴 것.
+  static const _inputChannelFirst = true;
+
   Interpreter? _interpreter;
 
   GpuDelegate _gpuDelegateIOS() {
@@ -83,6 +89,8 @@ class BallDetectionService {
     // 모델 교체 시 출력 레이아웃 가정(_numDims x _numAnchors)이 맞는지
     // 실기기 로그로 즉시 검증하기 위한 1회성 진단.
     debugPrint('[BallDetection] 모델 로드: $_modelPath, '
+        '입력 shape ${_interpreter!.getInputTensor(0).shape} '
+        '(채널우선=$_inputChannelFirst), '
         '출력 shape ${_interpreter!.getOutputTensor(0).shape} '
         '(기대: [1, $_numDims, $_numAnchors])');
   }
@@ -109,6 +117,22 @@ class BallDetectionService {
   }
 
   List<List<List<List<double>>>> _toFloat32Input(img.Image image) {
+    if (_inputChannelFirst) {
+      // NCHW: [1][3][H][W]
+      return [
+        List.generate(3, (c) {
+          return List.generate(
+            _inputSize,
+            (y) => List.generate(_inputSize, (x) {
+              final px = image.getPixel(x, y);
+              final v = c == 0 ? px.r : (c == 1 ? px.g : px.b);
+              return v / 255.0;
+            }),
+          );
+        })
+      ];
+    }
+    // NHWC: [1][H][W][3]
     return [
       List.generate(
         _inputSize,
