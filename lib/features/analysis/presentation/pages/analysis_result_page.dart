@@ -336,6 +336,9 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                           value: data.speedKmh?.toStringAsFixed(1),
                           unit: 'km/h',
                           highlight: true,
+                          badge: data.speedKmh != null
+                              ? speedConfidenceBadgeLabel(data.speedConfidence)
+                              : null,
                         ),
                         const SizedBox(height: 12),
                         Text(
