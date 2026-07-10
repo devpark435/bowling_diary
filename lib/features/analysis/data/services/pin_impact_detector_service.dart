@@ -10,7 +10,11 @@ import 'package:bowling_diary/features/analysis/domain/entities/homography_matri
 class PinImpactDetectorService {
   static const _pinZoneRatio = 0.20;
   static const _changeThreshold = 0.15;
-  static const _homographyZoneChangeThreshold = 0.10;
+  // 호모그래피 존 경로는 첫-돌파 고정 임계값이 아니라 탐색창 내 최대 변화율
+  // (argmax)을 채택하므로, 이 값은 "이 정도는 넘어야 노이즈가 아니라 실제
+  // 충돌 신호로 본다"는 최소 바닥(floor)이다. 실측(최대 변화율 9.4%)이
+  // 구 임계값(10%)에 걸려 미감지되던 사례를 근거로 완화했다.
+  static const _homographyZoneImpactFloor = 0.06;
   static const double _pixelDiffThreshold = 30.0;
   // 릴리즈 직후 볼 스윙 이벤트를 오탐하지 않도록 최소 탐색 시작 프레임
   // 50 km/h 기준 18.29m 이동 = 1.3s = 39프레임 → 여유분 포함 20프레임
@@ -88,8 +92,6 @@ class PinImpactDetectorService {
         : releaseFrame + _minTravelFrames;
     if (searchStart >= frames.length) return null;
 
-    final threshold = pinZone != null ? _homographyZoneChangeThreshold : _changeThreshold;
-
     // 검색 시작 프레임 자체를 씨드(기준)로 삼는다 — release~searchStart 구간의 자연스러운
     // 드리프트(카메라 미동/조명 변화)를 비교 대상에서 아예 제외해, 그 구간을 건너뛰고
     // 여기서부터의 "급격한" 변화만 감지한다. 과거(release=36, searchStart=56)에는 이 구간을
@@ -98,9 +100,9 @@ class PinImpactDetectorService {
     final seedFrame = frames[searchStart];
     img.Image prevZone = img.grayscale(_cropZone(seedFrame, pinZone));
 
-    // 진단용 — 탐색 전체에서 관측된 최대 변화율과 그 프레임. 임계값을 못 넘어
-    // "미감지"로 끝나는 경우, 이 값으로 "핀존 자체에 변화가 거의 없었다"(존/각도
-    // 문제)와 "근접했는데 문턱을 못 넘었다"(임계값 튜닝 문제)를 구분한다.
+    // 진단용 — 탐색 전체에서 관측된 최대 변화율과 그 프레임. 호모그래피 존
+    // 경로에서는 이 값 자체가 채택 기준(argmax)이 된다. legacy 경로에서는
+    // 여전히 "임계값을 못 넘어 미감지"로 끝나는 경우의 진단용으로만 쓰인다.
     double maxRatio = 0;
     int maxRatioFrame = searchStart;
 
@@ -109,17 +111,35 @@ class PinImpactDetectorService {
       final grayZone = img.grayscale(_cropZone(frame, pinZone));
 
       final ratio = _changeRatio(prevZone, grayZone);
+      // strict `>` 비교이므로 동률이면 최초로 관측된 프레임을 유지한다.
       if (ratio > maxRatio) {
         maxRatio = ratio;
         maxRatioFrame = i;
       }
-      if (ratio >= threshold) {
-        debugPrint('[PinImpact] 핀 충돌 프레임: $i (변화율: ${(ratio * 100).toStringAsFixed(1)}%, '
-            '존: ${pinZone != null ? "호모그래피" : "legacy"})');
+
+      // legacy(존 미지정) 경로만 첫 돌파 방식을 유지한다 — 존이 상단 20%로
+      // 크고 신호도 굵어 첫 돌파로도 안정적으로 잡힌다.
+      if (pinZone == null && ratio >= _changeThreshold) {
+        debugPrint('[PinImpact] 핀 충돌 프레임: $i (변화율: ${(ratio * 100).toStringAsFixed(1)}%, 존: legacy)');
         return i;
       }
       prevZone = grayZone;
     }
+
+    // 호모그래피 존 경로: 탐색은 이미 공이 핀 근접(≥16m)에 도달한 이후로
+    // 게이트돼 있어 창이 충돌 근처로 좁다. 그 좁은 창 안에서 프레임간
+    // 변화율이 가장 큰 지점이 곧 핀이 흩어지는(빛/그림자가 요동치는) 순간이다.
+    // 첫-돌파+고정 임계값은 조명/구도별 신호 크기 편차에 취약해서 실측
+    // (최대 변화율 9.4%)이 구 임계값(10%)에 못 미쳐 두 런 연속 미감지가
+    // 났다 — 그래서 창 전체를 스캔한 뒤 최대값(argmax)을 채택하고, 노이즈와
+    // 구분하기 위한 완화된 바닥(6%)만 넘으면 인정한다.
+    if (pinZone != null && maxRatio >= _homographyZoneImpactFloor) {
+      debugPrint('[PinImpact] 핀 충돌 프레임: $maxRatioFrame (최대 변화율: '
+          '${(maxRatio * 100).toStringAsFixed(1)}%, 존: 호모그래피/argmax)');
+      return maxRatioFrame;
+    }
+
+    final threshold = pinZone != null ? _homographyZoneImpactFloor : _changeThreshold;
     final zoneDesc = pinZone != null
         ? '핀존(호모그래피) LTRB(${pinZone.left.toStringAsFixed(2)},${pinZone.top.toStringAsFixed(2)},'
             '${pinZone.right.toStringAsFixed(2)},${pinZone.bottom.toStringAsFixed(2)})'

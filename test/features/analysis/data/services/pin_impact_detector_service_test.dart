@@ -137,5 +137,35 @@ void main() {
       final result = sut.findImpactFrame(frames, 0, pinZone: zone);
       expect(result, isNull);
     });
+
+    test('존 면적의 8%만 바뀌는(구 첫-돌파 10% 기준이면 미감지였을) 신호도 argmax+floor(6%)로 감지', () {
+      // 존은 20x20=400px. 16col x 2row = 32px 변경 → 32/400 = 8%.
+      // 구 첫-돌파 임계값(10%)이면 이 신호는 절대 문턱을 넘지 못해 미감지로
+      // 끝났을 것이다.
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      final frames = List.generate(30, (i) {
+        final frame = img.Image(width: 100, height: 100);
+        if (i == 25) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 55, y2: 1, color: img.ColorRgb8(255, 255, 255));
+        }
+        return frame;
+      });
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      expect(result, 25);
+    });
+
+    test('탐색구간 전체 변화율이 6% 미만이면 null', () {
+      // 존은 20x20=400px. 4col x 5row = 20px 변경 → 20/400 = 5% < floor(6%).
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      final frames = List.generate(30, (i) {
+        final frame = img.Image(width: 100, height: 100);
+        if (i == 25) {
+          img.fillRect(frame, x1: 40, y1: 0, x2: 43, y2: 4, color: img.ColorRgb8(255, 255, 255));
+        }
+        return frame;
+      });
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      expect(result, isNull);
+    });
   });
 }
