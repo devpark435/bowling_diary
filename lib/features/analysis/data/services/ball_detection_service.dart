@@ -28,11 +28,21 @@ class BallDetection {
 }
 
 class BallDetectionService {
-  static const _modelPath = 'assets/models/yolov8n.tflite';
-  static const _inputSize = 320;
+  // YOLO11s @ 640 (COCO 80클래스, ultralytics tflite export — 출력 (1, 84, 8400),
+  // 84 = box4 + 클래스점수80, 좌표는 0~1 정규화 xywh). 이전 모델
+  // yolov8n.tflite(@320, 1클래스 전용학습, 출력 (1, 5, 2100))은 롤백용으로
+  // 애셋에 유지 — 아래 상수 5개를 (yolov8n, 320, 5, 2100, 무시)로 되돌리면 복귀.
+  // 교체 이유: far-lane에서 공이 3~5px로 뭉개지는 320 입력의 localization
+  // 지터(정제 드롭률 58%, 회귀 R² 0.67 실측)를 640 입력 + s급 모델로 개선 실험.
+  static const _modelPath = 'assets/models/yolo11s.tflite';
+  static const _inputSize = 640;
   static const _confidenceThreshold = 0.3;
-  static const _numDims = 5;
-  static const _numAnchors = 2100;
+  static const _numDims = 84;
+  static const _numAnchors = 8400;
+
+  /// COCO 클래스 인덱스 32 = sports ball. 1클래스 모델(_numDims == 5)에서는
+  /// 사용되지 않는다(_parseBest 참조).
+  static const _ballClassIndex = 32;
 
   Interpreter? _interpreter;
 
@@ -70,6 +80,11 @@ class BallDetectionService {
       final options = InterpreterOptions()..threads = 2;
       _interpreter = await Interpreter.fromAsset(_modelPath, options: options);
     }
+    // 모델 교체 시 출력 레이아웃 가정(_numDims x _numAnchors)이 맞는지
+    // 실기기 로그로 즉시 검증하기 위한 1회성 진단.
+    debugPrint('[BallDetection] 모델 로드: $_modelPath, '
+        '출력 shape ${_interpreter!.getOutputTensor(0).shape} '
+        '(기대: [1, $_numDims, $_numAnchors])');
   }
 
   void dispose() {
@@ -109,8 +124,12 @@ class BallDetectionService {
     double maxConf = _confidenceThreshold;
     BallDetection? best;
 
+    // 1클래스 전용학습 모델(5차원)은 row4가 곧 신뢰도, COCO 80클래스 모델은
+    // row4부터 클래스별 점수라 sports ball(_ballClassIndex) 행만 본다.
+    final confRow = _numDims == 5 ? 4 : 4 + _ballClassIndex;
+
     for (int i = 0; i < _numAnchors; i++) {
-      final conf = raw[4][i];
+      final conf = raw[confRow][i];
       if (conf <= maxConf) continue;
       maxConf = conf;
       best = BallDetection(
