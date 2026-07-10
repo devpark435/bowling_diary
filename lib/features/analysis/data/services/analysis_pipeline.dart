@@ -169,8 +169,7 @@ class AnalysisPipeline {
     final speed = speedEstimator.estimate(
       release: release,
       impact: impact,
-      detections: detections,
-      homography: homography,
+      refinedTrajectory: refined,
       sampleFps: extracted.sampleFps,
     );
 
