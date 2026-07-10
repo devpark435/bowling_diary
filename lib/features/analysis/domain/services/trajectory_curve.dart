@@ -92,6 +92,58 @@ List<TrajectorySample> extendCurveStart(
   return [...prefix.reversed, ...curve];
 }
 
+/// 리샘플된 곡선을 끝 방향(핀덱 쪽)으로 선형 연장한다.
+///
+/// 원거리(17m+)에서는 공이 화면상 수 픽셀이라 검출이 끊겨 곡선이 핀
+/// 직전에서 멈춘다(실측: 17.1m에서 종료 — 레인의 94%). 마지막 추적점이
+/// [minLastY] 이상이면(공이 핀을 향하고 있음이 명백) 끝 기울기를
+/// [targetEndY]까지 그대로 늘린다. [minLastY] 미만이면 중간 유실일 수
+/// 있으므로 날조하지 않는다. 시작 연장(extendCurveStart)과 대칭.
+List<TrajectorySample> extendCurveEnd(
+  List<TrajectorySample> curve, {
+  required double targetEndY,
+  double yStepM = 0.25,
+  double minLastY = 14.0,
+}) {
+  if (curve.length < 2) return curve;
+  final last = curve.last;
+  final secondLast = curve[curve.length - 2];
+  if (last.lane.yM >= targetEndY - 1e-9) return curve;
+  if (last.lane.yM < minLastY) return curve;
+
+  final dy = last.lane.yM - secondLast.lane.yM;
+  if (dy <= 0) return curve;
+
+  final dxPerY = (last.lane.xM - secondLast.lane.xM) / dy;
+  final dfPerY = (last.frame - secondLast.frame) / dy;
+
+  final suffix = <TrajectorySample>[];
+  var prevFrame = last.frame;
+  var y = last.lane.yM + yStepM;
+  while (y < targetEndY - 1e-9) {
+    final sample = _extrapolatedForward(last, y, dxPerY, dfPerY, prevFrame);
+    suffix.add(sample);
+    prevFrame = sample.frame;
+    y += yStepM;
+  }
+  suffix.add(_extrapolatedForward(last, targetEndY, dxPerY, dfPerY, prevFrame));
+
+  return [...curve, ...suffix];
+}
+
+TrajectorySample _extrapolatedForward(
+  TrajectorySample anchor,
+  double y,
+  double dxPerY,
+  double dfPerY,
+  int prevFrame,
+) {
+  final ahead = y - anchor.lane.yM;
+  final x = (anchor.lane.xM + dxPerY * ahead).clamp(0.0, 1.05);
+  final frame = (anchor.frame + dfPerY * ahead).round().clamp(prevFrame, 1 << 30);
+  return (frame: frame, lane: LanePoint(xM: x, yM: y));
+}
+
 TrajectorySample _extrapolated(
   TrajectorySample anchor,
   double y,

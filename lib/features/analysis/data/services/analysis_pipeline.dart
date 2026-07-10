@@ -125,10 +125,13 @@ class AnalysisPipeline {
     final fitted = fitAndResample(refined);
     // 정제가 초반 노이즈 구간을 잘라내도 릴리즈 직후부터 선이 보이도록,
     // 원시 궤적의 실제 시작 y(최소 2.5m)까지 곡선을 선형 연장한다.
-    final curve = fsm.trajectory.isEmpty
+    final started = fsm.trajectory.isEmpty
         ? fitted
         : extendCurveStart(fitted,
             targetStartY: math.max(2.5, fsm.trajectory.first.lane.yM));
+    // 원거리(17m+)에서는 공이 화면상 수 픽셀이라 검출이 끊겨 곡선이 핀
+    // 직전에서 멈춘다 — 핀덱(18.29m)까지 끝 기울기를 그대로 연장한다.
+    final curve = extendCurveEnd(started, targetEndY: 18.29);
     const ribbonHalfWidthM = 0.11; // 볼 반경(공 지름 0.218m)
     final trajectory = curve
         .map((e) => TrajectoryRibbonPoint(

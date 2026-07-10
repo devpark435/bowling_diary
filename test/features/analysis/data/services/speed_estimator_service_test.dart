@@ -68,15 +68,25 @@ void main() {
       expect(r.failure, SpeedFailure.releaseNotFound);
     });
 
-    test('impact confidence가 low면 anchorMismatch로 실패 (강제로 값 채택 안 함)', () {
-      final r = svc.estimate(
+    test('impact confidence가 low여도 회귀는 임팩트 프레임을 쓰지 않으므로 성공하되 '
+        'confidence는 high 대비 0.7배', () {
+      final trajectory = _linearTrajectory();
+      final high = svc.estimate(
         release: _release,
-        impact: _lowConfImpact,
-        refinedTrajectory: const [],
+        impact: _highConfImpact,
+        refinedTrajectory: trajectory,
         sampleFps: 30,
       );
-      expect(r.failure, SpeedFailure.anchorMismatch);
-      expect(r.kmh, isNull);
+      final low = svc.estimate(
+        release: _release,
+        impact: _lowConfImpact,
+        refinedTrajectory: trajectory,
+        sampleFps: 30,
+      );
+
+      expect(low.failure, isNull);
+      expect(low.kmh, closeTo(27.0, 0.1));
+      expect(low.confidence, closeTo(high.confidence * 0.7, 0.01));
     });
 
     test('정제 궤적 포인트가 8개 미만이면 lowConfidence', () {

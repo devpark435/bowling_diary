@@ -154,4 +154,56 @@ void main() {
       expect(extendCurveStart(curve, targetStartY: 2.5), curve);
     });
   });
+
+  group('extendCurveEnd', () {
+    test('끝 방향 선형 연장: targetEndY까지 기울기 유지, y/frame 비내림차순 보존', () {
+      // y 8.0~17.0 (0.25 간격), x가 y당 +0.01, frame이 y당 +4 (0.25m당 1프레임)
+      final curve = <TrajectorySample>[
+        for (var i = 0; i <= 36; i++)
+          (
+            frame: 46 + i,
+            lane: LanePoint(xM: 0.5 + 0.0025 * i, yM: 8.0 + 0.25 * i),
+          ),
+      ];
+
+      final result = extendCurveEnd(curve, targetEndY: 18.29);
+
+      expect(result.last.lane.yM, closeTo(18.29, 1e-9));
+      // 기울기 유지: 마지막 원본점(y=17.0, x=0.5+0.0025*36=0.59, frame=82)에서
+      // targetEndY(18.29)까지는 1.29m 앞 → x = 0.59 + 0.01*1.29 = 0.6029
+      expect(result.last.lane.xM, closeTo(0.6029, 1e-6));
+      // frame = 82 + 4*1.29 = 87.16 → round 87
+      expect(result.last.frame, 87);
+      // 원본 구간은 그대로 앞에 붙어 있다
+      expect(result.sublist(0, curve.length), curve);
+      // y·frame 모두 비내림차순
+      for (var i = 1; i < result.length; i++) {
+        expect(result[i].lane.yM, greaterThan(result[i - 1].lane.yM));
+        expect(result[i].frame, greaterThanOrEqualTo(result[i - 1].frame));
+      }
+    });
+
+    test('마지막 y가 minLastY(14.0) 미만이면 그대로 반환', () {
+      final curve = <TrajectorySample>[
+        (frame: 40, lane: const LanePoint(xM: 0.5, yM: 10.0)),
+        (frame: 44, lane: const LanePoint(xM: 0.5, yM: 12.0)),
+      ];
+      expect(extendCurveEnd(curve, targetEndY: 18.29), curve);
+    });
+
+    test('마지막 y가 targetEndY 이상이면 그대로 반환', () {
+      final curve = <TrajectorySample>[
+        (frame: 40, lane: const LanePoint(xM: 0.5, yM: 17.0)),
+        (frame: 44, lane: const LanePoint(xM: 0.5, yM: 18.29)),
+      ];
+      expect(extendCurveEnd(curve, targetEndY: 18.29), curve);
+    });
+
+    test('포인트 2개 미만이면 그대로 반환', () {
+      final curve = <TrajectorySample>[
+        (frame: 40, lane: const LanePoint(xM: 0.5, yM: 17.0)),
+      ];
+      expect(extendCurveEnd(curve, targetEndY: 18.29), curve);
+    });
+  });
 }

@@ -31,11 +31,6 @@ class SpeedEstimatorService {
       return SpeedResult.failed(SpeedFailure.releaseNotFound);
     }
 
-    if (impact.confidence == ImpactConfidence.low) {
-      debugPrint('[SpeedEstimator] impact 신호 불일치(low confidence) — 강제 채택 안 함');
-      return SpeedResult.failed(SpeedFailure.anchorMismatch);
-    }
-
     final n = refinedTrajectory.length;
     if (n < _minSamples) {
       debugPrint('[SpeedEstimator] 측정불가: 정제 궤적 포인트 부족 (n=$n, 최소 $_minSamples)');
@@ -83,12 +78,23 @@ class SpeedEstimatorService {
     }
     final rSquared = ssTot == 0.0 ? 0.0 : (1 - ssRes / ssTot);
 
-    final impactPenalty = impact.confidence == ImpactConfidence.medium ? 0.85 : 1.0;
+    // 회귀는 정제 궤적 전체를 대상으로 하며 임팩트 프레임 자체를 계산에 쓰지
+    // 않는다 — 옛 앵커 산식(release→impact 거리/시간)에서는 임팩트 프레임이
+    // 계산의 필수 입력이라 confidence가 낮으면(핀 감지 불확실) 결과 자체를
+    // 하드 게이트로 거부했지만, 지금은 그 이유가 사라졌다. 임팩트 신호는
+    // 이제 "분석 전반이 자기일관적인가"를 보여주는 보조 지표일 뿐이므로
+    // 거부 사유가 아니라 신뢰도 차감 사유로만 반영한다.
+    final impactPenalty = switch (impact.confidence) {
+      ImpactConfidence.high => 1.0,
+      ImpactConfidence.medium => 0.85,
+      ImpactConfidence.low => 0.7,
+    };
     final confidence = (rSquared * impactPenalty * release.confidence).clamp(0.0, 1.0);
 
     final rounded = double.parse(kmh.toStringAsFixed(1));
     debugPrint('[SpeedEstimator] 구속 ${rounded}km/h '
-        '(회귀 R² ${rSquared.toStringAsFixed(2)}, n=$n, confidence ${confidence.toStringAsFixed(2)})');
+        '(회귀 R² ${rSquared.toStringAsFixed(2)}, n=$n, impact ${impact.confidence.name}, '
+        'confidence ${confidence.toStringAsFixed(2)})');
     return SpeedResult.success(rounded, confidence);
   }
 }

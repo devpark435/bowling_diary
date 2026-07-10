@@ -12,9 +12,13 @@ class PinImpactDetectorService {
   static const _changeThreshold = 0.15;
   // 호모그래피 존 경로는 첫-돌파 고정 임계값이 아니라 탐색창 내 최대 변화율
   // (argmax)을 채택하므로, 이 값은 "이 정도는 넘어야 노이즈가 아니라 실제
-  // 충돌 신호로 본다"는 최소 바닥(floor)이다. 실측(최대 변화율 9.4%)이
-  // 구 임계값(10%)에 걸려 미감지되던 사례를 근거로 완화했다.
-  static const _homographyZoneImpactFloor = 0.06;
+  // 충돌 신호로 본다"는 최소 바닥(floor)이다. 실기기 3연속 런에서 argmax
+  // 위치는 매번 실제 충돌 프레임(107/118/118)으로 정확했고, 크기만 조명/
+  // 구도에 따라 5.9~10.2%로 변동했다 — 6%는 이 변동폭 하단(5.9%)을 잘라
+  // 미감지를 냈다. 탐색창이 이미 공이 핀 근접(16m 이상)에 도달한 이후로
+  // 게이트돼 있어 창 내 노이즈 바닥이 낮으므로 4%로 낮춰도 오탐 위험은
+  // 낮다.
+  static const _homographyZoneImpactFloor = 0.04;
   static const double _pixelDiffThreshold = 30.0;
   // 릴리즈 직후 볼 스윙 이벤트를 오탐하지 않도록 최소 탐색 시작 프레임
   // 50 km/h 기준 18.29m 이동 = 1.3s = 39프레임 → 여유분 포함 20프레임
@@ -132,7 +136,7 @@ class PinImpactDetectorService {
     // 첫-돌파+고정 임계값은 조명/구도별 신호 크기 편차에 취약해서 실측
     // (최대 변화율 9.4%)이 구 임계값(10%)에 못 미쳐 두 런 연속 미감지가
     // 났다 — 그래서 창 전체를 스캔한 뒤 최대값(argmax)을 채택하고, 노이즈와
-    // 구분하기 위한 완화된 바닥(6%)만 넘으면 인정한다.
+    // 구분하기 위한 완화된 바닥(4%)만 넘으면 인정한다.
     if (pinZone != null && maxRatio >= _homographyZoneImpactFloor) {
       debugPrint('[PinImpact] 핀 충돌 프레임: $maxRatioFrame (최대 변화율: '
           '${(maxRatio * 100).toStringAsFixed(1)}%, 존: 호모그래피/argmax)');
