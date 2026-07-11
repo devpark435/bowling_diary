@@ -144,36 +144,46 @@ class AnalysisPipeline {
         '프레임: ${refined.isEmpty ? "없음" : "${refined.first.frame}~${refined.last.frame}"}, '
         '레인 y범위(연장 후): ${curve.isEmpty ? "없음" : "${curve.first.lane.yM.toStringAsFixed(2)}~${curve.last.lane.yM.toStringAsFixed(2)}m"}');
 
-    if (!release.isFound || fsm.impactFrame == null) {
+    if (!release.isFound) {
       return AnalysisData(
-        speedFailure: !release.isFound ? SpeedFailure.releaseNotFound : SpeedFailure.impactNotFound,
+        speedFailure: SpeedFailure.releaseNotFound,
         framesAnalyzed: frames.length,
         fpsUsed: extracted.sampleFps,
         trajectory: trajectory,
       );
     }
 
-    // 공이 핀에 근접(16m 이상)한 시점부터만 핀 플래시를 탐색 — 그 전 구간의
-    // 핀존 변화(볼러 팔로스루 등)는 물리적으로 핀 충돌일 수 없다.
-    const pinProximityY = 16.0;
-    int? pinSearchStart;
-    for (final s in refined) {
-      if (s.lane.yM >= pinProximityY) {
-        pinSearchStart = s.frame;
-        break;
-      }
+    if (fsm.impactFrame == null) {
+      debugPrint('[AnalysisPipeline] FSM 임팩트 없음 — 핀 폭발 신호 단독으로 진행');
     }
+
+    // 핀 폭발 탐색 시작점 = 궤적이 소실된 프레임(refined 마지막 샘플)부터.
+    // 공은 소실 직전까지 추적되고 폭발은 그 뒤에 온다 — 소실이 BP(볼 반환)
+    // 등 중간 유실이어도 핀 폭발 감지의 영구변화 게이트(창 끝 중앙값>=15%)가
+    // 오탐을 막는다(폭발이 없으면 null → 정직한 실패). 과거의 절대 y(16m)
+    // 기준은 캘리브레이션 스케일 오류에 취약했다(실측: 최대 y 11.5m로 분석된
+    // 시도에서 게이트가 전혀 발동하지 않음).
+    final pinSearchStart = refined.isEmpty ? null : refined.last.frame;
 
     final impact = impactDetector.detect(
       frames: frames,
       releaseFrame: release.frame,
-      homographyImpactFrame: fsm.impactFrame!,
+      homographyImpactFrame: fsm.impactFrame,
       pinZone: PinImpactDetectorService.computePinZone(
         homography,
         frameAspect: frames[0].width / frames[0].height,
       ),
       pinSearchStart: pinSearchStart,
     );
+
+    if (impact == null) {
+      return AnalysisData(
+        speedFailure: SpeedFailure.impactNotFound,
+        framesAnalyzed: frames.length,
+        fpsUsed: extracted.sampleFps,
+        trajectory: trajectory,
+      );
+    }
 
     final speed = speedEstimator.estimate(
       release: release,

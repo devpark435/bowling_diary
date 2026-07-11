@@ -109,6 +109,45 @@ List<img.Image> _regressionFrames() => [
       for (var i = 0; i < 150; i++) i == 120 ? _whiteFrame() : _blankFrame(),
     ];
 
+// --- FSM 임팩트 null 시나리오용 합성 detection 시퀀스 ---
+// release(frame 36) 후 완만히 가속하며 y 11m대(14m 미만)까지만 추적되고
+// 그 이후(frame 71~) 검출을 완전히 잃는다. FSM의 null-count 임팩트 게이트
+// (_nullCountImpactMinY=14m)는 마지막 관측 y가 14m 이상이어야 발동하므로,
+// 11m대에서 소실되면 releaseFrame은 찾아도 impactFrame은 끝내 null로
+// 남는다 — 캘리브레이션 스케일이 실제보다 작게 잡혀(실측: 최대 y 11.5m) 절대
+// y 임팩트 게이트가 전혀 발동하지 않는 케이스를 재현한다.
+double _lostEarlyArea(int i) {
+  if (i < 35) return 0.01 + i * 0.0004;
+  if (i == 35) return 0.025;
+  final v = 0.025 - (i - 35) * 0.0004;
+  return v < 0.005 ? 0.005 : v;
+}
+
+double _lostEarlyCy(int i) {
+  if (i <= 35) return 0.05 + i * 0.001;
+  if (i == 36) return 0.135;
+  // release~frame70까지 완만한 가속(~0.25m/frame) — y 11m 부근까지만 도달.
+  return 0.135 + (i - 36) * 0.0137;
+}
+
+List<BallDetection?> _lostEarlyDetections({int trackedUntil = 70}) => [
+      for (var i = 0; i <= trackedUntil; i++)
+        BallDetection(
+          cx: 0.5,
+          cy: _lostEarlyCy(i),
+          bw: sqrt(_lostEarlyArea(i)),
+          bh: sqrt(_lostEarlyArea(i)),
+          confidence: 0.9,
+        ),
+    ];
+
+/// [explosionFrame] 이후로는 전체 프레임이 지속적으로 밝게 바뀐다 — 핀
+/// 폭발 감지기의 "영구 변화" 게이트(창 끝 중앙값>=15%)를 만족시키기 위해
+/// 단일 프레임 플래시가 아니라 끝까지 지속되는 변화로 구성한다.
+List<img.Image> _framesWithSustainedExplosionAt(int explosionFrame, {int total = 150}) => [
+      for (var i = 0; i < total; i++) i >= explosionFrame ? _whiteFrame() : _blankFrame(),
+    ];
+
 void main() {
   // 이 영상 전용으로 산출됐다고 가정하는 identity에 가까운 호모그래피(단위 정사각형 →
   // 레인 실측 좌표). 저장형 프로파일이 사라졌으므로 매 실행마다 이렇게 직접 구성된다.
@@ -289,6 +328,61 @@ void main() {
       }
     },
   );
+
+  group('임팩트 시간축 절대 y 분리 (스케일 오류로 FSM 임팩트가 null인 경우)', () {
+    test(
+      'FSM 임팩트 null + 핀 폭발 감지됨 → 핀 폭발 신호 단독으로 속도 산출 성공',
+      () async {
+        final detections = _lostEarlyDetections();
+        final frames = _framesWithSustainedExplosionAt(100);
+
+        // 전제: FSM은 release는 찾지만(공이 11m대에서 소실) impact는 끝내 못 찾는다.
+        final fsm = AnalysisStateMachine();
+        for (var i = 0; i < frames.length; i++) {
+          final d = i < detections.length ? detections[i] : null;
+          final lanePos = d != null ? homography.frameToLane(d.contactPoint) : null;
+          fsm.onFrame(frameIdx: i, detection: d, lanePos: lanePos);
+        }
+        expect(fsm.releaseFrame, isNotNull);
+        expect(fsm.impactFrame, isNull);
+
+        final pipeline = AnalysisPipeline(
+          frameExtractor: _FakeFrameExtractor(
+            FrameExtractionResult(frames: frames, originalFps: 30, sampleFps: 30),
+          ),
+          ballDetector: _FakeBallDetector(detections),
+          releaseDetector: ReleaseDetectorService(),
+          impactDetector: ImpactDetectorService(pinImpactDetector: PinImpactDetectorService()),
+          speedEstimator: SpeedEstimatorService(),
+        );
+
+        final result = await pipeline.run('fake.mp4', homography);
+
+        expect(result.speedFailure, isNull);
+        expect(result.speedKmh, isNotNull);
+      },
+    );
+
+    test('핀 폭발 미감지 + FSM 임팩트도 null이면 impactNotFound로 정직하게 실패', () async {
+      final detections = _lostEarlyDetections();
+      final frames = List.generate(150, (_) => _blankFrame());
+
+      final pipeline = AnalysisPipeline(
+        frameExtractor: _FakeFrameExtractor(
+          FrameExtractionResult(frames: frames, originalFps: 30, sampleFps: 30),
+        ),
+        ballDetector: _FakeBallDetector(detections),
+        releaseDetector: ReleaseDetectorService(),
+        impactDetector: ImpactDetectorService(pinImpactDetector: PinImpactDetectorService()),
+        speedEstimator: SpeedEstimatorService(),
+      );
+
+      final result = await pipeline.run('fake.mp4', homography);
+
+      expect(result.speedFailure, SpeedFailure.impactNotFound);
+      expect(result.speedKmh, isNull);
+    });
+  });
 
   group('리본 투영(ribbonHalfWidthM 오프셋 → homography.laneToFrame)', () {
     test('레인 (0.5, 10.0) 지점에서 좌/우 가장자리가 볼 반경만큼 벌어져 투영된다', () {
