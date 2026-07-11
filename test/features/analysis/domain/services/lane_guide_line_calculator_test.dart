@@ -19,7 +19,7 @@ void main() {
       expect(lines, isNotNull);
       expect(lines!.length, 4);
       expect(lines.map((l) => l.yM), [0, 4.57, 12.19, 18.29]);
-      expect(lines.map((l) => l.label), ['파울라인', '에로우(화살표)', '레인지파인더', '핀 발밑(핀덱)']);
+      expect(lines.map((l) => l.label), ['파울라인', '에로우(화살표)', '레인지파인더', '핀덱(구석 핀 머리 높이에)']);
       expect(lines[0].drawLine, isFalse);
       expect(lines[1].drawLine, isTrue);
       expect(lines[2].drawLine, isTrue);

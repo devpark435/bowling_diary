@@ -36,6 +36,9 @@ const _laneCorners = [
 /// 실시간 호모그래피를 산출하고, 검증용 레인 기준선 4개(파울라인/에로우/
 /// 레인지파인더/핀덱)를 프레임 좌표로 투영한다.
 ///
+/// 핀덱 라벨은 "구석 핀 머리 높이"를 안내한다 — 광각 렌즈 원거리 압축 보정을
+/// 위한 실측 경험칙(핀 발밑/바닥 기준으로 잡으면 구속이 과대 산출됨).
+///
 /// 코너가 4개가 아니거나 퇴화 사각형(예: 드래그 중 대각선 교차)이라
 /// 호모그래피를 풀 수 없으면 null을 반환한다 — 호출부는 그리드 렌더링을
 /// 생략하면 된다(크래시 금지가 우선).
@@ -48,7 +51,7 @@ List<LaneGuideLine>? computeLaneGuideLines(List<FramePoint> corners) {
       LaneGuideLine(yM: 0, label: '파울라인', left: at(0, 0), right: at(1.05, 0), drawLine: false),
       LaneGuideLine(yM: 4.57, label: '에로우(화살표)', left: at(0, 4.57), right: at(1.05, 4.57), drawLine: true),
       LaneGuideLine(yM: 12.19, label: '레인지파인더', left: at(0, 12.19), right: at(1.05, 12.19), drawLine: true),
-      LaneGuideLine(yM: 18.29, label: '핀 발밑(핀덱)', left: at(0, 18.29), right: at(1.05, 18.29), drawLine: false),
+      LaneGuideLine(yM: 18.29, label: '핀덱(구석 핀 머리 높이에)', left: at(0, 18.29), right: at(1.05, 18.29), drawLine: false),
     ];
   } catch (_) {
     return null;

@@ -110,6 +110,11 @@ class _TrajectoryOverlayState extends State<TrajectoryOverlay>
   Duration _lastElapsed = Duration.zero;
   int _visibleCount = 0;
 
+  /// 재생 위치→프레임 매핑 지연 진단용. 매 vsync(최대 초당 수십 회)마다 찍으면
+  /// 로그가 너무 시끄러워지므로 마지막 출력 이후 경과(ticker elapsed, 실시간
+  /// 기준)가 1초 이상일 때만 출력한다.
+  Duration? _lastLogElapsed;
+
   @override
   void initState() {
     super.initState();
@@ -139,7 +144,23 @@ class _TrajectoryOverlayState extends State<TrajectoryOverlay>
     if (count != _visibleCount) {
       setState(() => _visibleCount = count);
     }
+
+    if (kDebugMode) {
+      if (_lastLogElapsed == null ||
+          elapsed - _lastLogElapsed! >= const Duration(seconds: 1)) {
+        _lastLogElapsed = elapsed;
+        debugPrint(
+          '[Overlay] pos=${_formatSeconds(v.position)}s '
+          'est=${_formatSeconds(estimated)}s '
+          'playing=${v.isPlaying} speed=${v.playbackSpeed} '
+          'frame=$currentFrame visible=$count/${widget.points.length}',
+        );
+      }
+    }
   }
+
+  String _formatSeconds(Duration d) =>
+      (d.inMilliseconds / 1000).toStringAsFixed(2);
 
   @override
   void didUpdateWidget(covariant TrajectoryOverlay oldWidget) {
