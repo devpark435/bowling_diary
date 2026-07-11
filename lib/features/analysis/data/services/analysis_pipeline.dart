@@ -69,6 +69,37 @@ class AnalysisPipeline {
     return ReleaseResult.notFound;
   }
 
+  /// 핀 폭발 탐색 시작 프레임 (순수 함수, 단독 유닛테스트 가능).
+  ///
+  /// = 궤적 소실 프레임 + (공이 핀덱(18.29m)에 도착할 때까지의 예상 프레임 수 ÷ 2).
+  ///
+  /// 도착 예상은 마지막 y와 마지막 구간 기울기(끝 5개 샘플)로 외삽하는데,
+  /// 남은 거리와 기울기를 **같은 (왜곡됐을 수 있는) 캘리브레이션 자**로 재기
+  /// 때문에 스케일 오류가 비율에서 상당 부분 약분된다 — 절대 y 게이트(구
+  /// 16m 기준)와 달리 캘리브레이션이 틀어져도 동작한다. 절반만 더하는 이유:
+  /// 외삽 오차(±수 프레임)로 시작점이 실제 도착 뒤로 넘어가면 폭발 자체를
+  /// 놓치므로, 공 진입 Δ 스파이크만 피할 만큼 보수적으로 민다.
+  ///
+  /// 반환 null = 궤적 없음(탐색 시작 추정 불가 → detector가 legacy 규칙 사용).
+  static int? estimatePinSearchStart(List<TrajectorySample> refined) {
+    if (refined.isEmpty) return null;
+    final last = refined.last;
+    if (refined.length < 2) return last.frame;
+
+    final anchorIdx = math.max(0, refined.length - 5);
+    final anchor = refined[anchorIdx];
+    final df = last.frame - anchor.frame;
+    final dy = last.lane.yM - anchor.lane.yM;
+    if (df <= 0 || dy <= 0) return last.frame;
+
+    final slopePerFrame = dy / df;
+    final remainingM = 18.29 - last.lane.yM;
+    if (remainingM <= 0) return last.frame;
+
+    final halfArrivalFrames = (remainingM / slopePerFrame / 2).round();
+    return last.frame + halfArrivalFrames.clamp(0, 60);
+  }
+
   /// [homography]는 이 영상 전용으로 산출된 호모그래피다(레퍼런스 = 영상 자체이므로
   /// drift 개념이 존재하지 않는다 — spec §10 참조).
   Future<AnalysisData> run(String videoPath, HomographyMatrix homography) async {
@@ -157,13 +188,13 @@ class AnalysisPipeline {
       debugPrint('[AnalysisPipeline] FSM 임팩트 없음 — 핀 폭발 신호 단독으로 진행');
     }
 
-    // 핀 폭발 탐색 시작점 = 궤적이 소실된 프레임(refined 마지막 샘플)부터.
-    // 공은 소실 직전까지 추적되고 폭발은 그 뒤에 온다 — 소실이 BP(볼 반환)
-    // 등 중간 유실이어도 핀 폭발 감지의 영구변화 게이트(창 끝 중앙값>=15%)가
-    // 오탐을 막는다(폭발이 없으면 null → 정직한 실패). 과거의 절대 y(16m)
-    // 기준은 캘리브레이션 스케일 오류에 취약했다(실측: 최대 y 11.5m로 분석된
-    // 시도에서 게이트가 전혀 발동하지 않음).
-    final pinSearchStart = refined.isEmpty ? null : refined.last.frame;
+    // 핀 폭발 탐색 시작점: 궤적 소실 프레임에 "공이 핀덱에 도착할 때까지의
+    // 예상 프레임의 절반"을 더한다 (estimatePinSearchStart 참조). 소실 직후를
+    // 씨드로 쓰면 공이 핀존에 진입하는 순간의 날카로운 Δ가 폭발보다 먼저
+    // argmax에 잡히는 오탐이 3회 연속 실측됐다(115/115/117 vs 실제 ~128).
+    // 소실이 BP 등 중간 유실이어도 폭발 감지의 영구변화 게이트가 오탐을
+    // 막는다(폭발 없으면 null → 정직한 실패).
+    final pinSearchStart = estimatePinSearchStart(refined);
 
     final impact = impactDetector.detect(
       frames: frames,

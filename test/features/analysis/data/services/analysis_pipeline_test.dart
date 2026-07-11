@@ -13,6 +13,7 @@ import 'package:bowling_diary/features/analysis/domain/entities/release_result.d
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
 import 'package:bowling_diary/features/analysis/domain/services/homography_solver.dart';
+import 'package:bowling_diary/features/analysis/domain/services/trajectory_refiner.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
@@ -224,6 +225,40 @@ void main() {
       expect(result.framesAnalyzed, detections.length);
     },
   );
+
+  group('AnalysisPipeline.estimatePinSearchStart', () {
+    TrajectorySample s(int frame, double y) => (frame: frame, lane: LanePoint(xM: 0.5, yM: y));
+
+    test('소실 프레임 + 도착 예상 프레임의 절반을 더한다 (실측 케이스 재현)', () {
+      // 실측(2026-07-11 런): 끝 5샘플 105:11.9 → 113:14.9, 기울기 3.0/8=0.375,
+      // 남은 거리 3.39m → 도착까지 ~9프레임 → 절반 5(반올림) → 113+5=118.
+      // (공 진입 Δ 스파이크 구간 114~117을 정확히 건너뛴다.)
+      final refined = [s(100, 10.3), s(105, 11.9), s(107, 12.6), s(108, 12.9), s(109, 13.4), s(113, 14.9)];
+      expect(AnalysisPipeline.estimatePinSearchStart(refined), 118);
+    });
+
+    test('스케일이 압축된 캘리브레이션에서도 비율 약분으로 동작 (실측 12.5m 케이스)', () {
+      // 끝 5샘플 105:10.2 → 113:12.5, 기울기 2.3/8=0.2875, 남은 5.79m →
+      // ~20.1프레임 → 절반 10 → 123. (진짜 폭발 128보다 앞, 진입 스파이크 뒤.)
+      final refined = [s(100, 9.0), s(105, 10.2), s(107, 10.8), s(108, 11.0), s(109, 11.4), s(113, 12.5)];
+      expect(AnalysisPipeline.estimatePinSearchStart(refined), 123);
+    });
+
+    test('빈 궤적 → null, 1개 → 소실 프레임 그대로', () {
+      expect(AnalysisPipeline.estimatePinSearchStart(const []), isNull);
+      expect(AnalysisPipeline.estimatePinSearchStart([s(40, 5.0)]), 40);
+    });
+
+    test('기울기가 0 이하(정체/역행)면 소실 프레임 그대로 (외삽 불가)', () {
+      final refined = [s(40, 5.0), s(44, 5.0)];
+      expect(AnalysisPipeline.estimatePinSearchStart(refined), 44);
+    });
+
+    test('이미 핀덱 이상이면 소실 프레임 그대로', () {
+      final refined = [s(100, 17.0), s(110, 18.3)];
+      expect(AnalysisPipeline.estimatePinSearchStart(refined), 110);
+    });
+  });
 
   group('AnalysisPipeline.combineRelease', () {
     test('FSM 찾음 + detector 근접 일치(10프레임 이내) → high confidence로 FSM 프레임 채택', () {

@@ -102,6 +102,14 @@ class SpeedEstimatorService {
       final anchorFrames = impact.frame - firstSample.frame;
       if (anchorFrames > 0 && anchorDistM > 0) {
         anchorKmh = anchorDistM / (anchorFrames / sampleFps) * 3.6;
+        // 진단 전용 — 캘리브레이션 완전 무보정 변형: 릴리즈 y를 측정값 대신
+        // 전형값 상수(2.5m)로 가정하면 구속에서 캘리브레이션 의존이 완전히
+        // 사라진다(시간축은 픽셀 증거, 거리는 물리 상수). 여러 캘리브레이션
+        // 시도에서 이 값이 앵커와 비슷하게 유지되면 "구속은 무보정, 궤적만
+        // 보정" 단순화의 실측 근거가 된다.
+        final calibFreeKmh = (_pinDeckYM - 2.5) / (anchorFrames / sampleFps) * 3.6;
+        debugPrint('[SpeedEstimator] (진단) 무보정 앵커: ${calibFreeKmh.toStringAsFixed(1)}km/h '
+            '(릴리즈 y를 상수 2.5m로 가정)');
       }
     }
 
