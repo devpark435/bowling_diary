@@ -24,14 +24,26 @@ class PinImpactDetectorService {
   //     지나가면 존이 원상복구되어 끝 구간 diff가 낮게 유지되고, 1-프레임
   //     스파이크도 여기서 걸러진다. 폭발은 핀 배치가 영구히 바뀌므로
   //     (실측: 폭발 후 씨드 대비 34%로 고착) 게이트를 통과한다.
-  // (2) 폭발 "시점" = 씨드 대비 diff의 최대 단일 프레임 증가(Δd) 지점.
-  //     공 접근은 프레임당 +1~3%의 완만한 램프를 만들고 폭발은 뚜렷한
-  //     급증을 만든다(실영상 검증: 접근 램프 +2%/frame, 폭발 프레임 +4.9%,
-  //     Δd argmax = 실제 폭발 프레임 128 정확 적중). "최초로 floor를 넘는
-  //     프레임" 방식은 공 접근 램프가 floor를 통과하는 지점(공)을 폭발로
-  //     오인했다(실측: 119 오탐 vs 실제 128).
+  // (2) 폭발 "시점" = 램프-종료(ramp-end) 판별 (v3). v2(씨드 대비 diff의
+  //     최대 단일 프레임 증가 Δd argmax)는 공 진입 Δ가 폭발 Δ보다 날카로워
+  //     argmax가 진입 순간(프레임 117)을 잡는 오탐이 재현됐다(실제 핀
+  //     폭발은 프레임 ~128). 물리적 구분: 공 진입 후에는 diff가 계속
+  //     상승하지만(공이 존에 다가오는 램프), 핀이 실제로 흩어진 뒤에는
+  //     diff가 정체/하강한다(플래토). 실측 곡선: 공 진입 Δ≈13%+이후
+  //     8프레임 +14%p 추가 상승(램프 지속) vs 핀 폭발 Δ≈36%+이후 8프레임
+  //     −1.2%p(정체). 그래서 Δd가 floor(3%p)를 넘는 후보들을 순서대로
+  //     보되, "이후 8프레임 동안 추가 상승이 cap(4%p) 이하"인 최초 후보를
+  //     폭발 시점으로 채택한다 — 순증가가 계속되면 아직 램프 중이므로
+  //     기각하고 다음 후보를 본다. 후보가 탐색 창 끝 근처라 이후 8프레임을
+  //     다 볼 수 없으면(남은 프레임 2개 미만) 폭발이 창 끝에 걸린 것으로
+  //     보고 lookahead 검사 없이 채택한다. 후보가 하나도 채택되지 않으면
+  //     (전부 램프로 보이면) v2 방식(Δd argmax)으로 폴백한다 — 그 경우
+  //     최대 점프가 최선의 추정이다.
   static const _eruptionFloor = 0.15;
   static const _eruptionTailWindow = 5;
+  static const _eruptionJumpFloor = 0.03;
+  static const _postEruptionRiseCap = 0.04;
+  static const _eruptionLookaheadFrames = 8;
   static const double _pixelDiffThreshold = 30.0;
   // 릴리즈 직후 볼 스윙 이벤트를 오탐하지 않도록 최소 탐색 시작 프레임
   // 50 km/h 기준 18.29m 이동 = 1.3s = 39프레임 → 여유분 포함 20프레임
@@ -184,21 +196,62 @@ class PinImpactDetectorService {
       return null;
     }
 
-    // (2) 폭발 시점 = 씨드 대비 diff의 최대 단일 프레임 증가(Δd) 지점.
+    // (2) 폭발 시점 = 램프-종료 판별 (클래스 doc v3 참조).
     // 첫 원소의 Δd는 씨드(=0) 대비 diffs[0] 자체.
-    var bestIdx = 0;
-    var bestDelta = diffs[0];
-    for (var idx = 1; idx < diffs.length; idx++) {
-      final delta = diffs[idx] - diffs[idx - 1];
-      if (delta > bestDelta) {
-        bestDelta = delta;
-        bestIdx = idx;
+    int? rampEndIdx;
+    double? rampEndLookahead;
+    for (var idx = 0; idx < diffs.length; idx++) {
+      final delta = diffs[idx] - (idx == 0 ? 0 : diffs[idx - 1]);
+      if (delta < _eruptionJumpFloor) continue;
+
+      final framesAfter = (diffs.length - 1) - idx;
+      if (framesAfter < 2) {
+        // 창 끝에 걸친 후보 — 이후 구간을 다 볼 수 없으므로 lookahead 검사 없이 채택.
+        rampEndIdx = idx;
+        rampEndLookahead = null;
+        break;
       }
+
+      final lookahead = diffs[math.min(idx + _eruptionLookaheadFrames, diffs.length - 1)] - diffs[idx];
+      if (lookahead <= _postEruptionRiseCap) {
+        rampEndIdx = idx;
+        rampEndLookahead = lookahead;
+        break;
+      }
+      // 순증가가 이어짐 = 아직 램프 중 → 이 후보는 기각하고 다음 후보를 본다.
+    }
+
+    int bestIdx;
+    double bestDelta;
+    String lookaheadDesc;
+    if (rampEndIdx != null) {
+      bestIdx = rampEndIdx;
+      bestDelta = diffs[bestIdx] - (bestIdx == 0 ? 0 : diffs[bestIdx - 1]);
+      lookaheadDesc = rampEndLookahead != null
+          ? '${(rampEndLookahead * 100).toStringAsFixed(1)}%p'
+          : '창 끝(면제)';
+    } else {
+      // 후보가 하나도 채택되지 않음(전부 램프로 보임) → v2 폴백: Δd argmax.
+      // 전부 램프로 보이면 최대 점프가 최선의 추정이다.
+      bestIdx = 0;
+      bestDelta = diffs[0];
+      for (var idx = 1; idx < diffs.length; idx++) {
+        final delta = diffs[idx] - diffs[idx - 1];
+        if (delta > bestDelta) {
+          bestDelta = delta;
+          bestIdx = idx;
+        }
+      }
+      final framesAfter = (diffs.length - 1) - bestIdx;
+      lookaheadDesc = framesAfter < 2
+          ? '창 끝(면제)'
+          : '${((diffs[math.min(bestIdx + _eruptionLookaheadFrames, diffs.length - 1)] - diffs[bestIdx]) * 100).toStringAsFixed(1)}%p';
     }
 
     final impactFrame = searchStart + 1 + bestIdx;
     debugPrint('[PinImpact] 핀 폭발 프레임: $impactFrame '
-        '(Δ${(bestDelta * 100).toStringAsFixed(1)}%p, 창 끝 중앙값 ${(tailMedian * 100).toStringAsFixed(1)}%, 존: 호모그래피)');
+        '(Δ${(bestDelta * 100).toStringAsFixed(1)}%p, 이후8프레임 $lookaheadDesc, '
+        '창 끝 중앙값 ${(tailMedian * 100).toStringAsFixed(1)}%, $zoneDesc)');
     return impactFrame;
   }
 

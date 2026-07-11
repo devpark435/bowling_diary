@@ -10,6 +10,22 @@ img.Image _blackFrame(int w, int h) => img.Image(width: w, height: h);
 img.Image _whiteFrame(int w, int h) => img.Image(width: w, height: h)
   ..clear(img.ColorRgb8(255, 255, 255));
 
+/// 존(20x20=400px, LTRB(0.4,0.0,0.6,0.2) on 100x100 프레임) 안에서 지정한
+/// 픽셀 수만큼 위에서부터 행(20px/행) 단위로 흰색 채운다 — 씨드(검정) 대비
+/// diff 비율을 px/400으로 정밀 제어하기 위한 헬퍼.
+img.Image _zoneFrame(int px) {
+  final frame = img.Image(width: 100, height: 100);
+  var remaining = px < 0 ? 0 : (px > 400 ? 400 : px);
+  var y = 0;
+  while (remaining > 0 && y < 20) {
+    final int rowPx = remaining >= 20 ? 20 : remaining;
+    img.fillRect(frame, x1: 40, y1: y, x2: 40 + rowPx - 1, y2: y, color: img.ColorRgb8(255, 255, 255));
+    remaining -= rowPx;
+    y++;
+  }
+  return frame;
+}
+
 void main() {
   late PinImpactDetectorService sut;
   setUp(() => sut = PinImpactDetectorService());
@@ -152,6 +168,70 @@ void main() {
       // 램프 구간(22~33, 최대 12% — floor 미달이지만 설령 넘더라도 Δd는
       // 프레임당 1%p뿐)이 아니라 점프 프레임(34, Δd = 30-12 = 18%p)이어야 한다.
       expect(result, 34);
+    });
+
+    test('램프 후보가 floor(3%p)를 넘어도 지속 상승이면 기각되고, 진짜 플래토(폭발) 프레임을 채택한다', () {
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      // releaseFrame=0 → searchStart=20, 씨드=프레임20(검정).
+      // 프레임 22~29: 4%p/frame 램프(16px씩 증가, 4%~32%) — 매 스텝 Δ=4%p로
+      // floor(3%p)는 넘지만, 8프레임 뒤에도(=폭발 프레임 70%까지) 계속
+      // 오르므로 lookahead(cap 4%p)를 매번 초과해 전부 기각돼야 한다.
+      // 프레임 30부터 70%(280px)로 점프해 끝까지 고착 — 이 프레임(Δ=38%p,
+      // 이후 8프레임 변화 0%p)이 채택돼야 한다.
+      final frames = [
+        for (var i = 0; i < 50; i++)
+          if (i < 22)
+            _zoneFrame(0)
+          else if (i < 30)
+            _zoneFrame(16 * (i - 21))
+          else
+            _zoneFrame(280),
+      ];
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      expect(result, 30);
+    });
+
+    test('창 끝 폭발: 탐색 창 마지막 근처에서 시작된 점프는 이후 8프레임을 다 볼 수 없어도(lookahead 면제) 채택한다', () {
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      // 프레임 22~28: 2.5%p/frame의 완만한 램프(floor 미달, 후보 아님).
+      // 프레임 29에서 30%로 점프(Δ=12.5%p, floor 통과) — 탐색 창의 마지막
+      // 프레임이 30(=searchStart+1+9)이라 이후 남은 프레임이 1개뿐이라
+      // lookahead(8프레임)를 다 볼 수 없다 → 면제로 즉시 채택돼야 한다.
+      // (면제가 없었다면 프레임 30의 50%까지 추가 상승해 lookahead=20%p로
+      // cap을 초과, 기각됐을 것이다.)
+      final frames = [
+        for (var i = 0; i < 31; i++)
+          if (i < 22)
+            _zoneFrame(0)
+          else if (i < 29)
+            _zoneFrame(10 * (i - 21))
+          else if (i == 29)
+            _zoneFrame(120)
+          else
+            _zoneFrame(200),
+      ];
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      expect(result, 29);
+    });
+
+    test('전부 램프(감속하며 계속 상승만, 창 끝 중앙값은 게이트 통과) → 후보가 전부 기각돼 폴백(Δd argmax) 동작', () {
+      const zone = Rect.fromLTRB(0.4, 0.0, 0.6, 0.2);
+      // 프레임 21~34(diffs idx0~13): 감속하는 램프 — 초반 Δ=5%p(floor 통과,
+      // 후보)가 반복되지만 8프레임 뒤에도 계속 올라 lookahead가 cap을
+      // 초과해 매번 기각된다. 후반부(idx6 이후)는 Δ<3%p로 애초에 후보조차
+      // 아니다. 끝까지 진짜 플래토가 없으므로(전부 램프) 채택되는 후보가
+      // 없어 v2 폴백(Δd argmax)으로 넘어가야 하고, 그 최대 Δ는 idx1(첫
+      // 5%p 스텝, 이후 동률은 갱신 안 됨) → 프레임 22가 반환돼야 한다.
+      const pxByIdx = [0, 20, 40, 60, 76, 88, 96, 100, 102, 103, 104, 104, 105, 105];
+      final frames = [
+        for (var i = 0; i < 35; i++)
+          if (i < 21)
+            _zoneFrame(0)
+          else
+            _zoneFrame(pxByIdx[i - 21]),
+      ];
+      final result = sut.findImpactFrame(frames, 0, pinZone: zone);
+      expect(result, 22);
     });
 
     test('공 통과 무시: 프레임 30~40에만 씨드 대비 8%짜리 흰 블롭, 41부터 원상복구 → null (floor 미달)', () {
