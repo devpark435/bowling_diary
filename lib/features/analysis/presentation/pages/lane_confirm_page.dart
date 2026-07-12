@@ -14,6 +14,11 @@ import 'package:bowling_diary/features/analysis/presentation/widgets/lane_verifi
 ///
 /// spec §10 원칙: 자동검출 결과를 확인 없이 그대로 쓰지 않는다 — 등급이
 /// good이어도 이 화면은 항상 노출되고, 사용자가 확정해야 다음 단계로 넘어간다.
+///
+/// 구속 산출이 이벤트-시간 코어(SpeedEstimatorService — 물리 상수 18.29m ÷
+/// 파울라인 통과~핀 폭발 시간)로 전환되면서, 여기서 조정하는 캘리브레이션
+/// 스케일은 구속 계산과 수학적으로 무관해졌다 — 이 화면은 오직 궤적 오버레이
+/// 표시 위치를 맞추는 시각화 전용 단계다.
 class LaneConfirmPage extends StatefulWidget {
   final String framePath;
   final LaneDetectionResult detection;
@@ -68,7 +73,8 @@ class _LaneConfirmPageState extends State<LaneConfirmPage> {
   /// 문구를 바꿨다.
   static const _guideText = '가까운 두 점은 파울라인 양끝, 먼 두 점은 구석 핀(7번·10번)의 머리 높이에 '
       '맞춰 주세요. 핀 발밑이 아니라 머리 높이 기준입니다. 안내선(에로우·레인지파인더)이 실제 레인 '
-      '마킹과 겹치면 정확히 맞은 거예요.';
+      '마킹과 겹치면 정확히 맞은 거예요. 이 단계는 궤적 표시 위치를 맞추는 것으로, 구속 측정에는 '
+      '영향이 없어요.';
 
   String get _bannerText {
     switch (widget.detection.quality) {
