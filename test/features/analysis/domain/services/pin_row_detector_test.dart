@@ -90,5 +90,34 @@ void main() {
 
       expect(zone, isNull);
     });
+
+    test('레인 반사 모사(밝은 나무색 배경 위 흰 막대)는 틈 어두움 필터로 기각', () {
+      // 실영상 계측 근거: 핀 행의 run 사이 틈은 피트(검정, p25 25~60)지만
+      // 레인 반사/마킹의 틈은 밝은 나무색(p25 104~177). 배경을 나무색(160)으로
+      // 채우고 같은 막대 패턴을 그리면 run/비율 조건은 통과해도 틈 p25(160)가
+      // 필터(<60)에 걸려 null이어야 한다.
+      final frame = img.Image(width: _w, height: _h)
+        ..clear(img.ColorRgb8(160, 160, 160));
+      _paintBars(frame, y0: 40, y1: 60, count: 6);
+
+      expect(detectPinRowZone(frame), isNull);
+    });
+
+    test('핀 밴드(검정 틈)와 그 아래 반사 밴드(밝은 틈)가 공존하면 핀 밴드를 선택', () {
+      // 실영상 재현 케이스: 반사 밴드가 더 아래(프레임 ~69%)에 있어도 틈
+      // 어두움 필터로 자격을 잃으므로, "최하단" 규칙은 자격 밴드(핀)에만
+      // 적용된다.
+      final frame = _blackFrame();
+      _paintBars(frame, y0: 40, y1: 60, count: 6);
+      img.fillRect(frame, x1: 0, y1: 90, x2: _w - 1, y2: 110,
+          color: img.ColorRgb8(160, 160, 160));
+      _paintBars(frame, y0: 90, y1: 110, count: 6);
+
+      final zone = detectPinRowZone(frame);
+
+      expect(zone, isNotNull);
+      expect(zone!.bottom * _h, lessThan(75)); // 반사 밴드(90~110)가 아니라 핀 밴드
+      expect(zone.top * _h, lessThan(40));
+    });
   });
 }
