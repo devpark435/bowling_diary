@@ -19,6 +19,11 @@ class AnalysisData {
   /// 재생 위치와 동기화된 점진적 렌더링(현재 프레임까지만 그리기)에 사용한다.
   final List<TrajectoryRibbonPoint> trajectory;
 
+  /// 핀덱 진입각(도). 피팅 곡선 끝(핀덱 쪽)의 기울기에서 산출 — 통상 3~6°.
+  /// x/y가 캘리브레이션 좌표라 스케일 왜곡의 영향을 받는다: 구속(이벤트-시간,
+  /// 캘리브레이션 독립)과 달리 참고치 성격. 산출 불가 시 null.
+  final double? entryAngleDeg;
+
   const AnalysisData({
     this.speedKmh,
     this.speedConfidence = 0.0,
@@ -26,5 +31,6 @@ class AnalysisData {
     required this.framesAnalyzed,
     required this.fpsUsed,
     this.trajectory = const [],
+    this.entryAngleDeg,
   });
 }

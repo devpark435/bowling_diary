@@ -206,4 +206,31 @@ void main() {
       expect(extendCurveEnd(curve, targetEndY: 18.29), curve);
     });
   });
+
+  group('entryAngleDeg', () {
+    test('직진(x 고정) → 0°', () {
+      final curve = <TrajectorySample>[
+        (frame: 100, lane: const LanePoint(xM: 0.5, yM: 17.0)),
+        (frame: 104, lane: const LanePoint(xM: 0.5, yM: 18.0)),
+      ];
+      expect(entryAngleDeg(curve), closeTo(0.0, 1e-9));
+    });
+
+    test('끝 구간 Δx=0.1/Δy=1.0 → atan(0.1) ≈ 5.71°', () {
+      final curve = <TrajectorySample>[
+        (frame: 100, lane: const LanePoint(xM: 0.6, yM: 17.0)),
+        (frame: 104, lane: const LanePoint(xM: 0.5, yM: 18.0)),
+      ];
+      expect(entryAngleDeg(curve), closeTo(5.7106, 1e-3));
+    });
+
+    test('샘플 2개 미만 또는 끝 구간 비전진이면 null', () {
+      expect(entryAngleDeg([(frame: 1, lane: const LanePoint(xM: 0.5, yM: 17.0))]), isNull);
+      final backward = <TrajectorySample>[
+        (frame: 100, lane: const LanePoint(xM: 0.5, yM: 18.0)),
+        (frame: 104, lane: const LanePoint(xM: 0.5, yM: 17.5)),
+      ];
+      expect(entryAngleDeg(backward), isNull);
+    });
+  });
 }

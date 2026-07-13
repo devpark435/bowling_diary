@@ -340,6 +340,15 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
                               ? speedConfidenceBadgeLabel(data.speedConfidence)
                               : null,
                         ),
+                        if (data.entryAngleDeg != null) ...[
+                          const SizedBox(height: 10),
+                          _StatRow(
+                            label: '엔트리 앵글',
+                            value: data.entryAngleDeg!.toStringAsFixed(1),
+                            unit: '°',
+                            highlight: false,
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         Text(
                           '* AI 측정으로 정확하지 않을 수 있습니다',

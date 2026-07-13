@@ -12,6 +12,7 @@ import 'package:bowling_diary/features/analysis/domain/entities/homography_matri
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
+import 'package:bowling_diary/features/analysis/domain/services/pin_row_detector.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_curve.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_refiner.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -154,6 +155,10 @@ class AnalysisPipeline {
     final refined = refineTrajectory(fsm.trajectory);
     debugPrint('[Trajectory] refined (frame:y) = ${refined.map((s) => "${s.frame}:${s.lane.yM.toStringAsFixed(1)}").join(" ")}');
     final fitted = fitAndResample(refined);
+    // 엔트리 앵글은 끝 연장(extendCurveEnd) 전, 즉 실측 데이터 기반 곡선
+    // 기준으로 계산한다 — 연장은 선형이라 각도 자체는 동일하지만 실측
+    // 데이터 기준이 더 정직하다(연장 로직 변경에 영향받지 않음).
+    final entryAngle = entryAngleDeg(fitted);
     // 정제가 초반 노이즈 구간을 잘라내도 릴리즈 직후부터 선이 보이도록,
     // 원시 궤적의 실제 시작 y(최소 2.5m)까지 곡선을 선형 연장한다.
     final started = fsm.trajectory.isEmpty
@@ -181,12 +186,31 @@ class AnalysisPipeline {
         framesAnalyzed: frames.length,
         fpsUsed: extracted.sampleFps,
         trajectory: trajectory,
+        entryAngleDeg: entryAngle,
       );
     }
 
     if (fsm.impactFrame == null) {
       debugPrint('[AnalysisPipeline] FSM 임팩트 없음 — 핀 폭발 신호 단독으로 진행');
     }
+
+    // 핀 존 산출 3단 체인(Phase 3 존 독립화): 캘리브레이션(호모그래피)이
+    // 흔들려도 핀 폭발 감지가 정확한 위치를 보도록, 릴리즈 시점 프레임(핀이
+    // 온전히 서 있고 공은 아직 근거리)에서 핀 행을 직접 탐지하는 것을
+    // 1순위로 한다. 실패하면 기존 호모그래피 투영, 그마저 실패하면
+    // (impactDetector 내부에서) legacy 상단 20% 존으로 폴백한다.
+    final releaseFrameIdx = release.frame.clamp(0, frames.length - 1);
+    final pinRowZone = detectPinRowZone(frames[releaseFrameIdx]);
+    final homographyZone = pinRowZone == null
+        ? PinImpactDetectorService.computePinZone(
+            homography,
+            frameAspect: frames[0].width / frames[0].height,
+          )
+        : null;
+    final pinZone = pinRowZone ?? homographyZone;
+    final zoneSourceLabel = pinRowZone != null ? '자동탐지' : (homographyZone != null ? '호모그래피' : 'legacy');
+    debugPrint('[PinZone] 소스: $zoneSourceLabel'
+        '${pinZone != null ? " LTRB(${pinZone.left.toStringAsFixed(2)},${pinZone.top.toStringAsFixed(2)},${pinZone.right.toStringAsFixed(2)},${pinZone.bottom.toStringAsFixed(2)})" : ""}');
 
     // 핀 폭발 탐색 시작점: 궤적 소실 프레임에 "공이 핀덱에 도착할 때까지의
     // 예상 프레임의 절반"을 더한다 (estimatePinSearchStart 참조). 소실 직후를
@@ -200,10 +224,7 @@ class AnalysisPipeline {
       frames: frames,
       releaseFrame: release.frame,
       homographyImpactFrame: fsm.impactFrame,
-      pinZone: PinImpactDetectorService.computePinZone(
-        homography,
-        frameAspect: frames[0].width / frames[0].height,
-      ),
+      pinZone: pinZone,
       pinSearchStart: pinSearchStart,
     );
 
@@ -213,6 +234,7 @@ class AnalysisPipeline {
         framesAnalyzed: frames.length,
         fpsUsed: extracted.sampleFps,
         trajectory: trajectory,
+        entryAngleDeg: entryAngle,
       );
     }
 
@@ -230,6 +252,7 @@ class AnalysisPipeline {
       framesAnalyzed: frames.length,
       fpsUsed: extracted.sampleFps,
       trajectory: trajectory,
+      entryAngleDeg: entryAngle,
     );
   }
 }

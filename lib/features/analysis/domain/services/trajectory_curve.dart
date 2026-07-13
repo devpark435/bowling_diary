@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_refiner.dart';
 
@@ -154,6 +156,22 @@ TrajectorySample _extrapolated(
   final x = (anchor.lane.xM - dxPerY * back).clamp(0.0, 1.05);
   final frame = (anchor.frame - dfPerY * back).round().clamp(0, 1 << 30);
   return (frame: frame, lane: LanePoint(xM: x, yM: y));
+}
+
+/// 피팅·리샘플된 곡선의 끝(핀덱 쪽) 진입각(도).
+///
+/// 마지막 두 샘플의 atan2(|Δx|, Δy)를 도 단위로 환산한다 — 통상 3~6°.
+/// 주의: x/y가 캘리브레이션 좌표라 스케일 왜곡의 영향을 받는다. 구속
+/// (이벤트-시간, 스케일 불변)과 달리 참고치 성격이다. 샘플 2개 미만이거나
+/// 끝 구간이 전진(Δy>0)이 아니면 null.
+double? entryAngleDeg(List<TrajectorySample> curve) {
+  if (curve.length < 2) return null;
+  final last = curve.last;
+  final prev = curve[curve.length - 2];
+  final dy = last.lane.yM - prev.lane.yM;
+  if (dy <= 0) return null;
+  final dx = (last.lane.xM - prev.lane.xM).abs();
+  return math.atan2(dx, dy) * 180 / math.pi;
 }
 
 /// [points]는 frame 오름차순, y 단조증가로 가정. [y]를 감싸는 원본 구간을 찾아
