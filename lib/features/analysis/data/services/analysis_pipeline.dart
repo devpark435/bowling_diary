@@ -13,6 +13,7 @@ import 'package:bowling_diary/features/analysis/domain/entities/release_result.d
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
 import 'package:bowling_diary/features/analysis/domain/services/pin_row_detector.dart';
+import 'package:bowling_diary/features/analysis/domain/services/projective_track_model.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_curve.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_refiner.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -81,6 +82,46 @@ class AnalysisPipeline {
   /// 외삽 오차(±수 프레임)로 시작점이 실제 도착 뒤로 넘어가면 폭발 자체를
   /// 놓치므로, 공 진입 Δ 스파이크만 피할 만큼 보수적으로 민다.
   ///
+  /// 정제 궤적이 채택한 프레임들의 **픽셀** 관측을 모은다. 레인 좌표를 거치지
+  /// 않으므로 캘리브레이션과 무관하다 — 픽셀 공간 궤적 모델의 입력.
+  static List<BallPixelSample> collectPixelTrack(
+    List<BallDetection?> detections,
+    List<TrajectorySample> refined,
+  ) {
+    final keep = refined.map((s) => s.frame).toSet();
+    return <BallPixelSample>[
+      for (var i = 0; i < detections.length; i++)
+        if (keep.contains(i) && detections[i] != null)
+          (frame: i, contact: detections[i]!.contactPoint, widthN: detections[i]!.bw),
+    ];
+  }
+
+  /// 픽셀 공간 궤적 리본. 캘리브레이션을 전혀 쓰지 않는다.
+  ///
+  /// 기존 레인 좌표 경로 대비 세 가지가 고쳐진다:
+  ///  1) 끝 연장이 **직선**이 아니라 투영 곡선(쌍곡선)이다. 직선 연장은 핀덱
+  ///     부근에서 소실점을 넘어 발산한다(단위 테스트로 고정).
+  ///  2) 연장 목표가 레인 y=18.29m(캘리브레이션 스케일에 물림)가 아니라 실측
+  ///     **핀 충돌 프레임**이다.
+  ///  3) 리본 폭이 고정 0.22m 환산이 아니라 공의 실측 bbox 폭 + 원근 모델이다.
+  ///
+  /// 적합 실패 시 null — 호출부가 기존 레인 좌표 리본으로 폴백한다.
+  static List<TrajectoryRibbonPoint>? buildPixelRibbon({
+    required List<BallPixelSample> pixelTrack,
+    required int impactFrame,
+    required int releaseFrame,
+  }) {
+    final model = fitProjectiveTrack(pixelTrack);
+    if (model == null) return null;
+    final ribbon = buildProjectiveRibbon(
+      track: pixelTrack,
+      model: model,
+      endFrame: impactFrame,
+      startFrame: releaseFrame,
+    );
+    return ribbon.isEmpty ? null : ribbon;
+  }
+
   /// 반환 null = 궤적 없음(탐색 시작 추정 불가 → detector가 legacy 규칙 사용).
   static int? estimatePinSearchStart(List<TrajectorySample> refined) {
     if (refined.isEmpty) return null;
@@ -154,6 +195,7 @@ class AnalysisPipeline {
 
     final refined = refineTrajectory(fsm.trajectory);
     debugPrint('[Trajectory] refined (frame:y) = ${refined.map((s) => "${s.frame}:${s.lane.yM.toStringAsFixed(1)}").join(" ")}');
+    final pixelTrack = collectPixelTrack(detections, refined);
     final fitted = fitAndResample(refined);
     // 엔트리 앵글은 끝 연장(extendCurveEnd) 전, 즉 실측 데이터 기반 곡선
     // 기준으로 계산한다 — 연장은 선형이라 각도 자체는 동일하지만 실측
@@ -238,6 +280,17 @@ class AnalysisPipeline {
       );
     }
 
+    // 궤적 리본은 픽셀 공간 모델을 1순위로 쓴다(캘리브레이션 무관, 핀 충돌
+    // 프레임까지 투영 곡선으로 연장). 적합 실패 시 레인 좌표 리본으로 폴백.
+    final pixelRibbon = buildPixelRibbon(
+      pixelTrack: pixelTrack,
+      impactFrame: impact.frame,
+      releaseFrame: release.frame,
+    );
+    final finalTrajectory = pixelRibbon ?? trajectory;
+    debugPrint('[Trajectory] 리본 소스: ${pixelRibbon != null ? "픽셀투영모델" : "레인좌표(폴백)"} '
+        '(${finalTrajectory.length}개 단면, 픽셀관측 ${pixelTrack.length}개)');
+
     final speed = speedEstimator.estimate(
       release: release,
       impact: impact,
@@ -251,7 +304,7 @@ class AnalysisPipeline {
       speedFailure: speed.failure,
       framesAnalyzed: frames.length,
       fpsUsed: extracted.sampleFps,
-      trajectory: trajectory,
+      trajectory: finalTrajectory,
       entryAngleDeg: entryAngle,
     );
   }

@@ -260,6 +260,99 @@ void main() {
     });
   });
 
+  group('AnalysisPipeline 픽셀 공간 리본', () {
+    // 실영상 계측(1920×1080, 반해상도 960×540 픽셀). 화면 깊이축 = ny.
+    const depthPx = 960.0;
+    const lateralPx = 540.0;
+
+    BallDetection det(double depth, double lateral, double widthPx) {
+      final size = widthPx / depthPx;
+      return BallDetection(
+        cx: lateral / lateralPx,
+        cy: depth / depthPx - size / 2,
+        bw: size,
+        bh: size,
+        confidence: 0.9,
+      );
+    }
+
+    const observed = <int, (double, double, double)>{
+      43: (687.5, 275.1, 88),
+      53: (569.3, 222.3, 79),
+      63: (503.2, 200.9, 51),
+      73: (453.8, 188.8, 42),
+      83: (418.8, 182.9, 37),
+      93: (392.2, 183.5, 32),
+    };
+
+    List<BallDetection?> detections() => [
+          for (var i = 0; i < 130; i++)
+            if (observed.containsKey(i))
+              det(observed[i]!.$1, observed[i]!.$2, observed[i]!.$3)
+            else
+              null,
+        ];
+
+    List<TrajectorySample> refinedFor(Iterable<int> frames) => [
+          for (final f in frames) (frame: f, lane: LanePoint(xM: 0.5, yM: f / 10)),
+        ];
+
+    test('정제 궤적이 채택한 프레임의 픽셀 관측만 모은다', () {
+      // 정제가 f53을 버린 상황 — 픽셀 트랙에서도 빠져야 한다.
+      final track = AnalysisPipeline.collectPixelTrack(
+        detections(),
+        refinedFor([43, 63, 73, 83, 93]),
+      );
+      expect(track.map((s) => s.frame), [43, 63, 73, 83, 93]);
+      expect(track.first.contact.ny, closeTo(687.5 / depthPx, 1e-9));
+      expect(track.first.widthN, closeTo(88 / depthPx, 1e-9));
+    });
+
+    test('검출이 없는 프레임은 정제에 있어도 건너뛴다', () {
+      final track = AnalysisPipeline.collectPixelTrack(
+        detections(),
+        refinedFor([43, 50, 63]), // f50은 검출 없음
+      );
+      expect(track.map((s) => s.frame), [43, 63]);
+    });
+
+    test('핀 충돌 프레임까지 연장되고 관측 프레임은 검출값 그대로', () {
+      final track = AnalysisPipeline.collectPixelTrack(
+        detections(),
+        refinedFor(observed.keys),
+      );
+      final ribbon = AnalysisPipeline.buildPixelRibbon(
+        pixelTrack: track,
+        impactFrame: 126,
+        releaseFrame: 40,
+      );
+      expect(ribbon, isNotNull);
+      expect(ribbon!.last.frame, 126);
+      for (final s in track) {
+        final r = ribbon.firstWhere((e) => e.frame == s.frame);
+        expect((r.left.nx + r.right.nx) / 2, closeTo(s.contact.nx, 1e-9));
+        expect(r.left.ny, closeTo(s.contact.ny, 1e-9));
+      }
+      // 연장 구간이 핀 쪽(작은 ny)으로 계속 나아간다.
+      expect(ribbon.last.left.ny, lessThan(track.last.contact.ny));
+    });
+
+    test('적합 실패하면 null — 호출부가 레인 좌표 리본으로 폴백한다', () {
+      final track = AnalysisPipeline.collectPixelTrack(
+        detections(),
+        refinedFor([43, 53, 63]), // 3점 = minSamples 미만
+      );
+      expect(
+        AnalysisPipeline.buildPixelRibbon(
+          pixelTrack: track,
+          impactFrame: 126,
+          releaseFrame: 40,
+        ),
+        isNull,
+      );
+    });
+  });
+
   group('AnalysisPipeline.combineRelease', () {
     test('FSM 찾음 + detector 근접 일치(10프레임 이내) → high confidence로 FSM 프레임 채택', () {
       final result = AnalysisPipeline.combineRelease(36, const ReleaseResult(frame: 40, confidence: 0.5));
