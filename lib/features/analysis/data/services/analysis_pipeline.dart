@@ -12,11 +12,14 @@ import 'package:bowling_diary/features/analysis/domain/entities/homography_matri
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/speed_result.dart';
 import 'package:bowling_diary/features/analysis/domain/services/analysis_state_machine.dart';
+import 'package:bowling_diary/features/analysis/domain/services/arrow_detector.dart';
+import 'package:bowling_diary/features/analysis/domain/services/lane_landmark_speed.dart';
 import 'package:bowling_diary/features/analysis/domain/services/pin_row_detector.dart';
 import 'package:bowling_diary/features/analysis/domain/services/projective_track_model.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_curve.dart';
 import 'package:bowling_diary/features/analysis/domain/services/trajectory_refiner.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:image/image.dart' as img;
 
 class AnalysisPipeline {
   final VideoFrameExtractorService frameExtractor;
@@ -106,7 +109,8 @@ class AnalysisPipeline {
   ///  3) 리본 폭이 고정 0.22m 환산이 아니라 공의 실측 bbox 폭 + 원근 모델이다.
   ///
   /// 적합 실패 시 null — 호출부가 기존 레인 좌표 리본으로 폴백한다.
-  static List<TrajectoryRibbonPoint>? buildPixelRibbon({
+  /// [rms]는 적합 잔차(정규화 단위)로, 내부 QA 뱃지에 노출한다.
+  static ({List<TrajectoryRibbonPoint> ribbon, double rms})? buildPixelRibbon({
     required List<BallPixelSample> pixelTrack,
     required int impactFrame,
     required int releaseFrame,
@@ -119,7 +123,56 @@ class AnalysisPipeline {
       endFrame: impactFrame,
       startFrame: releaseFrame,
     );
-    return ribbon.isEmpty ? null : ribbon;
+    return ribbon.isEmpty ? null : (ribbon: ribbon, rms: model.rms);
+  }
+
+  /// 구속 채택 허용 범위(km/h). SpeedEstimatorService의 가드와 같은 값.
+  static const double minPlausibleKmh = 10;
+  static const double maxPlausibleKmh = 50;
+
+  /// 랜드마크 통과-시각 구속. 캘리브레이션(호모그래피)을 쓰지 않는다.
+  ///
+  /// [releaseFrame] 이미지에서 조준 화살표를 찾아 iso-u 선(양 끝 화살표,
+  /// 파울라인에서 12ft)을 만들고, 공이 그 선을 지난 프레임부터 핀 충돌
+  /// 프레임까지의 **시간**으로 구속을 낸다. 픽셀 깊이를 재지 않으므로 소실점
+  /// 근처의 원근 압축(기존 코어의 지배적 오차원)이 계산에서 빠진다.
+  ///
+  /// 화살표 검출·셰브론 검증 실패 시 null → 호출부가 기존 코어로 폴백한다.
+  /// 화살표 검출기 임계값은 실영상 1편 기준이라 일반화가 검증되지 않았다.
+  static double? estimateLandmarkSpeed({
+    required img.Image releaseFrame,
+    required List<BallPixelSample> pixelTrack,
+    required int impactFrame,
+    required int sampleFps,
+  }) {
+    final line = arrowLineFromDetections(detectArrows(releaseFrame));
+    if (line == null) return null;
+    return estimateLandmarkSpeedKmh(
+      track: [for (final s in pixelTrack) (frame: s.frame, p: s.contact)],
+      line: line,
+      impactFrame: impactFrame.toDouble(),
+      sampleFps: sampleFps,
+    );
+  }
+
+  /// 두 코어의 값 중 무엇을 최종 구속으로 쓸지 정한다.
+  ///
+  /// 랜드마크 코어가 물리적으로 말이 되는 값을 냈으면 그것을 채택한다 —
+  /// 조건수가 기존 코어보다 두 자릿수 좋기 때문(에로우 선 ±15px → ±0.4km/h vs
+  /// 기존 방식의 원근 압축 민감도). 못 냈거나 범위를 벗어나면 기존 코어로 폴백.
+  static ({double kmh, SpeedSource source})? adoptSpeed({
+    required double? landmarkKmh,
+    required double? legacyKmh,
+  }) {
+    if (landmarkKmh != null &&
+        landmarkKmh >= minPlausibleKmh &&
+        landmarkKmh <= maxPlausibleKmh) {
+      return (kmh: landmarkKmh, source: SpeedSource.landmark);
+    }
+    if (legacyKmh != null) {
+      return (kmh: legacyKmh, source: SpeedSource.legacy);
+    }
+    return null;
   }
 
   /// 반환 null = 궤적 없음(탐색 시작 추정 불가 → detector가 legacy 규칙 사용).
@@ -287,9 +340,12 @@ class AnalysisPipeline {
       impactFrame: impact.frame,
       releaseFrame: release.frame,
     );
-    final finalTrajectory = pixelRibbon ?? trajectory;
-    debugPrint('[Trajectory] 리본 소스: ${pixelRibbon != null ? "픽셀투영모델" : "레인좌표(폴백)"} '
-        '(${finalTrajectory.length}개 단면, 픽셀관측 ${pixelTrack.length}개)');
+    final finalTrajectory = pixelRibbon?.ribbon ?? trajectory;
+    final trajectorySource =
+        pixelRibbon != null ? TrajectorySource.projective : TrajectorySource.laneFallback;
+    debugPrint('[Trajectory] 리본 소스: ${trajectorySource.label} '
+        '(${finalTrajectory.length}개 단면, 픽셀관측 ${pixelTrack.length}개'
+        '${pixelRibbon != null ? ", rms ${pixelRibbon.rms.toStringAsFixed(5)}" : ""})');
 
     final speed = speedEstimator.estimate(
       release: release,
@@ -298,14 +354,31 @@ class AnalysisPipeline {
       sampleFps: extracted.sampleFps,
     );
 
+    // 랜드마크 통과-시각 구속 — 조준 화살표가 검출되면 이쪽이 1순위.
+    final landmarkKmh = estimateLandmarkSpeed(
+      releaseFrame: frames[releaseFrameIdx],
+      pixelTrack: pixelTrack,
+      impactFrame: impact.frame,
+      sampleFps: extracted.sampleFps,
+    );
+    final adopted = adoptSpeed(landmarkKmh: landmarkKmh, legacyKmh: speed.kmh);
+    debugPrint('[Speed] 랜드마크 ${landmarkKmh?.toStringAsFixed(1) ?? "없음"}km/h, '
+        '기존 ${speed.kmh?.toStringAsFixed(1) ?? "없음"}km/h → '
+        '채택 ${adopted == null ? "실패" : "${adopted.kmh.toStringAsFixed(1)}km/h(${adopted.source.label})"}');
+
     return AnalysisData(
-      speedKmh: speed.kmh,
+      speedKmh: adopted?.kmh,
       speedConfidence: speed.confidence,
-      speedFailure: speed.failure,
+      speedFailure: adopted == null ? speed.failure : null,
       framesAnalyzed: frames.length,
       fpsUsed: extracted.sampleFps,
       trajectory: finalTrajectory,
       entryAngleDeg: entryAngle,
+      trajectorySource: trajectorySource,
+      trajectoryFitRms: pixelRibbon?.rms,
+      speedSource: adopted?.source,
+      landmarkSpeedKmh: landmarkKmh,
+      legacySpeedKmh: speed.kmh,
     );
   }
 }

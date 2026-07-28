@@ -258,6 +258,18 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
             ),
           ),
 
+          // 내부 QA 진단 뱃지 — 테플(릴리즈 빌드)에서는 debugPrint를 볼 수 없어
+          // 어느 경로로 계산했는지를 화면에 띄운다. 정식 릴리즈 전에 이 블록과
+          // AnalysisData의 진단 필드를 함께 걷어낸다.
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 52,
+            left: 16,
+            child: _QaDiagnosticsBadge(
+              data: data,
+              videoHeightPx: isReady ? _videoController!.value.size.height : null,
+            ),
+          ),
+
           // 일시정지 아이콘
           if (isReady && !_videoController!.value.isPlaying)
             GestureDetector(
@@ -419,6 +431,87 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage>
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 내부 QA 진단 뱃지 — 궤적/구속을 어느 경로로 계산했는지 화면에 노출한다.
+///
+/// 테플은 릴리즈 빌드라 debugPrint를 볼 수 없다. 폴백으로 떨어지면 결과가
+/// 예전과 똑같이 나와 "아무것도 안 바뀐 것"처럼 보이므로, 경로를 눈으로
+/// 확인할 수단이 필요하다. 정식 릴리즈 전에 걷어낼 임시 위젯이다.
+class _QaDiagnosticsBadge extends StatelessWidget {
+  final AnalysisData data;
+
+  /// 영상 세로 픽셀 수. 정규화 rms를 px로 환산해 보여주는 데 쓴다
+  /// (투영 모델의 깊이축 ny가 프레임 높이로 정규화돼 있다). null이면 생략.
+  final double? videoHeightPx;
+
+  const _QaDiagnosticsBadge({required this.data, this.videoHeightPx});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <({String text, bool ok})>[];
+
+    final tSource = data.trajectorySource;
+    if (tSource != null) {
+      final rms = data.trajectoryFitRms;
+      final rmsText = (rms != null && videoHeightPx != null)
+          ? ' · rms ${(rms * videoHeightPx!).toStringAsFixed(1)}px'
+          : '';
+      rows.add((
+        text: '궤적 ${tSource.label} · ${data.trajectory.length}단면$rmsText',
+        ok: tSource == TrajectorySource.projective,
+      ));
+    }
+
+    final sSource = data.speedSource;
+    if (sSource != null) {
+      String fmt(double? v) => v == null ? '없음' : v.toStringAsFixed(1);
+      rows.add((
+        text: '구속 ${sSource.label} · 랜드마크 ${fmt(data.landmarkSpeedKmh)}'
+            ' · 기존 ${fmt(data.legacySpeedKmh)}',
+        ok: sSource == SpeedSource.landmark,
+      ));
+    }
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final r in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    r.ok ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                    size: 12,
+                    color: r.ok ? Colors.greenAccent : Colors.amberAccent,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    r.text,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

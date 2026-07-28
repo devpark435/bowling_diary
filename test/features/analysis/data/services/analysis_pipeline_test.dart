@@ -7,6 +7,7 @@ import 'package:bowling_diary/features/analysis/data/services/pin_impact_detecto
 import 'package:bowling_diary/features/analysis/data/services/release_detector_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/speed_estimator_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/video_frame_extractor_service.dart';
+import 'package:bowling_diary/features/analysis/domain/entities/analysis_data.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/coord.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/homography_matrix.dart';
 import 'package:bowling_diary/features/analysis/domain/entities/release_result.dart';
@@ -327,14 +328,16 @@ void main() {
         releaseFrame: 40,
       );
       expect(ribbon, isNotNull);
-      expect(ribbon!.last.frame, 126);
+      expect(ribbon!.ribbon.last.frame, 126);
       for (final s in track) {
-        final r = ribbon.firstWhere((e) => e.frame == s.frame);
+        final r = ribbon.ribbon.firstWhere((e) => e.frame == s.frame);
         expect((r.left.nx + r.right.nx) / 2, closeTo(s.contact.nx, 1e-9));
         expect(r.left.ny, closeTo(s.contact.ny, 1e-9));
       }
       // 연장 구간이 핀 쪽(작은 ny)으로 계속 나아간다.
-      expect(ribbon.last.left.ny, lessThan(track.last.contact.ny));
+      expect(ribbon.ribbon.last.left.ny, lessThan(track.last.contact.ny));
+      // 적합 잔차가 화면 높이의 0.2% 미만.
+      expect(ribbon.rms, lessThan(0.002));
     });
 
     test('적합 실패하면 null — 호출부가 레인 좌표 리본으로 폴백한다', () {
@@ -350,6 +353,111 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+
+  group('AnalysisPipeline 랜드마크 구속', () {
+    // 합성 프레임(960×540, 레인 가로) + 실영상 계측 좌표.
+    // 깊이축 = x/960, 가로축 = y/540 — 화살표와 볼 궤적이 같은 좌표계다.
+    const arrowMarks = <(double, double)>[
+      (626.3, 141.5),
+      (620.4, 175.4),
+      (615.2, 208.5),
+      (610.4, 240.8),
+      (614.3, 274.6),
+      (619.4, 309.6),
+      (624.2, 345.5),
+    ];
+    const ballMarks = <(int, double, double)>[
+      (43, 687.5, 275.1),
+      (53, 569.3, 222.3),
+      (63, 503.2, 200.9),
+      (73, 453.8, 188.8),
+      (83, 418.8, 182.9),
+      (93, 392.2, 183.5),
+    ];
+
+    img.Image blankLane() {
+      final im = img.Image(width: 960, height: 540);
+      for (var y = 0; y < 540; y++) {
+        for (var x = 0; x < 960; x++) {
+          im.setPixelRgb(x, y, 150, 150, 150);
+        }
+      }
+      return im;
+    }
+
+    img.Image arrowFrame() {
+      final im = blankLane();
+      for (final m in arrowMarks) {
+        for (var dy = -2; dy <= 2; dy++) {
+          for (var dx = -2; dx <= 2; dx++) {
+            im.setPixelRgb(m.$1.round() + dx, m.$2.round() + dy, 88, 88, 88);
+          }
+        }
+      }
+      return im;
+    }
+
+    final ballTrack = [
+      for (final b in ballMarks)
+        (
+          frame: b.$1,
+          contact: FramePoint(nx: b.$2 / 960, ny: b.$3 / 540),
+          widthN: 40 / 960,
+        ),
+    ];
+
+    test('화살표가 검출되면 랜드마크 구속을 낸다 (실영상 계측 재현)', () {
+      final kmh = AnalysisPipeline.estimateLandmarkSpeed(
+        releaseFrame: arrowFrame(),
+        pixelTrack: ballTrack,
+        impactFrame: 126,
+        sampleFps: 30,
+      );
+      expect(kmh, isNotNull);
+      expect(kmh!, closeTo(20.1, 0.6));
+    });
+
+    test('화살표가 없으면 null — 기존 코어로 폴백', () {
+      expect(
+        AnalysisPipeline.estimateLandmarkSpeed(
+          releaseFrame: blankLane(),
+          pixelTrack: ballTrack,
+          impactFrame: 126,
+          sampleFps: 30,
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('AnalysisPipeline.adoptSpeed', () {
+    test('랜드마크가 물리적으로 말이 되면 그것을 채택한다', () {
+      final r = AnalysisPipeline.adoptSpeed(landmarkKmh: 20.1, legacyKmh: 33.2);
+      expect(r!.kmh, 20.1);
+      expect(r.source, SpeedSource.landmark);
+    });
+
+    test('랜드마크가 범위 밖이면 기존 코어로 폴백', () {
+      expect(
+        AnalysisPipeline.adoptSpeed(landmarkKmh: 120.0, legacyKmh: 33.2)!.source,
+        SpeedSource.legacy,
+      );
+      expect(
+        AnalysisPipeline.adoptSpeed(landmarkKmh: 3.0, legacyKmh: 33.2)!.source,
+        SpeedSource.legacy,
+      );
+    });
+
+    test('랜드마크를 못 냈으면 기존 코어', () {
+      final r = AnalysisPipeline.adoptSpeed(landmarkKmh: null, legacyKmh: 33.2);
+      expect(r!.kmh, 33.2);
+      expect(r.source, SpeedSource.legacy);
+    });
+
+    test('둘 다 없으면 null', () {
+      expect(AnalysisPipeline.adoptSpeed(landmarkKmh: null, legacyKmh: null), isNull);
     });
   });
 
