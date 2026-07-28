@@ -18,6 +18,13 @@ class AnalysisStateMachine {
   static const _areaWindowSize = 5;
 
   int _flightNullCount = 0;
+  double? _lastFlightLaneY;
+
+  // 5프레임 연속 미검출을 "임팩트 도달"로 간주하려면 이미 레인 깊숙이(18.29m의 약 75%) 들어가 있어야 한다.
+  // 훅 브레이크포인트는 보통 6~12m 구간에서 발생하므로, 그 구간에서 일시적으로 검출을 놓쳐도
+  // 이 임계값에 못 미쳐 false-positive 임팩트로 이어지지 않는다. 회복 안 되고 끝까지 놓치면
+  // impactFrame이 끝내 null로 남아 파이프라인이 "측정불가"로 정직하게 실패한다(스펙 원칙: 틀린 숫자보다 정직한 실패).
+  static const double _nullCountImpactMinY = 14.0;
 
   final List<double> _recentLaneY = [];
   static const _laneYWindowSize = 3;
@@ -57,6 +64,7 @@ class AnalysisStateMachine {
     _recentAreas.clear();
     _recentLaneY.clear();
     _flightNullCount = 0;
+    _lastFlightLaneY = null;
   }
 
   void _handleIdle(int frameIdx, BallDetection? detection, LanePoint? lanePos) {
@@ -80,16 +88,17 @@ class AnalysisStateMachine {
   }
 
   void _handleRelease(int frameIdx, BallDetection? detection, LanePoint? lanePos) {
-    if (lanePos != null) {
-      _trajectory.add((frame: frameIdx, lane: lanePos));
-    }
+    // release는 릴리즈 직후 전환 상태(고정 4프레임 창)일 뿐, 공이 레인 위에 있다고
+    // 확정된 상태가 아니다. 이 구간에서 lanePos를 궤적에 누적하면 아직 손 안(레인
+    // 평면 밖)에 있는 공이 homography를 통해 왜곡된 좌표로 투영되어 궤적 오버레이가
+    // 어프로치/손 구간까지 그려지는 문제가 생긴다. 궤적 누적은 flight 진입 후에만.
     if (frameIdx - _phaseStartFrame >= 4) {
       _transitionTo(AnalysisPhase.flight, frameIdx);
     }
   }
 
   void _handleFlight(int frameIdx, BallDetection? detection, LanePoint? lanePos) {
-    if (lanePos != null) {
+    if (lanePos != null && lanePos.yM >= 0) {
       _trajectory.add((frame: frameIdx, lane: lanePos));
     }
     if (lanePos != null && lanePos.yM >= 18.29) {
@@ -99,12 +108,15 @@ class AnalysisStateMachine {
     }
     if (detection == null) {
       _flightNullCount++;
-      if (_flightNullCount >= 5) {
+      if (_flightNullCount >= 5 && _lastFlightLaneY != null && _lastFlightLaneY! >= _nullCountImpactMinY) {
         _impactFrame = frameIdx;
         _transitionTo(AnalysisPhase.impact, frameIdx);
       }
     } else {
       _flightNullCount = 0;
+      if (lanePos != null) {
+        _lastFlightLaneY = lanePos.yM;
+      }
     }
   }
 

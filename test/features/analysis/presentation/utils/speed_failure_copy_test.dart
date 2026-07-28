@@ -18,4 +18,21 @@ void main() {
     final msg = speedFailureUserMessage(null);
     expect(msg, isEmpty);
   });
+
+  group('speedConfidenceBadgeLabel', () {
+    test('0.75 이상은 신뢰도 높음 (경계 포함)', () {
+      expect(speedConfidenceBadgeLabel(0.90), '신뢰도 높음');
+      expect(speedConfidenceBadgeLabel(0.75), '신뢰도 높음');
+    });
+
+    test('0.5~0.75는 신뢰도 보통 (하한 경계 포함)', () {
+      expect(speedConfidenceBadgeLabel(0.74), '신뢰도 보통');
+      expect(speedConfidenceBadgeLabel(0.5), '신뢰도 보통');
+    });
+
+    test('0.5 미만은 참고용', () {
+      expect(speedConfidenceBadgeLabel(0.49), '참고용');
+      expect(speedConfidenceBadgeLabel(0.0), '참고용');
+    });
+  });
 }
