@@ -104,6 +104,46 @@ void main() {
       expect(detectArrows(_landscapeFrame(_measured.take(3).toList())), isEmpty);
     });
 
+    test('크기가 다른 잡음 블롭이 섞여도 화살표 7개만 골라낸다', () {
+      // 실촬영 첫 프레임 회귀 — 필터를 통과한 블롭 20개 중 화살표 7개(변 5~6)와
+      // 잡음 13개(변 8~18)가 섞이자, 전체 크기 중앙값이 8로 잡혀 ±비율 창이 둘
+      // 다 삼켰고 14개 → 개수 초과로 **전부** 버려졌다(검출 0개). 아래 잡음
+      // 좌표/크기는 그 프레임에서 실제로 살아남던 것들이다.
+      final im = _landscapeFrame(_measured);
+      for (final n in <(double, double, int)>[
+        (466, 441, 8),
+        (445, 438, 8),
+        (455, 433, 8),
+        (370, 404, 14),
+        (370, 362, 14),
+        (371, 381, 11),
+        (476, 452, 12),
+      ]) {
+        _stamp(im, n.$1, n.$2, side: n.$3);
+      }
+
+      final found = detectArrows(im);
+      expect(found.length, _measured.length);
+      for (final m in _measured) {
+        final target = FramePoint(nx: m.$1 / 960, ny: m.$2 / 540);
+        expect(
+          found.any((p) =>
+              (p.nx - target.nx).abs() < 1 / 960 * 2 &&
+              (p.ny - target.ny).abs() < 1 / 540 * 2),
+          isTrue,
+          reason: '화살표 $m 를 못 찾음',
+        );
+      }
+    });
+
+    test('바깥 화살표가 빠진 5개 무리는 채택하지 않는다', () {
+      // 구속 계산이 "최대분리 쌍 = board 5·35(둘 다 12ft)"를 가정하므로, 끝
+      // 화살표가 빠진 무리를 받으면 기준 거리가 조용히 틀어진다.
+      final inner = _measured.sublist(1, _measured.length - 1);
+      expect(inner.length, 5);
+      expect(detectArrows(_landscapeFrame(inner)), isEmpty);
+    });
+
     test('탐색 영역 밖(핀덱 쪽) 표식은 무시된다', () {
       // 깊이축 nx를 0.35 미만(=336px 미만)으로 옮기면 후보에서 빠진다.
       final tooFar = _measured.map((m) => (m.$1 - 400, m.$2)).toList();

@@ -37,13 +37,27 @@ const double _maxDepth = 0.95;
 const double _minLateral = 0.08;
 const double _maxLateral = 0.92;
 
+/// 화살표 무리가 가로축으로 차지해야 하는 최소 폭(정규화). board 5~35에 걸치므로
+/// 화면 가로의 상당 부분을 덮는다. 실측 0.38 — 잡음이 뭉친 좁은 무리를 배제한다.
+const double _minLateralSpan = 0.15;
+
+/// 깊이 폭 / 가로 폭 상한. 화살표는 12~15ft로 깊이가 거의 같다(실측 0.076).
+/// 잡음이 섞이면 깊이 폭이 급격히 커진다.
+const double _maxDepthSpanRatio = 0.25;
+
 /// 같은 무리로 볼 크기 비율(중앙값 대비).
 const double _sizeClusterLow = 0.6;
 const double _sizeClusterHigh = 1.6;
 
-/// 조준 화살표 후보 개수 범위. 규격은 7개지만 일부 마모/가려짐을 허용한다.
-const int _minArrows = 5;
-const int _maxArrows = 9;
+/// 조준 화살표 개수 — 규격 7개를 **정확히** 요구한다.
+///
+/// 일부 누락을 허용하면 안 된다. 구속 계산은 "최대분리 쌍 = 양 끝 화살표(board
+/// 5·35, 둘 다 12ft)"라는 가정 위에 서 있는데, 끝 화살표가 하나라도 빠지면 그
+/// 쌍이 board 10·30(13ft)이 되어 기준 거리가 조용히 틀어진다. 실측에서 5개만
+/// 잡힌 케이스가 그대로 "선 성립"으로 통과했다. 못 찾으면 빈 리스트를 내고
+/// 기존 코어로 폴백하는 편이 정직하다.
+const int _minArrows = 7;
+const int _maxArrows = 7;
 
 /// 프레임에서 레인 조준 화살표(targeting arrows)들의 중심을 검출한다.
 ///
@@ -85,24 +99,93 @@ List<FramePoint> detectArrows(img.Image frame) {
   final blobs = _findBlobs(dark, w, h);
   if (blobs.length < _minArrows) return const [];
 
-  // 어두운 순으로 추리고, 서로 크기가 비슷한 무리만 남긴다.
-  blobs.sort((a, b) => b.meanDark.compareTo(a.meanDark));
-  final pool = blobs.take(_maxArrows * 3).toList();
-  final sizes = pool.map((b) => b.size).toList()..sort();
-  final medianSize = sizes[sizes.length ~/ 2];
-  final cluster = pool
-      .where((b) =>
-          b.size >= medianSize * _sizeClusterLow && b.size <= medianSize * _sizeClusterHigh)
-      .toList();
+  final depthIsX = w >= h;
 
-  if (cluster.length < _minArrows || cluster.length > _maxArrows) return const [];
+  // 크기 무리를 **하나만** 시도하면 안 된다. 실촬영 첫 프레임에서 필터를 통과한
+  // 블롭 20개 중 화살표 7개(변 5~6)와 잡음 13개(변 8~18)가 섞여 전체 중앙값이
+  // 8로 잡혔고, ±비율 창이 둘 다 삼켜 14개 → 개수 초과로 통째로 버려졌다.
+  // 각 블롭 크기를 씨앗으로 후보 무리를 열거하고, 무리가 넘치면 깊이축으로
+  // 가장 조밀한 부분집합부터 좁혀가며 셰브론 검증에 건다 — 화살표는 레인
+  // 깊이가 12~15ft로 거의 같아 깊이 폭이 좁고, 셰브론 검증이 강한 판별자다.
+  // 셰브론을 통과한 후보를 전부 모아 게이트 두 개로 거른 뒤 **개수가 가장 많은**
+  // 것을 고른다. 첫 통과를 그냥 반환하면 잡음 2개가 낀 9개 집합이 채택돼
+  // 최대분리 쌍(= 바깥 화살표라는 가정)이 깨진다. 반대로 깊이 폭만 최소화하면
+  // 셰브론 꼭짓점이 정의상 깊이를 벌리므로 꼭짓점부터 버려진다.
+  //
+  // 게이트: 화살표는 board 5~35에 걸쳐 **가로로 길게** 퍼지고(실측 정규화 0.38),
+  // 깊이는 12~15ft로 거의 같아 폭이 좁다(실측 가로 폭의 0.076배).
+  List<FramePoint>? best;
+  var bestCount = 0;
+  var bestRatio = double.infinity;
 
-  final points = cluster
-      .map((b) => FramePoint(nx: b.cx / w, ny: b.cy / h))
-      .toList();
+  final seeds = <int>{for (final b in blobs) b.side}.toList()..sort();
+  for (final seed in seeds) {
+    final group = blobs
+        .where((b) =>
+            b.size >= seed * _sizeClusterLow && b.size <= seed * _sizeClusterHigh)
+        .toList();
+    if (group.length < _minArrows) continue;
 
-  if (!isChevron(points)) return const [];
-  return points;
+    group.sort((a, b) => (depthIsX ? a.cx : a.cy).compareTo(depthIsX ? b.cx : b.cy));
+
+    for (var take = math.min(group.length, _maxArrows); take >= _minArrows; take--) {
+      // 깊이축으로 정렬된 연속 구간 중 폭이 가장 좁은 take개를 고른다.
+      var bestStart = 0;
+      var bestSpan = double.infinity;
+      for (var s = 0; s + take <= group.length; s++) {
+        final lo = depthIsX ? group[s].cx : group[s].cy;
+        final hi = depthIsX ? group[s + take - 1].cx : group[s + take - 1].cy;
+        final span = hi - lo;
+        if (span < bestSpan) {
+          bestSpan = span;
+          bestStart = s;
+        }
+      }
+      final subset = group.sublist(bestStart, bestStart + take);
+      final points =
+          subset.map((b) => FramePoint(nx: b.cx / w, ny: b.cy / h)).toList();
+      if (!isChevron(points)) continue;
+
+      final depths = points.map((p) => depthIsX ? p.nx : p.ny).toList();
+      final laterals = points.map((p) => depthIsX ? p.ny : p.nx).toList();
+      final depthSpan = depths.reduce(math.max) - depths.reduce(math.min);
+      final lateralSpan = laterals.reduce(math.max) - laterals.reduce(math.min);
+      if (lateralSpan < _minLateralSpan) continue;
+      if (depthSpan > lateralSpan * _maxDepthSpanRatio) continue;
+      if (!_evenlySpaced(laterals)) continue;
+
+      final ratio = depthSpan / lateralSpan;
+      if (points.length > bestCount ||
+          (points.length == bestCount && ratio < bestRatio)) {
+        bestCount = points.length;
+        bestRatio = ratio;
+        best = points;
+      }
+    }
+  }
+
+  return best ?? const [];
+}
+
+/// 가로축 좌표들이 **등간격**인지 본다.
+///
+/// 규격상 화살표는 board 5·10·15·20·25·30·35 — 정확히 5보드 간격이다. 전부
+/// 거의 같은 깊이에 있어 원근 왜곡도 작으므로 화면상 간격도 균일하게 남는다
+/// (실측 최대/최소 간격비 1.12). 잡음이 한 개라도 끼면 그쪽 간격만 크게 벌어져
+/// 이 비율이 급등한다 — 실측에서 프레임 가장자리 오검출 1개가 끼자 2.65,
+/// 뭉친 잡음 무리는 25까지 올라갔다.
+bool _evenlySpaced(List<double> laterals, {double maxGapRatio = 2.2}) {
+  if (laterals.length < 3) return false;
+  final sorted = [...laterals]..sort();
+  var minGap = double.infinity;
+  var maxGap = 0.0;
+  for (var i = 1; i < sorted.length; i++) {
+    final gap = sorted[i] - sorted[i - 1];
+    if (gap <= 0) return false; // 같은 자리 중복
+    if (gap < minGap) minGap = gap;
+    if (gap > maxGap) maxGap = gap;
+  }
+  return maxGap <= minGap * maxGapRatio;
 }
 
 /// 점들이 조준 화살표 배치(셰브론)인지 검증한다.
