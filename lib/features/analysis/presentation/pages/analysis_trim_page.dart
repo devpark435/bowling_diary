@@ -174,7 +174,10 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         impactDetector: ImpactDetectorService(pinImpactDetector: PinImpactDetectorService()),
         speedEstimator: SpeedEstimatorService(),
       );
-      final analysisData = await pipeline.run(trimmedPath, homography);
+      // 화살표 검출은 분석 프레임(폭 480, jpeg q5)에선 뭉개진다 — 레인 확인용으로
+      // 이미 원본 해상도로 뽑아둔 첫 프레임을 그대로 넘긴다.
+      final analysisData =
+          await pipeline.run(trimmedPath, homography, landmarkFrame: frame);
 
       // 성공 케이스도 남긴다 — 구속 두 코어 값이 매 투구 쌓여야 표본 1개가
       // 아닌 분포로 정확도를 판단할 수 있다. await하지 않는다(결과 화면 지연 방지).
@@ -192,6 +195,23 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
           'trajectory_source': analysisData.trajectorySource?.name,
           'trajectory_fit_rms': analysisData.trajectoryFitRms,
           'trajectory_points': analysisData.trajectory.length,
+          // 리본이 핀까지 닿는지 SQL만으로 판정하기 위한 끝점(깊이축 정규화 좌표).
+          'trajectory_first_frame': analysisData.trajectory.isEmpty
+              ? null
+              : analysisData.trajectory.first.frame,
+          'trajectory_last_frame': analysisData.trajectory.isEmpty
+              ? null
+              : analysisData.trajectory.last.frame,
+          'trajectory_first_ny': analysisData.trajectory.isEmpty
+              ? null
+              : (analysisData.trajectory.first.left.ny +
+                      analysisData.trajectory.first.right.ny) /
+                  2,
+          'trajectory_last_ny': analysisData.trajectory.isEmpty
+              ? null
+              : (analysisData.trajectory.last.left.ny +
+                      analysisData.trajectory.last.right.ny) /
+                  2,
           'entry_angle_deg': analysisData.entryAngleDeg,
           'trim_start_sec': _startSec,
           'trim_end_sec': _endSec,
