@@ -1,2 +1,11 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+
+// tflite_flutter는 iOS에서 DynamicLibrary.process()로 TensorFlowLiteC 심볼을
+// 런타임에 dlsym 조회한다. Xcode 기본값(STRIP_STYLE=all)으로 아카이브하면
+// strip이 실행 파일 export trie에서 전역 심볼을 지워
+// `Failed to lookup symbol 'TfLiteInterpreterOptionsCreate'`로 죽는다.
+// `flutter build ios`는 strip을 돌리지 않아 로컬 릴리즈 빌드는 멀쩡하고
+// `xcodebuild archive`만 실패한다 — TestFlight에서만 재현되던 이유.
+// non-global은 로컬 심볼만 제거하므로 바이너리 크기 감소폭은 all과 동일하다.
+STRIP_STYLE = non-global
