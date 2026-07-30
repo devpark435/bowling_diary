@@ -145,7 +145,14 @@ class AnalysisPipeline {
     required int impactFrame,
     required int sampleFps,
   }) {
-    final line = arrowLineFromDetections(detectArrows(releaseFrame));
+    // 실패가 "검출 0개"인지 "검출은 됐는데 선을 못 세움"인지 구분되지 않으면
+    // 튜닝 방향을 정할 수 없다 — 실기기 1회 실패에 빌드 1회를 쓰게 된다.
+    final arrows = detectArrows(releaseFrame);
+    final line = arrowLineFromDetections(arrows);
+    debugPrint('[Arrow] 입력 ${releaseFrame.width}x${releaseFrame.height}, '
+        '검출 ${arrows.length}개'
+        '${arrows.isEmpty ? "" : " ${arrows.map((a) => "(${a.nx.toStringAsFixed(3)},${a.ny.toStringAsFixed(3)})").join(" ")}"}, '
+        '선 ${line == null ? "실패" : "성립"}');
     if (line == null) return null;
     return estimateLandmarkSpeedKmh(
       track: [for (final s in pixelTrack) (frame: s.frame, p: s.contact)],
@@ -197,7 +204,16 @@ class AnalysisPipeline {
 
   /// [homography]는 이 영상 전용으로 산출된 호모그래피다(레퍼런스 = 영상 자체이므로
   /// drift 개념이 존재하지 않는다 — spec §10 참조).
-  Future<AnalysisData> run(String videoPath, HomographyMatrix homography) async {
+  /// [landmarkFrame]은 조준 화살표 검출 전용 고해상도 프레임이다. 분석 프레임은
+  /// 폭 480 + jpeg q5로 뽑히는데, 화살표는 그 해상도에서 뭉개져 검출이 깨진다.
+  /// 화살표는 레인에 고정된 마킹이라 어느 프레임을 써도 무방하므로, 호출부가
+  /// 이미 원본 해상도로 뽑아둔 첫 프레임을 그대로 넘긴다. 없으면 릴리즈 프레임
+  /// 폴백.
+  Future<AnalysisData> run(
+    String videoPath,
+    HomographyMatrix homography, {
+    img.Image? landmarkFrame,
+  }) async {
     final extracted = await frameExtractor.extract(videoPath);
     final frames = extracted.frames;
     if (frames.isEmpty) {
@@ -346,6 +362,19 @@ class AnalysisPipeline {
     debugPrint('[Trajectory] 리본 소스: ${trajectorySource.label} '
         '(${finalTrajectory.length}개 단면, 픽셀관측 ${pixelTrack.length}개'
         '${pixelRibbon != null ? ", rms ${pixelRibbon.rms.toStringAsFixed(5)}" : ""})');
+    // 리본이 핀까지 닿는지는 끝점 ny를 핀존 ny와 직접 비교해야 판정된다.
+    // "선이 BP에서 끝난다"가 연장 실패인지 원근 압축인지 이 한 줄로 갈린다.
+    if (finalTrajectory.isNotEmpty) {
+      final head = finalTrajectory.first;
+      final tail = finalTrajectory.last;
+      final lastObserved = pixelTrack.isEmpty ? null : pixelTrack.last;
+      debugPrint('[Trajectory] 리본 f${head.frame}~f${tail.frame} '
+          'ny ${((head.left.ny + head.right.ny) / 2).toStringAsFixed(3)}'
+          '→${((tail.left.ny + tail.right.ny) / 2).toStringAsFixed(3)}, '
+          '마지막 관측 f${lastObserved?.frame} ny '
+          '${lastObserved?.contact.ny.toStringAsFixed(3) ?? "없음"}, '
+          '핀존 ny ${pinZone == null ? "없음" : "${pinZone.top.toStringAsFixed(3)}~${pinZone.bottom.toStringAsFixed(3)}"}');
+    }
 
     final speed = speedEstimator.estimate(
       release: release,
@@ -356,7 +385,7 @@ class AnalysisPipeline {
 
     // 랜드마크 통과-시각 구속 — 조준 화살표가 검출되면 이쪽이 1순위.
     final landmarkKmh = estimateLandmarkSpeed(
-      releaseFrame: frames[releaseFrameIdx],
+      releaseFrame: landmarkFrame ?? frames[releaseFrameIdx],
       pixelTrack: pixelTrack,
       impactFrame: impact.frame,
       sampleFps: extracted.sampleFps,
