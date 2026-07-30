@@ -14,6 +14,16 @@ class AnalysisStateMachine {
 
   final List<({int frame, LanePoint lane})> _trajectory = [];
 
+  /// 직전에 **완주한** 투구의 궤적.
+  ///
+  /// 이 FSM은 실시간 세션용이라 settle→idle에서 다음 투구를 위해 궤적을 비운다.
+  /// 그런데 파이프라인은 영상 전체를 다 먹인 **뒤에** [trajectory]를 읽는 배치
+  /// 사용자다. 영상이 임팩트 후 90프레임 이상 더 이어지면 마지막 프레임 근처에서
+  /// idle로 되돌아가며 궤적이 통째로 지워져, 같은 영상인데도 임팩트 도달 여부에
+  /// 따라 결과가 37포인트 또는 0포인트로 갈렸다(실측). 완주분을 따로 붙잡아
+  /// 배치 사용자가 잃지 않게 한다.
+  List<({int frame, LanePoint lane})> _completedTrajectory = const [];
+
   final List<({int frame, double area})> _recentAreas = [];
   static const _areaWindowSize = 5;
 
@@ -32,7 +42,10 @@ class AnalysisStateMachine {
   AnalysisPhase get phase => _phase;
   int? get releaseFrame => _releaseFrame;
   int? get impactFrame => _impactFrame;
-  List<({int frame, LanePoint lane})> get trajectory => List.unmodifiable(_trajectory);
+  /// 진행 중인 궤적이 있으면 그것을, 없으면 직전 완주 투구의 궤적을 준다.
+  List<({int frame, LanePoint lane})> get trajectory => List.unmodifiable(
+        _trajectory.isNotEmpty ? _trajectory : _completedTrajectory,
+      );
 
   void onFrame({
     required int frameIdx,
@@ -61,6 +74,7 @@ class AnalysisStateMachine {
     _releaseFrame = null;
     _impactFrame = null;
     _trajectory.clear();
+    _completedTrajectory = const [];
     _recentAreas.clear();
     _recentLaneY.clear();
     _flightNullCount = 0;
@@ -129,6 +143,9 @@ class AnalysisStateMachine {
   void _handleSettle(int frameIdx) {
     if (frameIdx - _phaseStartFrame >= 60) {
       _transitionTo(AnalysisPhase.idle, frameIdx);
+      // 실시간 오버레이가 지난 투구 선을 계속 그리지 않도록 진행분은 비우되,
+      // 배치 사용자가 읽을 수 있게 완주분은 남긴다.
+      _completedTrajectory = List.of(_trajectory);
       _trajectory.clear();
     }
   }
