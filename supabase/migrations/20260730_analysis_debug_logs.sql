@@ -4,7 +4,8 @@
 -- 파이프라인 중간 지표(검출률/핀존 소스/구속 두 코어 값)를 확인할 수 없다.
 -- 성공/실패 양쪽 모두 한 행씩 남겨 표본을 축적한다.
 --
--- 적용: Supabase 대시보드 → SQL Editor에 붙여넣고 실행.
+-- 적용 완료: 2026-07-30, 프로젝트 oofyrdipvinsgsrzqjvw. 이 파일은 기록용이며
+-- 재실행해도 안전하다(if not exists / drop policy if exists).
 -- 공개 배포 전 제거 대상(QA 뱃지·진단 필드와 함께).
 
 create table if not exists public.analysis_debug_logs (
