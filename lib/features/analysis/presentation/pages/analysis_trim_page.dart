@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/core/services/debug_log_buffer.dart';
+import 'package:bowling_diary/features/analysis/data/services/analysis_debug_log_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/analysis_pipeline.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
@@ -50,6 +53,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   double _totalSec = 0;
   bool _isAnalyzing = false;
   String? _trimmedPath;
+  final _debugLog = AnalysisDebugLogService();
 
   @override
   void initState() {
@@ -107,6 +111,11 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
 
   Future<void> _startAnalysis() async {
     setState(() => _isAnalyzing = true);
+    // 실패 시 어느 단계에서 터졌는지 QA가 바로 알 수 있게 단계를 기록한다
+    // (기존에는 6개 실패 지점이 하나의 "문제가 발생했어요"로 뭉개졌다).
+    var stage = '영상 자르기';
+    // 이번 분석이 남긴 줄만 올라가도록 직전 세션 로그를 비운다.
+    DebugLogBuffer.instance.clear();
     try {
       final tempDir = await getTemporaryDirectory();
       final trimmedPath = '${tempDir.path}/trimmed_${DateTime.now().millisecondsSinceEpoch}.mp4';
@@ -114,23 +123,29 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         '-i "${widget.videoPath}" -ss $_startSec -to $_endSec -c copy "$trimmedPath"',
       );
       final trimRc = await trimSession.getReturnCode();
-      if (trimRc == null || !trimRc.isValueSuccess()) throw Exception('영상 자르기 실패');
+      if (trimRc == null || !trimRc.isValueSuccess()) {
+        throw Exception('영상 자르기 실패 (rc: $trimRc)\n${await _ffmpegTail(trimSession)}');
+      }
 
       if (mounted) setState(() => _trimmedPath = trimmedPath);
 
       // 트림된 영상의 첫 프레임을 뽑아 레인 4코너를 자동검출한다(spec §10:
       // 영상별 자동검출+확인 — 저장형 캘리브레이션 프로파일 폐기).
+      stage = '첫 프레임 추출';
       final framePath = '${tempDir.path}/lane_frame_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final frameSession = await FFmpegKit.execute(
         '-i "$trimmedPath" -frames:v 1 -q:v 3 "$framePath"',
       );
       final frameRc = await frameSession.getReturnCode();
-      if (frameRc == null || !frameRc.isValueSuccess()) throw Exception('첫 프레임 추출 실패');
+      if (frameRc == null || !frameRc.isValueSuccess()) {
+        throw Exception('첫 프레임 추출 실패 (rc: $frameRc)\n${await _ffmpegTail(frameSession)}');
+      }
 
       final frameBytes = await File(framePath).readAsBytes();
       final frame = img.decodeImage(frameBytes);
       if (frame == null) throw Exception('첫 프레임 디코딩 실패');
 
+      stage = '레인 검출';
       final detection = LaneDetectorService().detect(frame);
 
       if (!mounted) return;
@@ -148,8 +163,10 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
         return;
       }
 
+      stage = '호모그래피 계산';
       final homography = HomographySolver.solve4Point(confirmedCorners, _laneCorners);
 
+      stage = '분석 파이프라인';
       final pipeline = AnalysisPipeline(
         frameExtractor: VideoFrameExtractorService(),
         ballDetector: BallDetectionService(),
@@ -159,20 +176,99 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
       );
       final analysisData = await pipeline.run(trimmedPath, homography);
 
+      // 성공 케이스도 남긴다 — 구속 두 코어 값이 매 투구 쌓여야 표본 1개가
+      // 아닌 분포로 정확도를 판단할 수 있다. await하지 않는다(결과 화면 지연 방지).
+      unawaited(_debugLog.log(
+        outcome: 'success',
+        metrics: <String, dynamic>{
+          'frames_analyzed': analysisData.framesAnalyzed,
+          'fps_used': analysisData.fpsUsed,
+          'speed_kmh': analysisData.speedKmh,
+          'landmark_speed_kmh': analysisData.landmarkSpeedKmh,
+          'legacy_speed_kmh': analysisData.legacySpeedKmh,
+          'speed_source': analysisData.speedSource?.name,
+          'speed_confidence': analysisData.speedConfidence,
+          'speed_failure': analysisData.speedFailure?.name,
+          'trajectory_source': analysisData.trajectorySource?.name,
+          'trajectory_fit_rms': analysisData.trajectoryFitRms,
+          'trajectory_points': analysisData.trajectory.length,
+          'entry_angle_deg': analysisData.entryAngleDeg,
+          'trim_start_sec': _startSec,
+          'trim_end_sec': _endSec,
+        },
+      ));
+
       if (!mounted) return;
       await Navigator.pushReplacement(context, MaterialPageRoute(
         builder: (_) => AnalysisResultPage(
           analysisData: analysisData, videoPath: trimmedPath, recordedAt: DateTime.now(),
         ),
       ));
-    } catch (e) {
-      debugPrint('분석 실패: $e');
+    } catch (e, st) {
+      debugPrint('분석 실패 [$stage]: $e\n$st');
+      unawaited(_debugLog.log(
+        outcome: 'failure',
+        stage: stage,
+        error: e,
+        stack: st,
+        metrics: <String, dynamic>{
+          'trim_start_sec': _startSec,
+          'trim_end_sec': _endSec,
+          'source_fps': widget.fps,
+        },
+      ));
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('분석 중 문제가 발생했어요. 다시 시도해 주세요')),
+        SnackBar(
+          content: Text('[$stage] 단계에서 실패했어요. 다시 시도해 주세요'),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: '자세히',
+            onPressed: () => _showFailureDetail(stage, e, st),
+          ),
+        ),
       );
     }
+  }
+
+  /// ffmpeg 실패 원인은 returnCode만으론 알 수 없다 — 마지막 로그 몇 줄을
+  /// 예외 메시지에 붙여 TestFlight에서도 원인이 보이게 한다.
+  Future<String> _ffmpegTail(dynamic session) async {
+    try {
+      final logs = await session.getLogs();
+      final lines = logs
+          .map((dynamic l) => l.getMessage() as String? ?? '')
+          .join()
+          .split('\n')
+          .where((String l) => l.trim().isNotEmpty)
+          .toList();
+      return lines.length <= 12 ? lines.join('\n') : lines.sublist(lines.length - 12).join('\n');
+    } catch (e) {
+      return '(로그 수집 실패: $e)';
+    }
+  }
+
+  /// 내부 QA용 — 실패 단계/예외/스택을 그대로 보여준다. 공개 배포 전 제거.
+  void _showFailureDetail(String stage, Object error, StackTrace st) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('분석 실패 — $stage'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              '$error\n\n$st',
+              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('닫기')),
+        ],
+      ),
+    );
   }
 
   String _fmt(double seconds) {
