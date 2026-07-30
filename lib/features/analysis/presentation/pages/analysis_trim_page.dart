@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bowling_diary/app/theme/app_colors.dart';
 import 'package:bowling_diary/app/theme/app_text_styles.dart';
+import 'package:bowling_diary/core/services/debug_log_buffer.dart';
+import 'package:bowling_diary/features/analysis/data/services/analysis_debug_log_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/analysis_pipeline.dart';
 import 'package:bowling_diary/features/analysis/data/services/ball_detection_service.dart';
 import 'package:bowling_diary/features/analysis/data/services/impact_detector_service.dart';
@@ -50,6 +53,7 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
   double _totalSec = 0;
   bool _isAnalyzing = false;
   String? _trimmedPath;
+  final _debugLog = AnalysisDebugLogService();
 
   @override
   void initState() {
@@ -110,6 +114,8 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
     // 실패 시 어느 단계에서 터졌는지 QA가 바로 알 수 있게 단계를 기록한다
     // (기존에는 6개 실패 지점이 하나의 "문제가 발생했어요"로 뭉개졌다).
     var stage = '영상 자르기';
+    // 이번 분석이 남긴 줄만 올라가도록 직전 세션 로그를 비운다.
+    DebugLogBuffer.instance.clear();
     try {
       final tempDir = await getTemporaryDirectory();
       final trimmedPath = '${tempDir.path}/trimmed_${DateTime.now().millisecondsSinceEpoch}.mp4';
@@ -170,6 +176,28 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
       );
       final analysisData = await pipeline.run(trimmedPath, homography);
 
+      // 성공 케이스도 남긴다 — 구속 두 코어 값이 매 투구 쌓여야 표본 1개가
+      // 아닌 분포로 정확도를 판단할 수 있다. await하지 않는다(결과 화면 지연 방지).
+      unawaited(_debugLog.log(
+        outcome: 'success',
+        metrics: <String, dynamic>{
+          'frames_analyzed': analysisData.framesAnalyzed,
+          'fps_used': analysisData.fpsUsed,
+          'speed_kmh': analysisData.speedKmh,
+          'landmark_speed_kmh': analysisData.landmarkSpeedKmh,
+          'legacy_speed_kmh': analysisData.legacySpeedKmh,
+          'speed_source': analysisData.speedSource?.name,
+          'speed_confidence': analysisData.speedConfidence,
+          'speed_failure': analysisData.speedFailure?.name,
+          'trajectory_source': analysisData.trajectorySource?.name,
+          'trajectory_fit_rms': analysisData.trajectoryFitRms,
+          'trajectory_points': analysisData.trajectory.length,
+          'entry_angle_deg': analysisData.entryAngleDeg,
+          'trim_start_sec': _startSec,
+          'trim_end_sec': _endSec,
+        },
+      ));
+
       if (!mounted) return;
       await Navigator.pushReplacement(context, MaterialPageRoute(
         builder: (_) => AnalysisResultPage(
@@ -178,6 +206,17 @@ class _AnalysisTrimPageState extends State<AnalysisTrimPage> {
       ));
     } catch (e, st) {
       debugPrint('분석 실패 [$stage]: $e\n$st');
+      unawaited(_debugLog.log(
+        outcome: 'failure',
+        stage: stage,
+        error: e,
+        stack: st,
+        metrics: <String, dynamic>{
+          'trim_start_sec': _startSec,
+          'trim_end_sec': _endSec,
+          'source_fps': widget.fps,
+        },
+      ));
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
       ScaffoldMessenger.of(context).showSnackBar(
