@@ -8,6 +8,48 @@ BallDetection _det({double bw = 0.05, double bh = 0.05}) =>
 
 void main() {
   group('AnalysisStateMachine', () {
+    test('임팩트 후 영상이 길게 이어져 idle로 되돌아가도 궤적이 남는다', () {
+      // 실측 회귀: 210프레임 영상에서 settle→idle이 frame 209에 발생하자
+      // _trajectory가 통째로 지워져, 같은 영상인데도 임팩트 도달 여부에 따라
+      // 결과가 37포인트 / 0포인트로 갈렸다. 배치 사용자는 전 프레임을 먹인
+      // 뒤에 trajectory를 읽으므로 완주분이 살아있어야 한다.
+      final fsm = AnalysisStateMachine();
+      var frameIdx = 0;
+
+      for (var i = 0; i < 6; i++) {
+        fsm.onFrame(
+          frameIdx: frameIdx++,
+          detection: _det(bw: 0.03 + i * 0.01, bh: 0.03 + i * 0.01),
+          lanePos: LanePoint(xM: 0.5, yM: 1.0 + i * 0.3),
+        );
+      }
+      for (var i = 0; i < 6; i++) {
+        fsm.onFrame(
+          frameIdx: frameIdx++,
+          detection: _det(bw: 0.08 - i * 0.01, bh: 0.08 - i * 0.01),
+          lanePos: LanePoint(xM: 0.5, yM: 2.8 + i * 0.3),
+        );
+      }
+      // flight: 핀덱까지 주행 → 임팩트 전이
+      for (var y = 5.0; y <= 18.5; y += 0.5) {
+        fsm.onFrame(
+          frameIdx: frameIdx++,
+          detection: _det(),
+          lanePos: LanePoint(xM: 0.5, yM: y),
+        );
+      }
+      expect(fsm.phase, AnalysisPhase.impact);
+      final duringFlight = fsm.trajectory.length;
+      expect(duringFlight, greaterThan(8));
+
+      // impact(30) + settle(60) 을 넘겨 idle 복귀시킨다.
+      for (var i = 0; i < 100; i++) {
+        fsm.onFrame(frameIdx: frameIdx++, detection: null, lanePos: null);
+      }
+      expect(fsm.phase, AnalysisPhase.idle);
+      expect(fsm.trajectory.length, duringFlight);
+    });
+
     test('초기 상태는 idle', () {
       final fsm = AnalysisStateMachine();
       expect(fsm.phase, AnalysisPhase.idle);
